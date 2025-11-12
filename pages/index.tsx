@@ -255,7 +255,7 @@ export default function Home() {
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
           {[
-            { icon: "🗓️", title: "Event Date", details: ["January 12, 2025", "5:00 PM Onwards"] },
+            { icon: "🗓️", title: "Event Date", details: ["November 23, 2025", "5:00 PM Onwards"] },
             { icon: "📍", title: "Venue", details: ["Mishty Studio Campus, Brts, ", "\n 132 Feet Ring Rd, beside Kaizen Hospital, \n opp. Valinath, Saurabh Society, Naranpura, Ahmedabad"] },
             { icon: "🎫", title: "Tickets", details: ["Starting from ₹149"]}
           ].map((card, index) => (
