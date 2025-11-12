@@ -621,7 +621,7 @@ export default function AdminPanel() {
                             ₹149 per ticket
                             </div>
                             <div className="text-sm font-medium text-purple-600">
-                              Total: {formatCurrency((booking.numberOfTickets || 0) * 69)}
+                              Total: {formatCurrency((booking.numberOfTickets || 0) * 149)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
