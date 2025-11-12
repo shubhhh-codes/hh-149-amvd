@@ -129,80 +129,35 @@ export default function Policies() {
             </section>
 
             {/* Refund Policy Section */}
-            <section className="bg-purple-50 rounded-xl p-6">
-              <h2 className="text-2xl font-bold text-purple-800 mb-6 flex items-center">
-                <span className="bg-purple-200 p-2 rounded-lg mr-3">💰</span>
-                Refund Policy
-              </h2>
-              <div className="prose prose-purple max-w-none text-gray-700 space-y-6">
-                <div>
-                  <h3 className="text-xl font-semibold text-purple-600 mb-2">Event Ticket Refunds</h3>
-                  <p>
-                    We understand that plans can change. Here's our detailed refund policy for event tickets:
-                  </p>
-                  <ul className="list-disc pl-5 space-y-2">
-                    <li>Full refund available if cancelled 48 hours or more before the event start time</li>
-                    <li>50% refund if cancelled between 24-48 hours before the event</li>
-                    <li>No refund for cancellations less than 24 hours before the event</li>
-                    <li>No refund for no-shows or late arrivals</li>
-                    <li><strong>Once you purchase a ticket, it is non-refundable and non-transferable.</strong></li>
-                  </ul>
-                </div>
+<section className="bg-purple-50 rounded-xl p-6">
+  <h2 className="text-2xl font-bold text-purple-800 mb-6 flex items-center">
+    <span className="bg-purple-200 p-2 rounded-lg mr-3">💰</span>
+    Refund Policy
+  </h2>
+  <div className="prose prose-purple max-w-none text-gray-700 space-y-6">
+    <div>
+      <h3 className="text-xl font-semibold text-purple-600 mb-2">Event Ticket Refunds</h3>
+      <p>
+        Once you purchase a ticket, it is <strong>non-refundable and non-transferable</strong>.
+        Please double-check your booking details before confirming your purchase.
+      </p>
+      <ul className="list-disc pl-5 space-y-2">
+        <li>No refunds will be issued for any reason including change of plans or no-shows.</li>
+        <li>Tickets cannot be transferred, exchanged, or resold once booked.</li>
+        <li>In the rare case an event is cancelled by <strong>The Humors Hub</strong>, 
+            a full refund will be processed automatically to the original payment method.</li>
+      </ul>
+    </div>
 
-                <div>
-                  <h3 className="text-xl font-semibold text-purple-600 mb-2">Refund Process</h3>
-                  <ul className="list-disc pl-5 space-y-2">
-                    <li>Refunds are processed back to the original payment method</li>
-                    <li>Processing time is typically 5-7 business days</li>
-                    <li>You will receive an email confirmation when your refund is processed</li>
-                    <li>Bank processing times may vary for the refund to appear in your account</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-semibold text-purple-600 mb-2">Special Circumstances</h3>
-                  <ul className="list-disc pl-5 space-y-2">
-                    <li>Full refunds are provided if an event is cancelled by The Humors Hub</li>
-                    <li>In case of event rescheduling, tickets will remain valid for the new date</li>
-                    <li>If you cannot attend the rescheduled date, a full refund will be provided</li>
-                    <li>Force majeure events will be handled on a case-by-case basis</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-semibold text-purple-600 mb-2">How to Request a Refund</h3>
-                  <ul className="list-disc pl-5 space-y-2">
-                    <li>Log in to your account and navigate to your bookings</li>
-                    <li>Select the booking you wish to cancel</li>
-                    <li>Click the "Cancel Booking" button (available if within refund policy timeframe)</li>
-                    <li>For special circumstances, contact us through:
-                      <ul className="list-disc pl-5 mt-2">
-                        <li>Email: shubhammvaghela999@gmail.com</li>
-                        <li>WhatsApp: Join our community group</li>
-                      </ul>
-                    </li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-semibold text-purple-600 mb-2">Non-Refundable Items</h3>
-                  <ul className="list-disc pl-5 space-y-2">
-                    <li>Convenience fees and service charges are non-refundable</li>
-                    <li>Special event tickets marked as "Non-Refundable"</li>
-                    <li>Group bookings may have different cancellation terms</li>
-                  </ul>
-                </div>
-
-                <div className="bg-purple-50 p-4 rounded-lg mt-4">
-                  <p className="font-semibold">Note:</p>
-                  <p>
-                    We reserve the right to modify these refund policies at any time. Any changes will be 
-                    effective immediately upon posting on this page. Your continued use of our services 
-                    following such modifications constitutes your acceptance of the modified refund policy.
-                  </p>
-                </div>
-              </div>
-            </section>
+    <div className="bg-purple-50 p-4 rounded-lg mt-4">
+      <p className="font-semibold">Note:</p>
+      <p>
+        By purchasing a ticket, you agree to this non-refundable and non-transferable policy.
+        Please ensure all booking information is correct before completing your purchase.
+      </p>
+    </div>
+  </div>
+</section>
 
             {/* Contact Information */}
             <section className="bg-purple-50 rounded-xl p-6">
