@@ -7,6 +7,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import clientPromise from '../../../lib/mongodb';
 
+const VENUE_CAPACITY = 50;
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -21,11 +23,11 @@ export default async function handler(
 
     const totalBookings = await db.collection('bookings')
       .aggregate([
-        { 
-          $match: { 
+        {
+          $match: {
             status: 'approved',
             isComedianBooking: { $ne: true }
-          } 
+          }
         },
         { $group: { _id: null, total: { $sum: '$numberOfTickets' } } }
       ])
@@ -33,10 +35,10 @@ export default async function handler(
 
     const totalApproved = totalBookings[0]?.total || 0;
 
-    res.status(200).json({ 
+    res.status(200).json({
       totalApproved,
-      isFull: false, // Always false since we have unlimited capacity
-      remainingSeats: 'unlimited' // Indicate unlimited seating capacity
+      isFull: totalApproved >= VENUE_CAPACITY,
+      remainingSeats: Math.max(0, VENUE_CAPACITY - totalApproved)
     });
   } catch (error) {
     console.error('Fetch venue status error:', error);

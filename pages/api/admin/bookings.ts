@@ -15,7 +15,7 @@ export default async function handler(
 ) {
   try {
     const session = await getServerSession(req, res, authOptions);
-    
+
     if (!session?.user?.email || session.user.email !== 'admin@humorshub.com') {
       return res.status(403).json({ message: 'Not authorized' });
     }
@@ -41,7 +41,7 @@ export default async function handler(
         }
 
         // Get the booking details
-        const booking = await db.collection('bookings').findOne({ 
+        const booking = await db.collection('bookings').findOne({
           _id: new ObjectId(bookingId)
         });
 
@@ -54,11 +54,11 @@ export default async function handler(
           // Get total approved seats
           const totalBookings = await db.collection('bookings')
             .aggregate([
-              { 
-                $match: { 
+              {
+                $match: {
                   status: 'approved',
                   isComedianBooking: { $ne: true }
-                } 
+                }
               },
               { $group: { _id: null, total: { $sum: '$numberOfTickets' } } }
             ])
@@ -68,8 +68,8 @@ export default async function handler(
 
           // Check if approving this booking would exceed capacity
           if (bookedSeats + booking.numberOfTickets > 50) {
-            return res.status(400).json({ 
-              message: 'Cannot approve booking - would exceed venue capacity' 
+            return res.status(400).json({
+              message: 'Cannot approve booking - would exceed venue capacity'
             });
           }
         }
@@ -77,11 +77,11 @@ export default async function handler(
         // Update the booking status
         const result = await db.collection('bookings').updateOne(
           { _id: new ObjectId(bookingId) },
-          { 
-            $set: { 
+          {
+            $set: {
               status,
               updatedAt: new Date()
-            } 
+            }
           }
         );
 
@@ -89,7 +89,7 @@ export default async function handler(
           return res.status(400).json({ message: 'Failed to update booking status' });
         }
 
-        res.status(200).json({ message: 'Booking status updated successfully' });
+        return res.status(200).json({ message: 'Booking status updated successfully' });
       } catch (error) {
         console.error('Update booking error:', error);
         res.status(500).json({ message: 'Internal server error' });

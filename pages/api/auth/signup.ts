@@ -26,7 +26,7 @@ export default async function handler(
   }
 
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, phone } = req.body;
 
     // Validate input
     if (!username || !email || !password) {
@@ -48,12 +48,13 @@ export default async function handler(
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
+    // Create user — BUG 15 FIX: phone field now stored
     const result = await db.collection('users').insertOne({
       userId,
       username,
       email,
       password: hashedPassword,
+      phone: phone || '',
       createdAt: new Date(),
       updatedAt: new Date(),
     });

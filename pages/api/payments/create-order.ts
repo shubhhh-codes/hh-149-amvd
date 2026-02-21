@@ -1,23 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Razorpay from 'razorpay';
 
-// Initialize Razorpay with proper error handling
-let razorpay: Razorpay;
-try {
-  razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID!,
-    key_secret: process.env.RAZORPAY_KEY_SECRET!,
-  });
-} catch (error: any) {
-  console.error('Razorpay initialization error:', {
-    message: error.message,
-    details: error.error?.description || error.description,
-    code: error.code,
-    statusCode: error.statusCode,
-  });
-  throw new Error('Failed to initialize Razorpay');
-}
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -33,8 +16,14 @@ export default async function handler(
         keyId: process.env.RAZORPAY_KEY_ID ? 'present' : 'missing',
         keySecret: process.env.RAZORPAY_KEY_SECRET ? 'present' : 'missing'
       });
-      throw new Error('Missing Razorpay credentials');
+      return res.status(500).json({ message: 'Missing Razorpay credentials' });
     }
+
+    // Initialize Razorpay inside the handler — avoids module-level crash
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
 
     const { numberOfTickets } = req.body;
 
@@ -58,7 +47,7 @@ export default async function handler(
     });
 
     const order = await razorpay.orders.create(options);
-    
+
     console.log('Order created successfully:', {
       orderId: order.id,
       amount: order.amount,
@@ -79,15 +68,14 @@ export default async function handler(
       statusCode: error.statusCode,
     });
 
-    // Handle specific error cases
     if (error?.statusCode === 401) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         message: 'Payment gateway authentication failed',
         error: 'AUTH_FAILED'
       });
     }
 
-    return res.status(500).json({ 
+    return res.status(500).json({
       message: 'Failed to create payment order',
       error: error.error?.description || error.message
     });
