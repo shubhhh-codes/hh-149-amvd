@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { connectToDatabase } from '../../../utils/mongodb';
 import bcrypt from 'bcryptjs';
+import { ObjectId } from 'mongodb';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow POST requests
@@ -39,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Update user's password
     const result = await usersCollection.updateOne(
-      { _id: userId },
+      { _id: new ObjectId(userId) },
       { $set: { password: hashedPassword } }
     );
 

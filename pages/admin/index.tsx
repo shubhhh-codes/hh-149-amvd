@@ -32,6 +32,7 @@ interface User {
   _id: string;
   username: string;
   email: string;
+  phone?: string;
   createdAt: string;
   role: string;
 }
@@ -121,17 +122,6 @@ export default function AdminPanel() {
     }
   }, [session, status, router, activeTab]);
 
-  useEffect(() => {
-    if (activeTab === 'comedians') {
-      fetchComedians();
-    }
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (activeTab === 'payments') {
-      fetchPayments();
-    }
-  }, [activeTab]);
 
   const fetchData = async () => {
     try {
@@ -210,7 +200,7 @@ export default function AdminPanel() {
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
-    
+
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: 'DELETE',
@@ -325,44 +315,40 @@ export default function AdminPanel() {
           <div className="flex flex-col md:flex-row p-2 space-y-2 md:space-y-0 md:space-x-2">
             <button
               onClick={() => setActiveTab('bookings')}
-              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'bookings' 
-                  ? 'bg-purple-600 text-white shadow-lg' 
-                  : 'hover:bg-gray-100 text-gray-700'
-              }`}
+              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'bookings'
+                ? 'bg-purple-600 text-white shadow-lg'
+                : 'hover:bg-gray-100 text-gray-700'
+                }`}
             >
               <TicketIcon className="w-5 h-5" />
               <span>Bookings</span>
             </button>
             <button
               onClick={() => setActiveTab('users')}
-              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'users' 
-                  ? 'bg-purple-600 text-white shadow-lg' 
-                  : 'hover:bg-gray-100 text-gray-700'
-              }`}
+              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'users'
+                ? 'bg-purple-600 text-white shadow-lg'
+                : 'hover:bg-gray-100 text-gray-700'
+                }`}
             >
               <UsersIcon className="w-5 h-5" />
               <span>Users</span>
             </button>
             <button
               onClick={() => setActiveTab('comedians')}
-              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'comedians' 
-                  ? 'bg-purple-600 text-white shadow-lg' 
-                  : 'hover:bg-gray-100 text-gray-700'
-              }`}
+              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'comedians'
+                ? 'bg-purple-600 text-white shadow-lg'
+                : 'hover:bg-gray-100 text-gray-700'
+                }`}
             >
               <MicrophoneIcon className="w-5 h-5" />
               <span>Comedians</span>
             </button>
             <button
               onClick={() => setActiveTab('payments')}
-              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'payments' 
-                  ? 'bg-purple-600 text-white shadow-lg' 
-                  : 'hover:bg-gray-100 text-gray-700'
-              }`}
+              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'payments'
+                ? 'bg-purple-600 text-white shadow-lg'
+                : 'hover:bg-gray-100 text-gray-700'
+                }`}
             >
               <CurrencyDollarIcon className="w-5 h-5" />
               <span>Payments</span>
@@ -376,7 +362,7 @@ export default function AdminPanel() {
             <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">Payment Records</h2>
-                <DownloadPaymentsButton 
+                <DownloadPaymentsButton
                   payments={payments}
                   className="text-sm shadow-md hover:shadow-lg"
                 />
@@ -496,7 +482,7 @@ export default function AdminPanel() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            {payment.bookingDetails?.numberOfTickets 
+                            {payment.bookingDetails?.numberOfTickets
                               ? `${payment.bookingDetails.numberOfTickets} ticket${payment.bookingDetails.numberOfTickets > 1 ? 's' : ''}`
                               : 'No booking details'
                             }
@@ -512,11 +498,11 @@ export default function AdminPanel() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            ${payment.status === 'completed' 
-                              ? 'bg-green-100 text-green-800' 
+                            ${payment.status === 'completed'
+                              ? 'bg-green-100 text-green-800'
                               : payment.status === 'failed'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-yellow-100 text-yellow-800'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-yellow-100 text-yellow-800'
                             }`}
                           >
                             {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
@@ -618,7 +604,7 @@ export default function AdminPanel() {
                               {booking.numberOfTickets} ticket(s)
                             </div>
                             <div className="text-xs text-gray-500">
-                            ₹149 per ticket
+                              ₹149 per ticket
                             </div>
                             <div className="text-sm font-medium text-purple-600">
                               Total: {formatCurrency((booking.numberOfTickets || 0) * 149)}
@@ -626,9 +612,9 @@ export default function AdminPanel() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                              ${booking.status === 'approved' ? 'bg-green-100 text-green-800' : 
-                                booking.status === 'declined' ? 'bg-red-100 text-red-800' : 
-                                'bg-yellow-100 text-yellow-800'}`}>
+                              ${booking.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                booking.status === 'declined' ? 'bg-red-100 text-red-800' :
+                                  'bg-yellow-100 text-yellow-800'}`}>
                               {booking.status === 'pending' ? 'pending - Awaiting payment confirmation' : booking.status}
                             </span>
                           </td>
@@ -692,6 +678,12 @@ export default function AdminPanel() {
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           <div className="flex items-center space-x-1">
+                            <span>📞</span>
+                            <span>Phone</span>
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <div className="flex items-center space-x-1">
                             <ShieldCheckIcon className="w-4 h-4" />
                             <span>Role</span>
                           </div>
@@ -722,6 +714,9 @@ export default function AdminPanel() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-500">{user.email}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">{user.phone || 'N/A'}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
@@ -782,11 +777,12 @@ export default function AdminPanel() {
                           <div>
                             <h3 className="text-lg font-semibold text-gray-900">{comedian.username}</h3>
                             <p className="text-sm text-gray-500">{comedian.email}</p>
+                            <p className="text-sm text-gray-500">📞 {comedian.phone || 'N/A'}</p>
                           </div>
                           <span className={`px-2 py-1 text-xs font-semibold rounded-full 
                             ${comedian.comedianProfile.status === 'approved' ? 'bg-green-100 text-green-800' :
                               comedian.comedianProfile.status === 'declined' ? 'bg-red-100 text-red-800' :
-                              'bg-yellow-100 text-yellow-800'}`}>
+                                'bg-yellow-100 text-yellow-800'}`}>
                             {comedian.comedianProfile.status}
                           </span>
                         </div>
@@ -854,7 +850,7 @@ export default function AdminPanel() {
               />
             </div>
             <div className="flex justify-end space-x-2">
-              <button 
+              <button
                 onClick={() => {
                   setPasswordResetModal(false);
                   setNewPassword('');
@@ -864,7 +860,7 @@ export default function AdminPanel() {
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleResetUserPassword}
                 className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
               >

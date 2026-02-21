@@ -26,7 +26,6 @@ export default async function handler(
       username,
       email,
       phone,
-      isComedian,
       comedianProfile
     } = req.body;
 
@@ -35,41 +34,44 @@ export default async function handler(
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
+    // Security: ensure the comedian is registering for their own account
+    if (email !== token.email) {
+      return res.status(403).json({ message: 'Forbidden: you can only register yourself as a comedian' });
+    }
+
+    // BUG 8 FIX: Always force status to 'pending' on the server — never trust
+    // client-supplied status. This prevents self-approval bypass.
+    const sanitizedProfile = {
+      ...comedianProfile,
+      status: 'pending',
+    };
+
     const client = await clientPromise;
     const db = client.db();
 
-    // Check if user exists
+    // User must already have an account — no password-less account creation
     const existingUser = await db.collection('users').findOne({ email });
-    
-    if (existingUser) {
-      // Update existing user
-      const result = await db.collection('users').updateOne(
-        { email },
-        {
-          $set: {
-            username,
-            phone,
-            isComedian,
-            comedianProfile,
-            updatedAt: new Date()
-          }
-        }
-      );
 
-      if (result.modifiedCount === 0) {
-        return res.status(400).json({ message: 'No changes made' });
+    if (!existingUser) {
+      return res.status(400).json({ message: 'User must have an account before registering as a comedian' });
+    }
+
+    // Update existing user with comedian profile
+    const result = await db.collection('users').updateOne(
+      { email },
+      {
+        $set: {
+          username,
+          phone,
+          isComedian: true,
+          comedianProfile: sanitizedProfile,
+          updatedAt: new Date()
+        }
       }
-    } else {
-      // Create new user
-      await db.collection('users').insertOne({
-        username,
-        email,
-        phone,
-        isComedian,
-        comedianProfile,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(400).json({ message: 'No changes made' });
     }
 
     res.status(200).json({ message: 'Comedian registration successful' });
@@ -77,4 +79,4 @@ export default async function handler(
     console.error('Comedian registration error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-} 
+}

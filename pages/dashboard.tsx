@@ -62,7 +62,7 @@ export default function Dashboard() {
       }
 
       setBookings(prev => prev.filter(booking => booking._id !== bookingId));
-      
+
       setStats(prev => ({
         total: prev.total - 1,
         pending: prev.pending - 1,
@@ -75,11 +75,6 @@ export default function Dashboard() {
 
   const downloadTicket = async (booking: Booking) => {
     try {
-      const paymentForBooking = payments.find(
-        payment => payment.bookingDetails.fullName === booking.fullName && 
-                   payment.bookingDetails.numberOfTickets === booking.numberOfTickets
-      );
-      
       await createAndSaveTicket({
         ticketNumber: booking._id,
         userEmail: session?.user?.email || 'N/A',
@@ -113,7 +108,7 @@ export default function Dashboard() {
         }
 
         setBookings(data.bookings);
-        
+
         // Calculate stats
         const stats = data.bookings.reduce((acc: any, booking: Booking) => {
           acc.total++;
@@ -121,7 +116,7 @@ export default function Dashboard() {
           if (booking.status === 'pending') acc.pending++;
           return acc;
         }, { total: 0, approved: 0, pending: 0 });
-        
+
         setStats(stats);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch bookings');
@@ -209,22 +204,20 @@ export default function Dashboard() {
           <nav className="flex space-x-4">
             <button
               onClick={() => setActiveTab('bookings')}
-              className={`flex items-center px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'bookings'
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`flex items-center px-4 py-2 rounded-lg transition-all ${activeTab === 'bookings'
+                ? 'bg-purple-100 text-purple-700'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               <TicketIcon className="w-5 h-5 mr-2" />
               <span>My Bookings</span>
             </button>
             <button
               onClick={() => setActiveTab('payments')}
-              className={`flex items-center px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'payments'
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`flex items-center px-4 py-2 rounded-lg transition-all ${activeTab === 'payments'
+                ? 'bg-purple-100 text-purple-700'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               <CreditCardIcon className="w-5 h-5 mr-2" />
               <span>Payment History</span>
@@ -294,14 +287,15 @@ export default function Dashboard() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${booking.status === 'approved' ? 'bg-green-100 text-green-800' : 
-                            booking.status === 'declined' ? 'bg-red-100 text-red-800' : 
-                            booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                            booking.status === 'cancelled' ? 'bg-yellow-100 text-yellow-800' : 
-                            'bg-yellow-100 text-yellow-800'}`}>
-                          {booking.status === 'pending' ? 'cancelled - Payment was cancelled by user' : 
-                            booking.status === 'declined' ? 'declined - Payment failed or cancelled by user' : 
-                            booking.status}
+                          ${booking.status === 'approved' ? 'bg-green-100 text-green-800' :
+                            booking.status === 'declined' ? 'bg-red-100 text-red-800' :
+                              booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                booking.status === 'cancelled' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-yellow-100 text-yellow-800'}`}>
+                          {booking.status === 'pending' ? 'Pending — Awaiting approval' :
+                            booking.status === 'declined' ? 'Declined' :
+                              booking.status === 'approved' ? 'Approved' :
+                                booking.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

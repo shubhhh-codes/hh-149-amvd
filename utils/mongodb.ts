@@ -2,7 +2,6 @@ import { MongoClient, Db } from 'mongodb';
 import { parse } from 'url';
 
 const uri = process.env.MONGODB_URI;
-const dbName = process.env.MONGODB_DB || extractDatabaseName(uri);
 
 function extractDatabaseName(connectionString?: string): string {
   if (!connectionString) {
@@ -13,7 +12,7 @@ function extractDatabaseName(connectionString?: string): string {
     const parsedUrl = parse(connectionString);
     // Extract database name from the path, removing leading '/'
     const pathParts = parsedUrl.pathname?.split('/').filter(Boolean);
-    
+
     if (pathParts && pathParts.length > 0) {
       // Take the last part of the path as the database name
       return pathParts[pathParts.length - 1];
@@ -30,6 +29,9 @@ function extractDatabaseName(connectionString?: string): string {
 if (!uri) {
   throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
 }
+
+// BUG 12 FIX: Moved after uri guard so extractDatabaseName is never called with undefined
+const dbName = process.env.MONGODB_DB || extractDatabaseName(uri);
 
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
