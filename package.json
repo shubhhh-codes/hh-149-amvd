@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.0.18",
+    "@tailwindcss/container-queries": "^0.1.1",
     "@tailwindcss/forms": "^0.5.7",
     "@tsparticles/react": "^3.0.0",
     "@tsparticles/slim": "^3.0.0",
