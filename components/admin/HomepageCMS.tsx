@@ -28,10 +28,29 @@ interface GalleryItem {
   createdAt: string;
 }
 
+interface NextShowItem {
+  _id: string;
+  type: string;
+  title: string;
+  imageId?: string;
+  metadata: {
+    date: string;
+    month: string;
+    day: string;
+    location: string;
+    time: string;
+    ticketPrice: string;
+    bookMyShowUrl: string;
+    whatsappUrl: string;
+  };
+  isVisible: boolean;
+}
+
 export default function HomepageCMS() {
-  const [cmsTab, setCmsTab] = useState<'performers' | 'gallery'>('performers');
+  const [cmsTab, setCmsTab] = useState<'performers' | 'gallery' | 'next_show'>('performers');
   const [performers, setPerformers] = useState<Comedian[]>([]);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [nextShow, setNextShow] = useState<NextShowItem | null>(null);
   const [loading, setLoading] = useState(true);
   
   // Modals state
@@ -54,10 +73,18 @@ export default function HomepageCMS() {
         const res = await fetch('/api/admin/comedians');
         const data = await res.json();
         if (data.comedians) setPerformers(data.comedians.filter((c: any) => c.comedianProfile.status === 'approved'));
-      } else {
+      } else if (cmsTab === 'gallery') {
         const res = await fetch('/api/admin/cms/content?type=gallery');
         const data = await res.json();
         if (data.content) setGallery(data.content);
+      } else if (cmsTab === 'next_show') {
+        const res = await fetch('/api/admin/cms/content?type=next_show');
+        const data = await res.json();
+        if (data.content && data.content.length > 0) {
+          setNextShow(data.content[0]);
+        } else {
+          setNextShow(null);
+        }
       }
     } catch (error) {
       console.error(error);
@@ -184,6 +211,60 @@ export default function HomepageCMS() {
     }
   };
 
+  const handleSaveNextShow = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setUploadingImage(true);
+    try {
+      const form = new FormData(e.currentTarget);
+      const file = form.get('image') as File;
+      
+      let imageId = nextShow?.imageId;
+      if (file && file.size > 0) {
+        const uploadRes = await handleImageUpload(file);
+        imageId = uploadRes.imageId;
+      }
+
+      const payload = {
+        type: 'next_show',
+        title: form.get('title'),
+        imageId,
+        isVisible: form.get('isVisible') === 'true',
+        metadata: {
+          date: form.get('date'),
+          month: form.get('month'),
+          day: form.get('day'),
+          location: form.get('location'),
+          time: form.get('time'),
+          ticketPrice: form.get('ticketPrice'),
+          bookMyShowUrl: form.get('bookMyShowUrl'),
+          whatsappUrl: form.get('whatsappUrl'),
+        }
+      };
+
+      // Since there's only one "Next Show", we either create or update the existing one
+      const url = nextShow 
+        ? `/api/admin/cms/content/${nextShow._id}` 
+        : `/api/admin/cms/content`;
+      const method = nextShow ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error('Failed to save next show');
+      
+      toast.success('Next show updated');
+      fetchData();
+      revalidateHomepage();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleGalleryAction = async (id: string, action: 'delete' | 'restore') => {
     try {
       const res = await fetch(`/api/admin/cms/content/${id}`, {
@@ -202,18 +283,24 @@ export default function HomepageCMS() {
   return (
     <div className="space-y-6">
       {/* Sub-Tabs */}
-      <div className="flex gap-4 border-b border-outline-variant pb-2">
+      <div className="flex gap-4 border-b border-outline-variant pb-2 overflow-x-auto hide-scrollbar">
         <button 
           onClick={() => setCmsTab('performers')}
-          className={`px-4 py-2 font-label-caps tracking-widest text-sm transition-all ${cmsTab === 'performers' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+          className={`px-4 py-2 whitespace-nowrap font-label-caps tracking-widest text-sm transition-all ${cmsTab === 'performers' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         >
           Who Performs Here
         </button>
         <button 
           onClick={() => setCmsTab('gallery')}
-          className={`px-4 py-2 font-label-caps tracking-widest text-sm transition-all ${cmsTab === 'gallery' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+          className={`px-4 py-2 whitespace-nowrap font-label-caps tracking-widest text-sm transition-all ${cmsTab === 'gallery' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         >
           Real Show Moments
+        </button>
+        <button 
+          onClick={() => setCmsTab('next_show')}
+          className={`px-4 py-2 whitespace-nowrap font-label-caps tracking-widest text-sm transition-all ${cmsTab === 'next_show' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+        >
+          Next Show Details
         </button>
       </div>
 
@@ -337,6 +424,86 @@ export default function HomepageCMS() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* NEXT SHOW TAB */}
+          {cmsTab === 'next_show' && (
+            <div className="bg-surface-container-low brutal-border p-6 rounded-lg max-w-4xl">
+              <h2 className="text-xl font-headline-md mb-6">Manage Next Show</h2>
+              <form onSubmit={handleSaveNextShow} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Basic Info */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Event Title</label>
+                      <input name="title" defaultValue={nextShow?.title} placeholder="e.g. The Humours Hub: Open Mic Night #14" required className="w-full bg-[#080808] border border-outline-variant p-3 rounded text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Ticket Price</label>
+                      <input name="ticketPrice" defaultValue={nextShow?.metadata?.ticketPrice} placeholder="e.g. ₹149" required className="w-full bg-[#080808] border border-outline-variant p-3 rounded text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Location</label>
+                      <textarea name="location" defaultValue={nextShow?.metadata?.location} placeholder="e.g. The Studio, SG Highway\nAhmedabad" required rows={2} className="w-full bg-[#080808] border border-outline-variant p-3 rounded text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Time Details</label>
+                      <textarea name="time" defaultValue={nextShow?.metadata?.time} placeholder="e.g. 8:00 PM to 10:30 PM\nGates open at 7:45 PM" required rows={2} className="w-full bg-[#080808] border border-outline-variant p-3 rounded text-white" />
+                    </div>
+                  </div>
+
+                  {/* Date & Links */}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Date</label>
+                        <input name="date" defaultValue={nextShow?.metadata?.date} placeholder="e.g. 24" required className="w-full bg-[#080808] border border-outline-variant p-3 rounded text-white" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Month</label>
+                        <input name="month" defaultValue={nextShow?.metadata?.month} placeholder="e.g. Nov" required className="w-full bg-[#080808] border border-outline-variant p-3 rounded text-white" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Day</label>
+                        <input name="day" defaultValue={nextShow?.metadata?.day} placeholder="e.g. Sunday" required className="w-full bg-[#080808] border border-outline-variant p-3 rounded text-white" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">BookMyShow URL</label>
+                      <input name="bookMyShowUrl" defaultValue={nextShow?.metadata?.bookMyShowUrl} placeholder="https://in.bookmyshow.com/..." className="w-full bg-[#080808] border border-outline-variant p-3 rounded text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">WhatsApp URL</label>
+                      <input name="whatsappUrl" defaultValue={nextShow?.metadata?.whatsappUrl} placeholder="https://wa.me/message/..." className="w-full bg-[#080808] border border-outline-variant p-3 rounded text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Visibility</label>
+                      <select name="isVisible" defaultValue={nextShow?.isVisible !== false ? 'true' : 'false'} className="w-full bg-[#080808] border border-outline-variant p-3 rounded text-white">
+                        <option value="true">Visible</option>
+                        <option value="false">Hidden</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-outline-variant">
+                  <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Background Image (JPG/PNG)</label>
+                  {nextShow?.imageId && (
+                    <div className="mb-2">
+                      <img src={`/api/images/${nextShow.imageId}`} alt="Current BG" className="h-32 rounded object-cover border border-outline-variant" />
+                    </div>
+                  )}
+                  <input name="image" type="file" accept="image/jpeg, image/png, image/jpg" required={!nextShow?.imageId} className="w-full bg-[#080808] border border-outline-variant p-2 rounded text-white text-sm" />
+                  <p className="text-xs text-on-surface-variant mt-1">Images are auto-converted to WebP. Keep it wide/landscape.</p>
+                </div>
+
+                <div className="flex justify-end pt-4">
+                  <button type="submit" disabled={uploadingImage} className="px-8 py-3 bg-primary text-on-primary font-headline-md rounded hover:brightness-110 disabled:opacity-50">
+                    {uploadingImage ? 'Saving...' : 'Save Next Show'}
+                  </button>
+                </div>
+              </form>
             </div>
           )}
         </>
