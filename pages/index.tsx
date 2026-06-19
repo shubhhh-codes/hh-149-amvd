@@ -26,12 +26,29 @@ interface GalleryItem {
   displayOrder: number;
 }
 
+interface NextShowItem {
+  _id: string;
+  title: string;
+  imageId?: string;
+  metadata: {
+    date: string;
+    month: string;
+    day: string;
+    location: string;
+    time: string;
+    ticketPrice: string;
+    bookMyShowUrl: string;
+    whatsappUrl: string;
+  };
+}
+
 interface Props {
   performers: Performer[];
   gallery: GalleryItem[];
+  nextShow: NextShowItem | null;
 }
 
-export default function Home({ performers, gallery }: Props) {
+export default function Home({ performers, gallery, nextShow }: Props) {
   const { data: session } = useSession();
   const [venueStatus, setVenueStatus] = useState<{
     totalApproved: number;
@@ -179,65 +196,85 @@ export default function Home({ performers, gallery }: Props) {
         </section>
 
         {/* NEXT SHOW */}
-        <section className="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
-          <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-12">Next Show Details</h2>
-          <div className="brutal-card p-0 flex flex-col lg:flex-row overflow-hidden border-white/20 shadow-2xl rounded-card">
-            <div className="lg:w-2/5 bg-brand-overlay relative min-h-[300px]">
-              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1589189280918-cc442edfc628?q=80&w=2670&auto=format&fit=crop')" }}></div>
-              <div className="absolute inset-0 bg-gradient-to-t from-brand-surface to-transparent lg:bg-gradient-to-l opacity-80"></div>
+        {nextShow ? (
+          <section className="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
+            <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-12">Next Show Details</h2>
+            <div className="brutal-card p-0 flex flex-col lg:flex-row overflow-hidden border-white/20 shadow-2xl rounded-card">
+              <div className="lg:w-2/5 bg-brand-overlay relative min-h-[300px]">
+                <div 
+                  className="absolute inset-0 bg-cover bg-center" 
+                  style={{ backgroundImage: `url('${nextShow.imageId ? `/api/images/${nextShow.imageId}` : 'https://images.unsplash.com/photo-1589189280918-cc442edfc628?q=80&w=2670&auto=format&fit=crop'}')` }}
+                ></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-brand-surface to-transparent lg:bg-gradient-to-l opacity-80"></div>
+              </div>
+              <div className="lg:w-3/5 p-8 lg:p-12 flex flex-col justify-center">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="font-display-lg text-display-lg text-primary-container font-bold leading-none">{nextShow.metadata?.date || '24'}</div>
+                  <div className="flex flex-col">
+                    <span className="font-headline-sm text-headline-sm text-on-surface leading-none uppercase">{nextShow.metadata?.month || 'Nov'}</span>
+                    <span className="font-body-md text-body-md text-on-surface-variant">{nextShow.metadata?.day || 'Sunday'}</span>
+                  </div>
+                </div>
+
+                <h3 className="font-headline-md text-headline-md text-on-surface mb-4">
+                  {nextShow.title || 'The Humours Hub: Open Mic Night'}
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 font-body-md text-body-md text-on-surface-variant">
+                  <div className="flex items-start gap-2">
+                    <span className="material-symbols-outlined text-primary-container shrink-0 mt-1">location_on</span>
+                    <span style={{ whiteSpace: 'pre-line' }}>{nextShow.metadata?.location || 'The Studio, SG Highway\nAhmedabad'}</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="material-symbols-outlined text-primary-container shrink-0 mt-1">schedule</span>
+                    <span style={{ whiteSpace: 'pre-line' }}>{nextShow.metadata?.time || '8:00 PM to 10:30 PM\nGates open at 7:45 PM'}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-6 mb-8 pt-6 border-t border-white/10">
+                  <div className="flex flex-col">
+                    <span className="font-label-caps text-label-caps text-on-surface-variant mb-1">Ticket Price</span>
+                    <span className="font-headline-sm text-headline-sm text-on-surface">{nextShow.metadata?.ticketPrice || '₹149'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-label-caps text-label-caps text-on-surface-variant mb-1">Status</span>
+                    <span className="font-headline-sm text-headline-sm text-primary-container font-bold">
+                      {venueStatus.isFull ? 'Sold Out' : `${Math.max(0, 30 - venueStatus.totalApproved)} Seats Left`}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Link href="/book-tickets" className="flex-1 bg-primary-container text-brand-black font-headline-sm text-headline-sm rounded-full px-6 py-4 text-center hover:bg-primary-container/90 transition-colors">
+                    Book on Our Website →
+                  </Link>
+                  {nextShow.metadata?.bookMyShowUrl && (
+                    <a href={nextShow.metadata.bookMyShowUrl} target="_blank" rel="noopener noreferrer" className="flex-1 bg-transparent border border-white/20 text-on-surface font-headline-sm text-headline-sm rounded-full px-6 py-4 text-center hover:bg-white/5 transition-colors">
+                      Book on BookMyShow →
+                    </a>
+                  )}
+                </div>
+
+                {nextShow.metadata?.whatsappUrl && (
+                  <div className="mt-6 text-center">
+                    <a className="text-on-surface-variant hover:text-primary-container flex items-center justify-center gap-2 text-sm transition-colors" href={nextShow.metadata.whatsappUrl} target="_blank" rel="noopener noreferrer">
+                      <span className="material-symbols-outlined text-base">forum</span> Have questions? Ask on WhatsApp
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="lg:w-3/5 p-8 lg:p-12 flex flex-col justify-center">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="font-display-lg text-display-lg text-primary-container font-bold leading-none">24</div>
-                <div className="flex flex-col">
-                  <span className="font-headline-sm text-headline-sm text-on-surface leading-none uppercase">Nov</span>
-                  <span className="font-body-md text-body-md text-on-surface-variant">Sunday</span>
-                </div>
-              </div>
-
-              <h3 className="font-headline-md text-headline-md text-on-surface mb-4">The Humours Hub: Open Mic Night #14</h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 font-body-md text-body-md text-on-surface-variant">
-                <div className="flex items-start gap-2">
-                  <span className="material-symbols-outlined text-primary-container shrink-0 mt-1">location_on</span>
-                  <span>The Studio, SG Highway<br />Ahmedabad</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="material-symbols-outlined text-primary-container shrink-0 mt-1">schedule</span>
-                  <span>8:00 PM to 10:30 PM<br />Gates open at 7:45 PM</span>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-6 mb-8 pt-6 border-t border-white/10">
-                <div className="flex flex-col">
-                  <span className="font-label-caps text-label-caps text-on-surface-variant mb-1">Ticket Price</span>
-                  <span className="font-headline-sm text-headline-sm text-on-surface">₹149</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-label-caps text-label-caps text-on-surface-variant mb-1">Status</span>
-                  <span className="font-headline-sm text-headline-sm text-primary-container font-bold">
-                    {venueStatus.isFull ? 'Sold Out' : `${Math.max(0, 30 - venueStatus.totalApproved)} Seats Left`}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/book-tickets" className="flex-1 bg-primary-container text-brand-black font-headline-sm text-headline-sm rounded-full px-6 py-4 text-center hover:bg-primary-container/90 transition-colors">
-                  Book on Our Website →
-                </Link>
-                <button className="flex-1 bg-transparent border border-white/20 text-on-surface font-headline-sm text-headline-sm rounded-full px-6 py-4 text-center hover:bg-white/5 transition-colors">
-                  Book on BookMyShow →
-                </button>
-              </div>
-
-              <div className="mt-6 text-center">
-                <a className="text-on-surface-variant hover:text-primary-container flex items-center justify-center gap-2 text-sm transition-colors" href="https://wa.me/message/YOUR_WHATSAPP" target="_blank" rel="noopener noreferrer">
-                  <span className="material-symbols-outlined text-base">forum</span> Have questions? Ask on WhatsApp
-                </a>
-              </div>
+          </section>
+        ) : (
+          <section className="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
+            <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-12">Next Show Details</h2>
+            <div className="brutal-card p-12 text-center text-on-surface-variant border-white/20 shadow-2xl rounded-card">
+              <span className="material-symbols-outlined text-5xl mb-4 opacity-40">event_busy</span>
+              <p className="font-headline-sm">We're brewing up something special.</p>
+              <p className="font-body-md mt-2">No upcoming shows scheduled right now. Check back soon!</p>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* WHO PERFORMS HERE - DYNAMIC */}
         <section className="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter overflow-hidden">
@@ -353,7 +390,7 @@ export const getStaticProps: GetStaticProps = async () => {
   try {
     const db = await getDbSafe();
     if (!db) {
-      return { props: { performers: [], gallery: [] }, revalidate: 60 };
+      return { props: { performers: [], gallery: [], nextShow: null }, revalidate: 60 };
     }
 
     // Fetch featured approved performers, sorted by displayOrder
@@ -378,6 +415,13 @@ export const getStaticProps: GetStaticProps = async () => {
     .sort({ displayOrder: 1 })
     .toArray();
 
+    // Fetch next show
+    const nextShowDoc = await db.collection('homepage_content').findOne({
+      type: 'next_show',
+      isVisible: true,
+      isDeleted: false,
+    });
+
     // Serialize MongoDB documents (convert ObjectIds to strings)
     const performers = performerDocs.map(doc => ({
       _id: doc._id.toString(),
@@ -399,14 +443,30 @@ export const getStaticProps: GetStaticProps = async () => {
       displayOrder: doc.displayOrder || 0,
     }));
 
+    const nextShow = nextShowDoc ? {
+      _id: nextShowDoc._id.toString(),
+      title: nextShowDoc.title || '',
+      imageId: nextShowDoc.imageId?.toString() || '',
+      metadata: {
+        date: nextShowDoc.metadata?.date || '',
+        month: nextShowDoc.metadata?.month || '',
+        day: nextShowDoc.metadata?.day || '',
+        location: nextShowDoc.metadata?.location || '',
+        time: nextShowDoc.metadata?.time || '',
+        ticketPrice: nextShowDoc.metadata?.ticketPrice || '',
+        bookMyShowUrl: nextShowDoc.metadata?.bookMyShowUrl || '',
+        whatsappUrl: nextShowDoc.metadata?.whatsappUrl || '',
+      }
+    } : null;
+
     return {
-      props: { performers, gallery },
+      props: { performers, gallery, nextShow },
       revalidate: 60, // ISR: revalidate every 60 seconds
     };
   } catch (error) {
     console.error('getStaticProps error:', error);
     return {
-      props: { performers: [], gallery: [] },
+      props: { performers: [], gallery: [], nextShow: null },
       revalidate: 60,
     };
   }
