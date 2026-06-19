@@ -40,6 +40,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           username: user.username,
           userId: user.userId,
+          role: user.role || 'user',
           name: user.name || null,
           image: user.image || null,
           createdAt: user.createdAt?.toISOString() || null,
@@ -55,6 +56,7 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email as string;
         session.user.username = token.username as string;
         session.user.userId = token.userId as string;
+        session.user.role = token.role as string;
         session.user.name = (token.name as string) || null;
         session.user.image = (token.image as string) || null;
         session.user.createdAt = (token.createdAt as string) || null;
@@ -67,6 +69,7 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.username = user.username;
         token.userId = user.userId;
+        token.role = user.role;
         token.name = user.name;
         token.image = user.image;
         token.createdAt = user.createdAt;

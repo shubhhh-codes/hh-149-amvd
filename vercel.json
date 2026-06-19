@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "framework": "nextjs",
@@ -39,7 +38,6 @@
   ],
   "cleanUrls": true,
   "trailingSlash": false,
-  "public": true,
   "github": {
     "silent": true,
     "autoJobCancelation": true

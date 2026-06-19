@@ -1,223 +1,15 @@
-/**
- * @copyright (c) 2024 - Present
- * @author ...
- * @license MIT
- */
+const fs = require('fs');
 
-import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/router';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import { motion } from 'framer-motion';
+const content = fs.readFileSync('pages/book-tickets.tsx', 'utf8');
+const match = content.match(/  return \(\r?\n    <>\r?\n      <div className="min-h-screen/);
+if (!match) {
+  console.error("Could not find the target return block");
+  process.exit(1);
+}
 
-type ComedianType = 'standup' | 'musical' | 'other';
+const prefix = content.substring(0, match.index);
 
-export default function BookTickets() {
-  const { data: session } = useSession();
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [bookingType, setBookingType] = useState<'show' | 'joinAsComedian'>('show');
-  const [numberOfTickets, setNumberOfTickets] = useState(1);
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: session?.user?.email || '',
-    phone: '',
-    // Comedian registration fields
-    comedianType: '' as ComedianType,
-    bio: '',
-    speciality: '',
-    experience: '',
-    socialLinks: '',
-  });
-
-  useEffect(() => {
-    if (!session) {
-      router.push('/auth/login');
-    }
-  }, [session, router]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const initializeRazorpay = () => {
-    return new Promise<boolean>((resolve) => {
-      if ((window as any).Razorpay) {
-        console.log('Razorpay SDK already loaded');
-        resolve(true);
-      } else {
-        const script = document.createElement('script');
-        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-        script.onload = () => {
-          console.log('Razorpay SDK loaded successfully');
-          resolve(true);
-        };
-        script.onerror = () => {
-          console.error('Failed to load Razorpay SDK');
-          resolve(false);
-        };
-        document.body.appendChild(script);
-      }
-    });
-  };
-
-  const handlePayment = async (bookingId: string, amount: number) => {
-    try {
-      const res = await fetch('/api/payments/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          numberOfTickets,
-          amount: 149 * numberOfTickets,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-
-      const options = {
-        key: data.keyId,
-        amount: data.amount,
-        currency: data.currency,
-        name: 'Humors Hub',
-        description: `${numberOfTickets} Show Ticket${numberOfTickets > 1 ? 's' : ''} @ 149 each`,
-        order_id: data.orderId,
-        handler: async (response: any) => {
-          try {
-            const verifyRes = await fetch('/api/payments/verify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature,
-                bookingId,
-              }),
-            });
-
-            const verifyData = await verifyRes.json();
-            if (!verifyRes.ok) throw new Error(verifyData.message);
-
-            setSuccess('Payment successful! Your booking is confirmed.');
-            router.push('/dashboard');
-          } catch (err) {
-            console.error('Payment verification error:', err);
-            setError('Payment verification failed. Please contact support.');
-          }
-        },
-        prefill: {
-          name: formData.fullName,
-          email: session?.user?.email,
-          contact: formData.phone,
-        },
-        theme: {
-          color: '#7C3AED',
-        },
-      };
-
-      const rzp = new (window as any).Razorpay(options);
-      rzp.open();
-    } catch (err) {
-      console.error('Payment error:', err);
-      setError('Failed to initiate payment. Please try again.');
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setIsLoading(true);
-
-    if (!session?.user?.email) {
-      setError('Please sign in first');
-      setIsLoading(false);
-      return;
-    }
-
-    // Check Razorpay initialization first for show bookings
-    if (bookingType === 'show') {
-      const isRazorpayReady = await initializeRazorpay();
-      if (!isRazorpayReady) {
-        setError('Payment gateway is not ready. Please refresh the page and try again.');
-        setIsLoading(false);
-        return;
-      }
-    }
-
-    try {
-      if (bookingType === 'show') {
-        const res = await fetch('/api/bookings/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fullName: formData.fullName,
-            email: session.user.email,
-            phone: formData.phone,
-            numberOfTickets,
-          }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message);
-
-        await handlePayment(data.bookingId, numberOfTickets * 149); // 149 per ticket
-      } else {
-        // Comedian registration logic
-        const res = await fetch('/api/comedians/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: formData.fullName,
-            email: session.user.email,
-            phone: formData.phone,
-            isComedian: true,
-            comedianProfile: {
-              comedianType: formData.comedianType,
-              bio: formData.bio,
-              speciality: formData.speciality,
-              experience: formData.experience,
-              status: 'pending'
-            }
-          }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.message || 'Something went wrong');
-        }
-
-        setSuccess('Your comedian application has been submitted successfully! We will review it shortly.');
-      }
-
-      // Reset form
-      setFormData(prev => ({
-        ...prev,
-        fullName: '',
-        phone: '',
-        comedianType: '' as ComedianType,
-        bio: '',
-        speciality: '',
-        experience: '',
-        socialLinks: '',
-      }));
-    } catch (err) {
-      console.error('Submission error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to submit');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
+const newReturn = `  return (
     <div className="bg-background min-h-screen flex flex-col overflow-x-hidden text-on-surface">
       {/* TopNavBar */}
       <header className="bg-background border-b border-white/10 w-full z-50 sticky top-0">
@@ -283,22 +75,22 @@ export default function BookTickets() {
                   <button 
                     type="button"
                     onClick={() => setBookingType('show')}
-                    className={`flex-1 py-4 px-6 rounded-lg font-label-caps text-label-caps transition-all ${
+                    className={\`flex-1 py-4 px-6 rounded-lg font-label-caps text-label-caps transition-all \${
                       bookingType === 'show' 
                         ? 'bg-primary-container text-on-primary-fixed border border-primary-container' 
                         : 'bg-transparent text-on-surface border border-white/20 hover:border-primary-container hover:text-primary-container'
-                    }`}
+                    }\`}
                   >
                     Book Show Tickets
                   </button>
                   <button 
                     type="button"
                     onClick={() => setBookingType('joinAsComedian')}
-                    className={`flex-1 py-4 px-6 rounded-lg font-label-caps text-label-caps transition-all ${
+                    className={\`flex-1 py-4 px-6 rounded-lg font-label-caps text-label-caps transition-all \${
                       bookingType === 'joinAsComedian' 
                         ? 'bg-primary-container text-on-primary-fixed border border-primary-container' 
                         : 'bg-transparent text-on-surface border border-white/20 hover:border-primary-container hover:text-primary-container'
-                    }`}
+                    }\`}
                   >
                     Join as Comedian
                   </button>
@@ -495,3 +287,6 @@ export default function BookTickets() {
     </div>
   );
 }
+`;
+
+fs.writeFileSync('pages/book-tickets.tsx', prefix + newReturn);

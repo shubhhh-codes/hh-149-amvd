@@ -1,22 +1,16 @@
-/**
- * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
- * @license MIT
- */
+import NextAuth, { DefaultSession } from "next-auth";
+import { JWT } from "next-auth/jwt";
 
-import 'next-auth';
-
-declare module 'next-auth' {
+declare module "next-auth" {
   interface Session {
     user: {
       id: string;
       email: string;
       username: string;
       userId: string;
-      name?: string | null;
-      image?: string | null;
+      role?: string;
       createdAt?: string | null;
-    }
+    } & DefaultSession["user"];
   }
 
   interface User {
@@ -24,20 +18,18 @@ declare module 'next-auth' {
     email: string;
     username: string;
     userId: string;
-    name?: string | null;
-    image?: string | null;
+    role?: string;
     createdAt?: string | null;
   }
 }
 
-declare module 'next-auth/jwt' {
+declare module "next-auth/jwt" {
   interface JWT {
-    id: string;
-    email: string;
-    username: string;
-    userId: string;
-    name?: string | null;
-    image?: string | null;
+    id?: string;
+    email?: string;
+    username?: string;
+    userId?: string;
+    role?: string;
     createdAt?: string | null;
   }
-} 
+}

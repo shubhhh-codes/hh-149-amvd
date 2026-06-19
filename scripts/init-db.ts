@@ -56,6 +56,22 @@ async function initializeDatabase() {
       { key: { userId: 1 } }
     ]);
 
+    // Create homepage_content indexes
+    await db.collection('homepage_content').createIndexes([
+      { key: { type: 1 } },
+      { key: { displayOrder: 1 } },
+      { key: { isVisible: 1 } },
+      { key: { isDeleted: 1 } },
+    ]);
+
+    // Ensure users index for comedians
+    await db.collection('users').createIndexes([
+      { key: { isComedian: 1 } },
+      { key: { 'comedianProfile.status': 1 } },
+      { key: { 'comedianProfile.isFeatured': 1 } },
+      { key: { 'comedianProfile.displayOrder': 1 } }
+    ]);
+
     console.log('Database initialized successfully');
   } catch (error) {
     console.error('Database initialization error:', error);
