@@ -3,7 +3,7 @@
  * @author github.com/KunalG932
  * @license MIT
  */
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Navbar from '@/components/Navbar';
@@ -291,221 +291,383 @@ export default function AdminPanel() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100">
-        <Navbar />
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <LoadingSpinner />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Navbar />
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row items-center justify-between mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <div className="flex items-center space-x-2 mt-4 md:mt-0">
-            <UserCircleIcon className="w-6 h-6 text-purple-600" />
-            <span className="text-gray-600">{session?.user?.email}</span>
+    <div className="antialiased bg-background text-on-surface font-body-md">
+      {/* SideNavBar */}
+      <aside className="flex flex-col h-screen fixed left-0 top-0 py-8 gap-4 bg-surface-container-low w-64 brutal-border border-r z-50">
+        <div className="px-6 mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary-container rounded flex items-center justify-center">
+              <span className="material-symbols-outlined text-on-primary-container font-bold" style={{fontVariationSettings: "'FILL' 1"}}>theater_comedy</span>
+            </div>
+            <div>
+              <h1 className="text-headline-sm font-headline-md text-primary tracking-tight leading-none">Admin Portal</h1>
+              <p className="text-xs text-on-surface-variant font-label-caps mt-1">Manage Ahmedabad Scene</p>
+            </div>
           </div>
         </div>
-
-        {/* Enhanced Tab Navigation */}
-        <div className="bg-white rounded-lg shadow mb-8">
-          <div className="flex flex-col md:flex-row p-2 space-y-2 md:space-y-0 md:space-x-2">
-            <button
-              onClick={() => setActiveTab('bookings')}
-              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'bookings'
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'hover:bg-gray-100 text-gray-700'
-                }`}
-            >
-              <TicketIcon className="w-5 h-5" />
-              <span>Bookings</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'users'
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'hover:bg-gray-100 text-gray-700'
-                }`}
-            >
-              <UsersIcon className="w-5 h-5" />
-              <span>Users</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('comedians')}
-              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'comedians'
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'hover:bg-gray-100 text-gray-700'
-                }`}
-            >
-              <MicrophoneIcon className="w-5 h-5" />
-              <span>Comedians</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('payments')}
-              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'payments'
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'hover:bg-gray-100 text-gray-700'
-                }`}
-            >
-              <CurrencyDollarIcon className="w-5 h-5" />
-              <span>Payments</span>
+        
+        <nav className="flex-1 space-y-2 px-2">
+          <button 
+            onClick={() => setActiveTab('bookings')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mx-2 transition-all duration-200 ${activeTab === 'bookings' ? 'bg-primary-container text-on-primary-container opacity-90 scale-[0.98]' : 'text-on-surface-variant hover:bg-surface-variant hover:text-on-surface'}`}
+          >
+            <span className="material-symbols-outlined">calendar_today</span>
+            <span className="text-body-md font-body-md">Event Bookings</span>
+          </button>
+          
+          <button 
+            onClick={() => setActiveTab('users')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mx-2 transition-all duration-200 ${activeTab === 'users' ? 'bg-primary-container text-on-primary-container opacity-90 scale-[0.98]' : 'text-on-surface-variant hover:bg-surface-variant hover:text-on-surface'}`}
+          >
+            <span className="material-symbols-outlined">group</span>
+            <span className="text-body-md font-body-md">User Accounts</span>
+          </button>
+          
+          <button 
+            onClick={() => setActiveTab('comedians')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mx-2 transition-all duration-200 ${activeTab === 'comedians' ? 'bg-primary-container text-on-primary-container opacity-90 scale-[0.98]' : 'text-on-surface-variant hover:bg-surface-variant hover:text-on-surface'}`}
+          >
+            <span className="material-symbols-outlined">theater_comedy</span>
+            <span className="text-body-md font-body-md">Comedian Apps</span>
+          </button>
+          
+          <button 
+            onClick={() => setActiveTab('payments')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mx-2 transition-all duration-200 ${activeTab === 'payments' ? 'bg-primary-container text-on-primary-container opacity-90 scale-[0.98]' : 'text-on-surface-variant hover:bg-surface-variant hover:text-on-surface'}`}
+          >
+            <span className="material-symbols-outlined">payments</span>
+            <span className="text-body-md font-body-md">Payments</span>
+          </button>
+        </nav>
+        
+        <div className="px-4 mt-auto">
+          <div className="mt-6 pt-6 border-t border-outline-variant">
+            <button onClick={() => signOut({ callbackUrl: '/' })} className="w-full flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-error-container hover:text-white rounded-lg mx-2 transition-all">
+              <span className="material-symbols-outlined">logout</span>
+              <span className="text-body-md font-body-md">Logout</span>
             </button>
           </div>
         </div>
+      </aside>
 
-        {/* Payment Stats Cards */}
-        {activeTab === 'payments' && (
-          <>
-            <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Payment Records</h2>
-                <DownloadPaymentsButton
-                  payments={payments}
-                  className="text-sm shadow-md hover:shadow-lg"
-                />
+      {/* TopNavBar */}
+      <header className="flex justify-between items-center w-full px-margin-desktop h-20 fixed top-0 right-0 bg-background z-40 border-b border-surface-variant ml-64 pl-72">
+        <div className="flex items-center flex-1">
+          <div className="relative w-full max-w-md">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+            <input className="bg-[#080808] border border-outline-variant rounded-full pl-10 pr-4 py-2 w-full text-on-surface focus:outline-none focus:border-primary transition-colors font-body-md" placeholder="Search records..." type="text"/>
+          </div>
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 border-l border-outline-variant pl-6">
+            <div className="text-right">
+              <p className="text-body-md font-headline-md text-on-surface leading-tight">Admin User</p>
+              <p className="text-xs text-on-surface-variant font-label-caps">{session?.user?.email}</p>
+            </div>
+            <div className="w-10 h-10 rounded-full border border-primary flex items-center justify-center bg-surface-variant text-primary font-bold">A</div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content Canvas */}
+      <main className="ml-64 pt-28 px-margin-desktop pb-20 relative overflow-hidden min-h-screen">
+        <div className="spotlight-glow absolute top-0 left-1/4 w-[800px] h-[800px] -z-10 opacity-30"></div>
+        <div className="max-w-container-max mx-auto space-y-12">
+          {/* Header */}
+          <div className="flex justify-between items-end">
+            <div>
+              <h2 className="text-display-lg font-headline-md text-on-surface tracking-tight">Admin Dashboard</h2>
+              <p className="text-body-lg font-body-md text-on-surface-variant mt-2 max-w-xl">Real-time oversight of Ahmedabad's premiere comedy ecosystem and live performance logistics.</p>
+            </div>
+            <div className="text-right">
+              <p className="text-label-caps text-primary mb-1">SYSTEM STATUS</p>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span className="text-body-md font-body-md text-on-surface">Cloud Engines Live</span>
               </div>
+            </div>
+          </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-md">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-purple-100">Total Revenue</p>
-                      <p className="text-2xl font-bold mt-1">
-                        {formatCurrency(paymentStats.totalAmount / 100)}
-                      </p>
-                    </div>
-                    <ChartBarIcon className="w-12 h-12 text-purple-200" />
-                  </div>
-                </div>
+          {error && (
+            <div className="flex items-center bg-error-container/20 border border-error-container p-4 rounded-md">
+              <span className="material-symbols-outlined text-error mr-2">error</span>
+              <p className="text-error">{error}</p>
+            </div>
+          )}
 
-                <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-md">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-green-100">Successful</p>
-                      <p className="text-2xl font-bold mt-1">{paymentStats.successfulPayments}</p>
-                    </div>
-                    <CheckCircleIcon className="w-12 h-12 text-green-200" />
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-6 text-white shadow-md">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-yellow-100">Pending</p>
-                      <p className="text-2xl font-bold mt-1">
-                        {paymentStats.totalPayments - paymentStats.successfulPayments}
-                      </p>
-                    </div>
-                    <ClockIcon className="w-12 h-12 text-yellow-200" />
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-md">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-blue-100">Total Transactions</p>
-                      <p className="text-2xl font-bold mt-1">{paymentStats.totalPayments}</p>
-                    </div>
-                    <CurrencyDollarIcon className="w-12 h-12 text-blue-200" />
-                  </div>
+          {/* Quick Stats Row */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-gutter">
+            <div className="bg-surface-container-low brutal-border p-6 group hover:border-primary transition-colors">
+              <div className="flex justify-between items-start mb-4">
+                <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center text-primary">
+                  <span className="material-symbols-outlined">currency_rupee</span>
                 </div>
               </div>
+              <p className="text-label-caps text-on-surface-variant">Total Revenue</p>
+              <h3 className="text-headline-md font-headline-md text-on-surface mt-1">{formatCurrency(paymentStats.totalAmount / 100)}</h3>
+            </div>
+            <div className="bg-surface-container-low brutal-border p-6 group hover:border-primary transition-colors">
+              <div className="flex justify-between items-start mb-4">
+                <div className="w-10 h-10 rounded bg-blue-500/10 flex items-center justify-center text-blue-400">
+                  <span className="material-symbols-outlined">confirmation_number</span>
+                </div>
+              </div>
+              <p className="text-label-caps text-on-surface-variant">Active Bookings</p>
+              <h3 className="text-headline-md font-headline-md text-on-surface mt-1">{bookings.length}</h3>
+            </div>
+            <div className="bg-surface-container-low brutal-border p-6 group hover:border-primary transition-colors">
+              <div className="flex justify-between items-start mb-4">
+                <div className="w-10 h-10 rounded bg-primary-container/10 flex items-center justify-center text-primary-container">
+                  <span className="material-symbols-outlined">pending_actions</span>
+                </div>
+                <span className="text-xs font-label-caps text-primary-container">{comedians.filter(c => c.comedianProfile.status === 'pending').length} Req.</span>
+              </div>
+              <p className="text-label-caps text-on-surface-variant">Pending Apps</p>
+              <h3 className="text-headline-md font-headline-md text-on-surface mt-1">{comedians.length}</h3>
+            </div>
+            <div className="bg-surface-container-low brutal-border p-6 group hover:border-primary transition-colors">
+              <div className="flex justify-between items-start mb-4">
+                <div className="w-10 h-10 rounded bg-purple-500/10 flex items-center justify-center text-purple-400">
+                  <span className="material-symbols-outlined">person_add</span>
+                </div>
+              </div>
+              <p className="text-label-caps text-on-surface-variant">Total Users</p>
+              <h3 className="text-headline-md font-headline-md text-on-surface mt-1">{users.length}</h3>
+            </div>
+          </div>
 
-              <div className="overflow-x-auto bg-white rounded-lg shadow">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center space-x-1">
-                          <CalendarIcon className="w-4 h-4" />
-                          <span>Date & Time</span>
-                        </div>
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center space-x-1">
-                          <UserCircleIcon className="w-4 h-4" />
-                          <span>Customer Details</span>
-                        </div>
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center space-x-1">
-                          <CurrencyDollarIcon className="w-4 h-4" />
-                          <span>Payment Info</span>
-                        </div>
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center space-x-1">
-                          <TicketIcon className="w-4 h-4" />
-                          <span>Booking Details</span>
-                        </div>
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center space-x-1">
-                          <CurrencyDollarIcon className="w-4 h-4" />
-                          <span>Amount</span>
-                        </div>
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center space-x-1">
-                          <CheckCircleIcon className="w-4 h-4" />
-                          <span>Status</span>
-                        </div>
-                      </th>
+          {/* Dynamic Content Based on Tab */}
+          <section className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <h3 className="text-headline-sm font-headline-md text-on-surface uppercase tracking-widest">
+                  {activeTab === 'bookings' && 'Booking Records'}
+                  {activeTab === 'users' && 'User Accounts'}
+                  {activeTab === 'comedians' && 'Comedian Applications'}
+                  {activeTab === 'payments' && 'Payment Records'}
+                </h3>
+              </div>
+              
+              {activeTab === 'payments' && (
+                <div className="flex items-center gap-2 text-body-md font-headline-md text-primary">
+                  <DownloadPaymentsButton payments={payments} className="!bg-transparent !text-primary !border-none !shadow-none hover:underline underline-offset-4 flex items-center gap-2" />
+                </div>
+              )}
+            </div>
+
+            {/* TAB CONTENT: BOOKINGS */}
+            {activeTab === 'bookings' && (
+              <div className="bg-surface-container-low brutal-border overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-surface-variant/20 border-b border-outline-variant">
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">Booking Date</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">Customer Details</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">Tickets</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">Status</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="divide-y divide-outline-variant">
+                    {bookings.map((booking) => (
+                      <tr key={booking._id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-6 py-6 font-body-md text-on-surface">{new Date(booking.createdAt).toLocaleDateString()}</td>
+                        <td className="px-6 py-6">
+                          <div className="space-y-0.5">
+                            <p className="font-headline-md text-on-surface">{booking.fullName}</p>
+                            <p className="text-xs text-on-surface-variant">{booking.email}</p>
+                            <p className="text-xs text-on-surface-variant">{booking.phone}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-6">
+                          <div className="space-y-0.5">
+                            <p className="text-body-md font-headline-md text-on-surface">{booking.numberOfTickets} ticket(s)</p>
+                            <p className="text-xs text-on-surface-variant">₹149 / ticket</p>
+                            <p className="text-sm font-bold text-primary">Total: {formatCurrency((booking.numberOfTickets || 0) * 149)}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-6">
+                          {booking.status === 'pending' && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-500 text-[10px] font-bold uppercase tracking-widest border border-yellow-500/20">
+                              PENDING
+                            </span>
+                          )}
+                          {booking.status === 'approved' && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-500/10 text-green-500 text-[10px] font-bold uppercase tracking-widest border border-green-500/20">
+                              APPROVED
+                            </span>
+                          )}
+                          {booking.status === 'declined' && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-bold uppercase tracking-widest border border-red-500/20">
+                              DECLINED
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-6 text-right">
+                          {booking.status === 'pending' ? (
+                            <div className="flex justify-end gap-4">
+                              <button onClick={() => handleStatusUpdate(booking._id, 'approved')} className="text-green-500 font-label-caps hover:brightness-125 transition-all flex items-center gap-1">
+                                <span className="material-symbols-outlined text-sm">check</span>
+                                Approve
+                              </button>
+                              <button onClick={() => handleStatusUpdate(booking._id, 'declined')} className="text-red-400 font-label-caps hover:brightness-125 transition-all flex items-center gap-1">
+                                <span className="material-symbols-outlined text-sm">close</span>
+                                Decline
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-on-surface-variant text-xs font-label-caps">Processed</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* TAB CONTENT: USERS */}
+            {activeTab === 'users' && (
+              <div className="bg-surface-container-low brutal-border overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-surface-variant/20 border-b border-outline-variant">
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">User Details</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">Role</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">Joined At</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant">
+                    {users.map((user) => (
+                      <tr key={user._id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-6 py-6">
+                          <div className="space-y-0.5">
+                            <p className="font-headline-md text-on-surface">{user.username}</p>
+                            <p className="text-xs text-on-surface-variant">{user.email}</p>
+                            <p className="text-xs text-on-surface-variant">{user.phone || 'N/A'}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-6">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest border border-primary/20">
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-6 font-body-md text-on-surface">{new Date(user.createdAt).toLocaleDateString('en-IN')}</td>
+                        <td className="px-6 py-6 text-right">
+                          <button onClick={() => handleResetPassword(user)} className="text-primary font-label-caps hover:brightness-125 transition-all">
+                            Reset Password
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* TAB CONTENT: COMEDIANS */}
+            {activeTab === 'comedians' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+                {comedians.map((comedian) => (
+                  <div key={comedian._id} className="bg-surface-container-low brutal-border p-1 group">
+                    <div className="relative overflow-hidden aspect-[16/10] bg-surface-variant flex items-center justify-center">
+                      <span className="material-symbols-outlined text-6xl text-on-surface-variant/50">mic</span>
+                      <div className="absolute top-4 left-4">
+                        <span className={`px-3 py-1 text-[10px] font-label-caps ${comedian.comedianProfile.status === 'approved' ? 'bg-green-500 text-white' : comedian.comedianProfile.status === 'declined' ? 'bg-red-500 text-white' : 'bg-primary text-on-primary'}`}>
+                          {comedian.comedianProfile.status.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-5 space-y-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-headline-sm font-headline-md text-on-surface">{comedian.username}</h4>
+                          <p className="text-xs font-label-caps text-primary tracking-widest mt-1">{comedian.comedianProfile.comedianType.toUpperCase()}</p>
+                          <p className="text-xs text-on-surface-variant">{comedian.comedianProfile.speciality}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-label-caps text-on-surface-variant">EXP.</p>
+                          <p className="text-body-md font-bold text-on-surface">{comedian.comedianProfile.experience}</p>
+                        </div>
+                      </div>
+                      <p className="text-body-md font-body-md text-on-surface-variant line-clamp-3">{comedian.comedianProfile.bio}</p>
+                      
+                      {comedian.comedianProfile.status === 'pending' && (
+                        <div className="grid grid-cols-2 gap-2 mt-4">
+                          <button onClick={() => handleComedianStatusUpdate(comedian._id, 'approved')} className="w-full py-2 bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500 hover:text-white transition-all font-headline-md text-sm rounded">Approve</button>
+                          <button onClick={() => handleComedianStatusUpdate(comedian._id, 'declined')} className="w-full py-2 bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all font-headline-md text-sm rounded">Decline</button>
+                        </div>
+                      )}
+                      {comedian.comedianProfile.videoUrl && (
+                        <a href={comedian.comedianProfile.videoUrl} target="_blank" rel="noopener noreferrer" className="block text-center mt-2 w-full py-2 border border-outline-variant hover:border-primary hover:text-primary transition-all font-headline-md text-sm">Watch Video</a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* TAB CONTENT: PAYMENTS */}
+            {activeTab === 'payments' && (
+              <div className="bg-surface-container-low brutal-border overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-surface-variant/20 border-b border-outline-variant">
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">Date & Time</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">Customer</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">Payment Info</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">Booking Details</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">Amount</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant">
                     {payments.map((payment) => (
-                      <tr key={payment._id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {new Date(payment.createdAt).toLocaleDateString('en-IN')}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {new Date(payment.createdAt).toLocaleTimeString('en-IN')}
+                      <tr key={payment._id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-6 py-6">
+                          <p className="font-body-md text-on-surface">{new Date(payment.createdAt).toLocaleDateString('en-IN')}</p>
+                          <p className="text-xs text-on-surface-variant">{new Date(payment.createdAt).toLocaleTimeString('en-IN')}</p>
+                        </td>
+                        <td className="px-6 py-6">
+                          <div className="space-y-0.5">
+                            <p className="font-headline-md text-on-surface">{payment.bookingDetails?.fullName || 'N/A'}</p>
+                            <p className="text-xs text-on-surface-variant">{payment.user?.email || 'N/A'}</p>
+                            <p className="text-xs text-on-surface-variant">{payment.bookingDetails?.phone || 'N/A'}</p>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {payment.bookingDetails?.fullName || 'N/A'}
-                          </div>
-                          <div className="text-sm text-gray-500">{payment.user?.email || 'N/A'}</div>
-                          <div className="text-xs text-gray-400">
-                            {payment.bookingDetails?.phone || 'N/A'}
+                        <td className="px-6 py-6">
+                          <div className="space-y-0.5">
+                            <p className="text-body-md text-on-surface">{payment.paymentId}</p>
+                            <p className="text-xs text-on-surface-variant">Order: {payment.orderId}</p>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{payment.paymentId}</div>
-                          <div className="text-xs text-gray-500">Order: {payment.orderId}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {payment.bookingDetails?.numberOfTickets
-                              ? `${payment.bookingDetails.numberOfTickets} ticket${payment.bookingDetails.numberOfTickets > 1 ? 's' : ''}`
-                              : 'No booking details'
-                            }
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {payment.type === 'ticket_booking' ? 'Show Ticket' : payment.type}
+                        <td className="px-6 py-6">
+                          <div className="space-y-0.5">
+                            <p className="text-body-md text-on-surface">
+                              {payment.bookingDetails?.numberOfTickets ? `${payment.bookingDetails.numberOfTickets} ticket(s)` : 'No booking details'}
+                            </p>
+                            <p className="text-xs text-on-surface-variant">
+                              {payment.type === 'ticket_booking' ? 'Show Ticket' : payment.type}
+                            </p>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {formatCurrency(payment.amount / 100)}
-                          </div>
+                        <td className="px-6 py-6">
+                          <p className="font-bold text-primary">{formatCurrency(payment.amount / 100)}</p>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            ${payment.status === 'completed'
-                              ? 'bg-green-100 text-green-800'
-                              : payment.status === 'failed'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                            }`}
-                          >
-                            {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                        <td className="px-6 py-6 text-right">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border 
+                            ${payment.status === 'completed' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 
+                              payment.status === 'failed' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 
+                              'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'}`}>
+                            {payment.status}
                           </span>
                         </td>
                       </tr>
@@ -513,356 +675,46 @@ export default function AdminPanel() {
                   </tbody>
                 </table>
               </div>
-            </div>
-          </>
-        )}
-
-        {/* Error Alert */}
-        {error && (
-          <div className="flex items-center bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-md">
-            <XCircleIcon className="w-5 h-5 text-red-500 mr-2" />
-            <p className="text-red-700">{error}</p>
-          </div>
-        )}
-
-        {/* Content Sections */}
-        {!loading && (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            {/* Bookings Table */}
-            {activeTab === 'bookings' && (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Booking Records</h2>
-                  <div className="flex space-x-4">
-                    <div className="flex items-center bg-green-100 px-4 py-2 rounded-lg">
-                      <CheckCircleIcon className="w-5 h-5 text-green-600 mr-2" />
-                      <div>
-                        <p className="text-xs text-green-600">Approved</p>
-                        <p className="text-lg font-bold text-green-700">
-                          {bookings.filter(b => b.status === 'approved').length}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center bg-yellow-100 px-4 py-2 rounded-lg">
-                      <ClockIcon className="w-5 h-5 text-yellow-600 mr-2" />
-                      <div>
-                        <p className="text-xs text-yellow-600">Pending</p>
-                        <p className="text-lg font-bold text-yellow-700">
-                          {bookings.filter(b => b.status === 'pending').length}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <CalendarIcon className="w-4 h-4" />
-                            <span>Booking Date</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <UserCircleIcon className="w-4 h-4" />
-                            <span>Customer Details</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <TicketIcon className="w-4 h-4" />
-                            <span>Tickets</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <CheckCircleIcon className="w-4 h-4" />
-                            <span>Status</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {bookings.map((booking) => (
-                        <tr key={booking._id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(booking.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm font-medium text-gray-900">{booking.fullName}</div>
-                            <div className="text-sm text-gray-500">{booking.email}</div>
-                            <div className="text-xs text-gray-400">{booking.phone}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {booking.numberOfTickets} ticket(s)
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              ₹149 per ticket
-                            </div>
-                            <div className="text-sm font-medium text-purple-600">
-                              Total: {formatCurrency((booking.numberOfTickets || 0) * 149)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                              ${booking.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                booking.status === 'declined' ? 'bg-red-100 text-red-800' :
-                                  'bg-yellow-100 text-yellow-800'}`}>
-                              {booking.status === 'pending' ? 'pending - Awaiting payment confirmation' : booking.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex justify-end space-x-2">
-                              {booking.status === 'pending' && (
-                                <>
-                                  <button
-                                    onClick={() => handleStatusUpdate(booking._id, 'approved')}
-                                    className="text-green-600 hover:text-green-900 bg-green-50 hover:bg-green-100 px-3 py-1 rounded-md transition-colors"
-                                  >
-                                    Approve
-                                  </button>
-                                  <button
-                                    onClick={() => handleStatusUpdate(booking._id, 'declined')}
-                                    className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors"
-                                  >
-                                    Decline
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             )}
 
-            {/* Users Table */}
-            {activeTab === 'users' && (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
-                  <div className="bg-blue-50 px-4 py-2 rounded-lg flex items-center">
-                    <UsersIcon className="w-5 h-5 text-blue-600 mr-2" />
-                    <div>
-                      <p className="text-xs text-blue-600">Total Users</p>
-                      <p className="text-lg font-bold text-blue-700">{users.length}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <UserCircleIcon className="w-4 h-4" />
-                            <span>Username</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <EnvelopeIcon className="w-4 h-4" />
-                            <span>Email</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <span>📞</span>
-                            <span>Phone</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <ShieldCheckIcon className="w-4 h-4" />
-                            <span>Role</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <CalendarIcon className="w-4 h-4" />
-                            <span>Created At</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {users.map((user) => (
-                        <tr key={user._id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
-                                <UserCircleIcon className="h-5 w-5 text-purple-600" />
-                              </div>
-                              <div className="ml-3">
-                                <div className="text-sm font-medium text-gray-900">{user.username}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500">{user.email}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500">{user.phone || 'N/A'}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                              {user.role}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(user.createdAt).toLocaleDateString('en-IN')}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button
-                              onClick={() => handleResetPassword(user)}
-                              className="text-purple-600 hover:text-purple-900 font-medium"
-                            >
-                              Reset Password
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Comedians Grid */}
-            {activeTab === 'comedians' && (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Comedian Applications</h2>
-                  <div className="flex space-x-4">
-                    <div className="flex items-center bg-green-100 px-4 py-2 rounded-lg">
-                      <CheckCircleIcon className="w-5 h-5 text-green-600 mr-2" />
-                      <div>
-                        <p className="text-xs text-green-600">Approved</p>
-                        <p className="text-lg font-bold text-green-700">
-                          {comedians.filter(c => c.comedianProfile.status === 'approved').length}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center bg-yellow-100 px-4 py-2 rounded-lg">
-                      <ClockIcon className="w-5 h-5 text-yellow-600 mr-2" />
-                      <div>
-                        <p className="text-xs text-yellow-600">Pending</p>
-                        <p className="text-lg font-bold text-yellow-700">
-                          {comedians.filter(c => c.comedianProfile.status === 'pending').length}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {comedians.map((comedian) => (
-                    <div key={comedian._id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-                      <div className="p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="text-lg font-semibold text-gray-900">{comedian.username}</h3>
-                            <p className="text-sm text-gray-500">{comedian.email}</p>
-                            <p className="text-sm text-gray-500">📞 {comedian.phone || 'N/A'}</p>
-                          </div>
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full 
-                            ${comedian.comedianProfile.status === 'approved' ? 'bg-green-100 text-green-800' :
-                              comedian.comedianProfile.status === 'declined' ? 'bg-red-100 text-red-800' :
-                                'bg-yellow-100 text-yellow-800'}`}>
-                            {comedian.comedianProfile.status}
-                          </span>
-                        </div>
-
-                        <div className="space-y-3 mb-4">
-                          <div className="flex items-center text-sm">
-                            <MicrophoneIcon className="w-4 h-4 text-gray-400 mr-2" />
-                            <span className="font-medium text-gray-700">{comedian.comedianProfile.comedianType}</span>
-                          </div>
-                          <div className="flex items-center text-sm">
-                            <CalendarIcon className="w-4 h-4 text-gray-400 mr-2" />
-                            <span className="text-gray-600">{comedian.comedianProfile.experience} Experience</span>
-                          </div>
-                          <div className="flex items-center text-sm">
-                            <StarIcon className="w-4 h-4 text-gray-400 mr-2" />
-                            <span className="text-gray-600">{comedian.comedianProfile.speciality}</span>
-                          </div>
-                        </div>
-
-                        <p className="text-sm text-gray-600 mb-4 line-clamp-3">{comedian.comedianProfile.bio}</p>
-
-                        {comedian.comedianProfile.status === 'pending' && (
-                          <div className="flex justify-end space-x-2 pt-4 border-t">
-                            <button
-                              onClick={() => handleComedianStatusUpdate(comedian._id, 'approved')}
-                              className="px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleComedianStatusUpdate(comedian._id, 'declined')}
-                              className="px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors"
-                            >
-                              Decline
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+          </section>
+        </div>
       </main>
-      <Footer />
+
       {/* Password Reset Modal */}
       {passwordResetModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
-            <h2 className="text-xl font-semibold mb-4">Reset Password for {selectedUser.username}</h2>
-            <div className="mb-4">
-              <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                New Password
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-sm">
+          <div className="bg-surface-container-high brutal-border rounded-lg p-6 w-96">
+            <h2 className="text-xl font-headline-md text-on-surface mb-4">Reset Password</h2>
+            <p className="text-body-md text-on-surface-variant mb-4">For user: {selectedUser.username}</p>
+            <div className="mb-6">
+              <label htmlFor="newPassword" className="block text-sm font-label-caps text-on-surface-variant mb-2">
+                NEW PASSWORD
               </label>
               <input
                 type="password"
                 id="newPassword"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full bg-[#080808] px-3 py-2 border border-outline-variant rounded focus:outline-none focus:border-primary text-on-surface"
                 placeholder="Enter new password"
                 required
               />
             </div>
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-end gap-3">
               <button
                 onClick={() => {
                   setPasswordResetModal(false);
                   setNewPassword('');
                   setSelectedUser(null);
                 }}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+                className="px-4 py-2 border border-outline-variant text-on-surface-variant rounded hover:bg-surface-variant transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleResetUserPassword}
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                className="px-4 py-2 bg-primary-container text-on-primary-container rounded hover:brightness-110 transition-colors font-headline-md"
               >
                 Reset Password
               </button>
