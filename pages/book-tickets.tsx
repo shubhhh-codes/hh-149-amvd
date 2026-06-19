@@ -237,7 +237,7 @@ export default function BookTickets() {
         </nav>
       </header>
 
-      <main className="flex-grow flex items-center justify-center py-16 px-margin-mobile md:py-24 relative overflow-hidden">
+      <main className="flex-grow flex items-center justify-center py-16 px-margin-mobile md:py-16 relative overflow-hidden">
         {/* Spotlight Glow Effect */}
         <div className="absolute inset-0 spotlight-glow pointer-events-none"></div>
         <div className="w-full max-w-2xl z-10">

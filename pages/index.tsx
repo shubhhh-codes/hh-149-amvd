@@ -100,7 +100,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         {/* HERO SECTION */}
         <section className="relative flex flex-col justify-start items-center text-center px-margin-mobile md:px-margin-desktop glow-spotlight pt-[80px] pb-[60px] h-auto">
           <div className="max-w-4xl mx-auto space-y-8 z-10">
-            <h1 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface font-bold reveal-text" id="heroHeading" style={{ fontSize: "clamp(40px, 8vw, 80px)", opacity: 1 }}>
+            <h1 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface font-bold reveal-text" id="heroHeading" style={{ fontSize: "clamp(32px, 6.5vw, 64px)", opacity: 1 }}>
               Ahmedabad's own<br /><span className="text-primary-container">comedy night.</span>
             </h1>
             <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto scroll-enter">Stand-up · Poetry · Singing · Guitar Jams — all in one night.</p>
@@ -121,10 +121,10 @@ export default function Home({ performers, gallery, nextShow }: Props) {
             </div>
 
             <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-8 scroll-enter">
-              <Link href="/book-tickets" className="w-full sm:w-auto bg-primary-container text-brand-black text-[24px] font-bold rounded-full px-8 py-4 hover:bg-primary-container/90 transition-colors animate-pulse-slow">
+              <Link href="/book-tickets" className="w-full sm:w-auto bg-primary-container text-brand-black text-[18px] font-bold rounded-full px-6 py-3 hover:bg-primary-container/90 transition-colors animate-pulse-slow">
                 Book Your Seat →
               </Link>
-              <button className="w-full sm:w-auto bg-transparent border border-white/20 text-on-surface font-headline-sm text-headline-sm rounded-full px-8 py-4 hover:bg-white/5 transition-colors">
+              <button className="w-full sm:w-auto bg-transparent border border-white/20 text-on-surface font-headline-sm text-headline-sm rounded-full px-6 py-3 hover:bg-white/5 transition-colors">
                 Watch past shows
               </button>
             </div>
@@ -158,7 +158,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         </div>
 
         {/* WHAT HAPPENS HERE */}
-        <section className="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
+        <section className="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
           <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-12">What happens in a show?</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="brutal-card p-8 group">
@@ -197,7 +197,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
 
         {/* NEXT SHOW */}
         {nextShow ? (
-          <section className="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
+          <section className="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
             <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-12">Next Show Details</h2>
             <div className="brutal-card p-0 flex flex-col lg:flex-row overflow-hidden border-white/20 shadow-2xl rounded-card">
               <div className="lg:w-2/5 bg-brand-overlay relative min-h-[300px]">
@@ -266,7 +266,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
             </div>
           </section>
         ) : (
-          <section className="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
+          <section className="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
             <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-12">Next Show Details</h2>
             <div className="brutal-card p-12 text-center text-on-surface-variant border-white/20 shadow-2xl rounded-card">
               <span className="material-symbols-outlined text-5xl mb-4 opacity-40">event_busy</span>
@@ -277,7 +277,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         )}
 
         {/* WHO PERFORMS HERE - DYNAMIC */}
-        <section className="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter overflow-hidden">
+        <section className="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter overflow-hidden">
           <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-12">Who Performs Here?</h2>
           <div className="flex gap-6 overflow-x-auto hide-scrollbar pb-8">
             {performers.length === 0 ? (
@@ -327,7 +327,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         </section>
 
         {/* REAL SHOW MOMENTS - DYNAMIC */}
-        <section className="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
+        <section className="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
           <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-12">Real Show Moments</h2>
 
           {gallery.length === 0 ? (
@@ -358,7 +358,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         </section>
 
         {/* COMMUNITY PROOF */}
-        <section className="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter text-center">
+        <section className="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter text-center">
           <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-8">What the Community Says</h2>
           <div className="max-w-3xl mx-auto brutal-card p-12">
             <span className="material-symbols-outlined text-4xl text-primary-container mb-4 opacity-50">format_quote</span>
@@ -368,7 +368,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         </section>
 
         {/* COMMUNITY / PERFORM */}
-        <section className="py-24 bg-brand-surface border-y border-white/5 scroll-enter glow-spotlight w-full">
+        <section className="py-16 bg-brand-surface border-y border-white/5 scroll-enter glow-spotlight w-full">
           <div className="max-w-4xl mx-auto px-margin-mobile md:px-margin-desktop text-center">
             <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-6">Want to perform with us?</h2>
             <p className="font-body-lg text-body-lg text-on-surface-variant mb-10 max-w-2xl mx-auto">
