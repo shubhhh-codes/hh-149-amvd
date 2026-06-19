@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import HomepageCMS from '@/components/admin/HomepageCMS';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { formatCurrency } from '@/utils/format';
@@ -92,7 +93,7 @@ interface PaymentStats {
 export default function AdminPanel() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'bookings' | 'users' | 'comedians' | 'payments'>('bookings');
+  const [activeTab, setActiveTab] = useState<'bookings' | 'users' | 'comedians' | 'payments' | 'cms'>('bookings');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [comedians, setComedians] = useState<ComedianProfile[]>([]);
@@ -345,6 +346,16 @@ export default function AdminPanel() {
             <span className="material-symbols-outlined">payments</span>
             <span className="text-body-md font-body-md">Payments</span>
           </button>
+
+          <div className="pt-4 mt-2 border-t border-outline-variant mx-4"></div>
+
+          <button 
+            onClick={() => setActiveTab('cms')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mx-2 transition-all duration-200 ${activeTab === 'cms' ? 'bg-primary-container text-on-primary-container opacity-90 scale-[0.98]' : 'text-on-surface-variant hover:bg-surface-variant hover:text-on-surface'}`}
+          >
+            <span className="material-symbols-outlined">web</span>
+            <span className="text-body-md font-body-md">Homepage CMS</span>
+          </button>
         </nav>
         
         <div className="px-4 mt-auto">
@@ -452,6 +463,7 @@ export default function AdminPanel() {
                   {activeTab === 'users' && 'User Accounts'}
                   {activeTab === 'comedians' && 'Comedian Applications'}
                   {activeTab === 'payments' && 'Payment Records'}
+                  {activeTab === 'cms' && 'Homepage Content Management'}
                 </h3>
               </div>
               
@@ -676,6 +688,9 @@ export default function AdminPanel() {
                 </table>
               </div>
             )}
+
+            {/* TAB CONTENT: CMS */}
+            {activeTab === 'cms' && <HomepageCMS />}
 
           </section>
         </div>

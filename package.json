@@ -26,6 +26,7 @@
     "@tsparticles/slim": "^3.0.0",
     "@vercel/analytics": "^1.0.0",
     "bcryptjs": "^2.4.3",
+    "formidable": "^3.5.4",
     "framer-motion": "^11.11.17",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.2",
@@ -39,10 +40,12 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^5.0.1",
-    "react-toastify": "^10.0.4"
+    "react-toastify": "^10.0.4",
+    "sharp": "^0.35.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/formidable": "^3.5.1",
     "@types/node": "^20.11.0",
     "@types/pdfkit": "^0.17.5",
     "@types/qrcode": "^1.5.5",

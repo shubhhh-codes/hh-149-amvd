@@ -3,8 +3,35 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useState, useEffect } from 'react';
+import { GetStaticProps } from 'next';
+import { getDbSafe } from '@/lib/db-safe';
 
-export default function Home() {
+interface Performer {
+  _id: string;
+  username: string;
+  comedianProfile: {
+    speciality: string;
+    tagline?: string;
+    instagramUrl?: string;
+    photoId?: string;
+    displayOrder: number;
+    isFeatured: boolean;
+  };
+}
+
+interface GalleryItem {
+  _id: string;
+  title: string;
+  imageId: string;
+  displayOrder: number;
+}
+
+interface Props {
+  performers: Performer[];
+  gallery: GalleryItem[];
+}
+
+export default function Home({ performers, gallery }: Props) {
   const { data: session } = useSession();
   const [venueStatus, setVenueStatus] = useState<{
     totalApproved: number;
@@ -212,41 +239,45 @@ export default function Home() {
           </div>
         </section>
 
-        {/* WHO PERFORMS HERE */}
+        {/* WHO PERFORMS HERE - DYNAMIC */}
         <section className="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter overflow-hidden">
           <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-12">Who Performs Here?</h2>
           <div className="flex gap-6 overflow-x-auto hide-scrollbar pb-8">
-            <div className="flex flex-col items-center gap-3 shrink-0 group">
-              <div className="w-32 h-32 rounded-full bg-brand-overlay border-2 border-transparent group-hover:border-primary-container transition-colors duration-300 overflow-hidden relative">
-                <div className="w-full h-full bg-surface-container-high flex items-center justify-center text-on-surface-variant text-xs text-center p-2 absolute inset-0">[Performer Photo]</div>
+            {performers.length === 0 ? (
+              <div className="flex-1 text-center py-12 text-on-surface-variant">
+                <span className="material-symbols-outlined text-4xl block mb-4 opacity-40">mic</span>
+                <p>No featured performers yet. Check back soon!</p>
               </div>
-              <span className="font-headline-sm text-base text-on-surface">Rahul Sharma</span>
-              <span className="text-sm text-on-surface-variant">Stand-up</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-3 shrink-0 group">
-              <div className="w-32 h-32 rounded-full bg-brand-overlay border-2 border-transparent group-hover:border-primary-container transition-colors duration-300 overflow-hidden relative">
-                <div className="w-full h-full bg-surface-container-high flex items-center justify-center text-on-surface-variant text-xs text-center p-2 absolute inset-0">[Performer Photo]</div>
-              </div>
-              <span className="font-headline-sm text-base text-on-surface">Priya Patel</span>
-              <span className="text-sm text-on-surface-variant">Poetry</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-3 shrink-0 group">
-              <div className="w-32 h-32 rounded-full bg-brand-overlay border-2 border-transparent group-hover:border-primary-container transition-colors duration-300 overflow-hidden relative">
-                <div className="w-full h-full bg-surface-container-high flex items-center justify-center text-on-surface-variant text-xs text-center p-2 absolute inset-0">[Performer Photo]</div>
-              </div>
-              <span className="font-headline-sm text-base text-on-surface">Aman Desai</span>
-              <span className="text-sm text-on-surface-variant">Music</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-3 shrink-0 group">
-              <div className="w-32 h-32 rounded-full bg-brand-overlay border-2 border-transparent group-hover:border-primary-container transition-colors duration-300 overflow-hidden relative">
-                <div className="w-full h-full bg-surface-container-high flex items-center justify-center text-on-surface-variant text-xs text-center p-2 absolute inset-0">[Performer Photo]</div>
-              </div>
-              <span className="font-headline-sm text-base text-on-surface">Neha Gupta</span>
-              <span className="text-sm text-on-surface-variant">Stand-up</span>
-            </div>
+            ) : (
+              performers.map((performer) => (
+                <div key={performer._id} className="flex flex-col items-center gap-3 shrink-0 group">
+                  <div className="w-32 h-32 rounded-full bg-brand-overlay border-2 border-transparent group-hover:border-primary-container transition-colors duration-300 overflow-hidden relative">
+                    {performer.comedianProfile.photoId ? (
+                      <img
+                        src={`/api/images/${performer.comedianProfile.photoId}`}
+                        alt={performer.username}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-surface-container-high flex items-center justify-center absolute inset-0">
+                        <span className="material-symbols-outlined text-3xl text-on-surface-variant">person</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className="font-headline-sm text-base text-on-surface">{performer.username}</span>
+                  <span className="text-sm text-on-surface-variant">{performer.comedianProfile.speciality}</span>
+                  {performer.comedianProfile.tagline && (
+                    <span className="text-xs text-on-surface-variant/60 text-center max-w-[8rem]">{performer.comedianProfile.tagline}</span>
+                  )}
+                  {performer.comedianProfile.instagramUrl && (
+                    <a href={performer.comedianProfile.instagramUrl} target="_blank" rel="noopener noreferrer" className="text-primary-container text-xs hover:underline">
+                      Instagram ↗
+                    </a>
+                  )}
+                </div>
+              ))
+            )}
 
             <Link href="/book-tickets?type=comedian" className="flex flex-col items-center gap-3 shrink-0 group cursor-pointer">
               <div className="w-32 h-32 rounded-full border-2 border-dashed border-white/20 group-hover:border-primary-container flex items-center justify-center transition-colors duration-300">
@@ -258,27 +289,35 @@ export default function Home() {
           </div>
         </section>
 
-        {/* REAL SHOW MOMENTS */}
+        {/* REAL SHOW MOMENTS - DYNAMIC */}
         <section className="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
           <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-12">Real Show Moments</h2>
-          <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
-            <div className="relative group rounded-card overflow-hidden bg-brand-overlay aspect-square break-inside-avoid">
-              <div className="absolute inset-0 bg-surface-container-high flex items-center justify-center text-on-surface-variant text-sm">[Real show photo here]</div>
-              <div className="absolute inset-0 bg-primary-container/0 group-hover:bg-primary-container/40 transition-colors duration-300"></div>
+
+          {gallery.length === 0 ? (
+            <div className="text-center py-16 text-on-surface-variant border border-outline-variant rounded-card">
+              <span className="material-symbols-outlined text-5xl block mb-4 opacity-40">image</span>
+              <p className="text-lg">Gallery coming soon. Check back after the next show!</p>
             </div>
-            <div className="relative group rounded-card overflow-hidden bg-brand-overlay aspect-video break-inside-avoid">
-              <div className="absolute inset-0 bg-surface-container-high flex items-center justify-center text-on-surface-variant text-sm">[Real show photo here]</div>
-              <div className="absolute inset-0 bg-primary-container/0 group-hover:bg-primary-container/40 transition-colors duration-300"></div>
+          ) : (
+            <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
+              {gallery.map((item) => (
+                <div key={item._id} className="relative group rounded-card overflow-hidden bg-brand-overlay break-inside-avoid">
+                  <img
+                    src={`/api/images/${item.imageId}`}
+                    alt={item.title || 'Show Moment'}
+                    className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500"
+                    loading="lazy"
+                  />
+                  {item.title && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <p className="text-white text-sm font-headline-sm">{item.title}</p>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-primary-container/0 group-hover:bg-primary-container/10 transition-colors duration-300"></div>
+                </div>
+              ))}
             </div>
-            <div className="relative group rounded-card overflow-hidden bg-brand-overlay aspect-[3/4] break-inside-avoid">
-              <div className="absolute inset-0 bg-surface-container-high flex items-center justify-center text-on-surface-variant text-sm">[Real show photo here]</div>
-              <div className="absolute inset-0 bg-primary-container/0 group-hover:bg-primary-container/40 transition-colors duration-300"></div>
-            </div>
-            <div className="relative group rounded-card overflow-hidden bg-brand-overlay aspect-video break-inside-avoid">
-              <div className="absolute inset-0 bg-surface-container-high flex items-center justify-center text-on-surface-variant text-sm">[Real show photo here]</div>
-              <div className="absolute inset-0 bg-primary-container/0 group-hover:bg-primary-container/40 transition-colors duration-300"></div>
-            </div>
-          </div>
+          )}
         </section>
 
         {/* COMMUNITY PROOF */}
@@ -309,3 +348,66 @@ export default function Home() {
     </>
   );
 }
+
+export const getStaticProps: GetStaticProps = async () => {
+  try {
+    const db = await getDbSafe();
+    if (!db) {
+      return { props: { performers: [], gallery: [] }, revalidate: 60 };
+    }
+
+    // Fetch featured approved performers, sorted by displayOrder
+    const performerDocs = await db.collection('users').find({
+      isComedian: true,
+      'comedianProfile.status': 'approved',
+      'comedianProfile.isFeatured': true,
+    })
+    .project({
+      password: 0,
+      email: 0,
+    })
+    .sort({ 'comedianProfile.displayOrder': 1 })
+    .toArray();
+
+    // Fetch visible gallery items, sorted by displayOrder
+    const galleryDocs = await db.collection('homepage_content').find({
+      type: 'gallery',
+      isVisible: true,
+      isDeleted: false,
+    })
+    .sort({ displayOrder: 1 })
+    .toArray();
+
+    // Serialize MongoDB documents (convert ObjectIds to strings)
+    const performers = performerDocs.map(doc => ({
+      _id: doc._id.toString(),
+      username: doc.username,
+      comedianProfile: {
+        speciality: doc.comedianProfile?.speciality || '',
+        tagline: doc.comedianProfile?.tagline || null,
+        instagramUrl: doc.comedianProfile?.instagramUrl || null,
+        photoId: doc.comedianProfile?.photoId?.toString() || null,
+        displayOrder: doc.comedianProfile?.displayOrder || 0,
+        isFeatured: doc.comedianProfile?.isFeatured || false,
+      },
+    }));
+
+    const gallery = galleryDocs.map(doc => ({
+      _id: doc._id.toString(),
+      title: doc.title || '',
+      imageId: doc.imageId?.toString() || '',
+      displayOrder: doc.displayOrder || 0,
+    }));
+
+    return {
+      props: { performers, gallery },
+      revalidate: 60, // ISR: revalidate every 60 seconds
+    };
+  } catch (error) {
+    console.error('getStaticProps error:', error);
+    return {
+      props: { performers: [], gallery: [] },
+      revalidate: 60,
+    };
+  }
+};
