@@ -1,153 +1,15 @@
-/**
- * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
- * @license MIT
- */
+const fs = require('fs');
 
-import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import Link from 'next/link';
-import { Booking } from '@/types';
-import { formatCurrency } from '@/utils/format';
-import {
-  UserCircleIcon,
-  TicketIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  CalendarIcon,
-  CreditCardIcon,
-  IdentificationIcon,
-  CurrencyRupeeIcon,
-} from '@heroicons/react/24/outline';
-import { generateTicketPDF, createAndSaveTicket } from '@/components/TicketPDF';
-
-interface Payment {
-  _id: string;
-  orderId: string;
-  paymentId: string;
-  amount: number;
-  status: 'pending' | 'approved' | 'declined' | 'cancel' | 'completed';
-  type: string;
-  createdAt: string;
-  bookingDetails: {
-    numberOfTickets: number;
-    fullName: string;
-  };
+const content = fs.readFileSync('pages/dashboard.tsx', 'utf8');
+const match = content.match(/  return \(\r?\n    <div className="min-h-screen/);
+if (!match) {
+  console.error("Could not find the target return block");
+  process.exit(1);
 }
 
-export default function Dashboard() {
-  const { data: session } = useSession();
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [stats, setStats] = useState({
-    total: 0,
-    approved: 0,
-    pending: 0
-  });
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [activeTab, setActiveTab] = useState<'bookings' | 'payments'>('bookings');
+const prefix = content.substring(0, match.index);
 
-  const handleCancelBooking = async (bookingId: string) => {
-    try {
-      const res = await fetch(`/api/bookings/${bookingId}`, {
-        method: 'DELETE',
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Failed to cancel booking');
-      }
-
-      setBookings(prev => prev.filter(booking => booking._id !== bookingId));
-
-      setStats(prev => ({
-        total: prev.total - 1,
-        pending: prev.pending - 1,
-        approved: prev.approved
-      }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to cancel booking');
-    }
-  };
-
-  const downloadTicket = async (booking: Booking) => {
-    try {
-      await createAndSaveTicket({
-        ticketNumber: booking._id,
-        userEmail: session?.user?.email || 'N/A',
-        userName: booking.fullName || 'User',
-        userPhone: booking.phone || 'N/A',
-        numberOfTickets: booking.numberOfTickets,
-        showDetails: {
-          name: 'Stand Up Evening',
-          date: '23 November 2025',
-          time: '5:00 PM',
-          venue: 'Mishty Studio Campus, Brts, \n 132 Feet Ring Rd, beside Kaizen Hospital, \n opp. Valinath, Saurabh Society, Naranpura, Ahmedabad'
-        },
-        paymentId: booking?.paymentId,
-        paymentTime: booking?.createdAt
-      });
-    } catch (err) {
-      console.error('Failed to generate ticket:', err);
-    }
-  };
-
-  useEffect(() => {
-    async function fetchBookings() {
-      if (!session?.user?.email) return;
-
-      try {
-        const res = await fetch(`/api/bookings/user?email=${session.user.email}`);
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.message || 'Failed to fetch bookings');
-        }
-
-        setBookings(data.bookings);
-
-        // Calculate stats
-        const stats = data.bookings.reduce((acc: any, booking: Booking) => {
-          acc.total++;
-          if (booking.status === 'approved') acc.approved++;
-          if (booking.status === 'pending') acc.pending++;
-          return acc;
-        }, { total: 0, approved: 0, pending: 0 });
-
-        setStats(stats);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch bookings');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchBookings();
-  }, [session]);
-
-  useEffect(() => {
-    async function fetchPayments() {
-      if (!session?.user?.email) return;
-
-      try {
-        const res = await fetch('/api/payments/user');
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message);
-        setPayments(data.payments);
-      } catch (err) {
-        console.error('Failed to fetch payments:', err);
-      }
-    }
-
-    if (activeTab === 'payments') {
-      fetchPayments();
-    }
-  }, [session, activeTab]);
-
-  return (
+const newReturn = `  return (
     <div className="bg-background min-h-screen text-on-surface font-body-md overflow-x-hidden">
       {/* TopNavBar */}
       <header className="fixed top-0 w-full z-50 border-b border-white/10 bg-background/95 backdrop-blur-md">
@@ -227,22 +89,22 @@ export default function Dashboard() {
         <nav className="flex space-x-4 mb-gutter">
           <button
             onClick={() => setActiveTab('bookings')}
-            className={`flex items-center px-8 py-4 rounded-xl font-label-caps text-label-caps transition-all border ${
+            className={\`flex items-center px-8 py-4 rounded-xl font-label-caps text-label-caps transition-all border \${
               activeTab === 'bookings'
                 ? 'bg-tertiary/10 text-tertiary active-tab-glow border-tertiary/30'
                 : 'text-on-surface-variant hover:bg-surface-container-high border-transparent'
-            }`}
+            }\`}
           >
             <span className="material-symbols-outlined mr-2">event</span>
             MY BOOKINGS
           </button>
           <button
             onClick={() => setActiveTab('payments')}
-            className={`flex items-center px-8 py-4 rounded-xl font-label-caps text-label-caps transition-all border ${
+            className={\`flex items-center px-8 py-4 rounded-xl font-label-caps text-label-caps transition-all border \${
               activeTab === 'payments'
                 ? 'bg-tertiary/10 text-tertiary active-tab-glow border-tertiary/30'
                 : 'text-on-surface-variant hover:bg-surface-container-high border-transparent'
-            }`}
+            }\`}
           >
             <span className="material-symbols-outlined mr-2">payments</span>
             PAYMENT HISTORY
@@ -347,7 +209,7 @@ export default function Dashboard() {
                           <p className="font-bold text-white">{formatCurrency(payment.amount / 100)}</p>
                         </td>
                         <td className="px-8 py-6 text-right whitespace-nowrap">
-                          <span className={`font-bold ${payment.status === 'completed' ? 'text-green-400' : 'text-yellow-400'}`}>
+                          <span className={\`font-bold \${payment.status === 'completed' ? 'text-green-400' : 'text-yellow-400'}\`}>
                             {payment.status.toUpperCase()}
                           </span>
                         </td>
@@ -395,3 +257,6 @@ export default function Dashboard() {
     </div>
   );
 }
+`;
+
+fs.writeFileSync('pages/dashboard.tsx', prefix + newReturn);
