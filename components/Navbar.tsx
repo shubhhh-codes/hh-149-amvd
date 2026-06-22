@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   Menu,
   X 
-} from 'lucide-react';
+} from 'lucide-react';  
 
 export default function Navbar() {
   const { data: session } = useSession();
@@ -39,10 +39,10 @@ export default function Navbar() {
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
   const navLinks = [
-    { href: "/", label: "Shows", requireAuth: false },
-    { href: "#", label: "Gallery", requireAuth: false },
-    { href: "#", label: "About", requireAuth: false },
-    { href: "#", label: "Perform With Us", requireAuth: false },
+    { href: "/shows", label: "Shows", requireAuth: false },
+    { href: "/gallery", label: "Gallery", requireAuth: false },
+    { href: "/about", label: "About", requireAuth: false },
+    { href: "/perform-with-us", label: "Perform With Us", requireAuth: false },
   ];
 
   return (
@@ -53,12 +53,6 @@ export default function Navbar() {
       >
         <div className="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-3.5 flex justify-between items-center w-full">
           <Link href="/" className="font-headline-sm text-headline-sm font-bold text-on-surface dark:text-on-surface group flex items-center space-x-2">
-              <motion.div 
-                whileHover={{ rotate: [0, 10, -10, 10, 0], scale: 1.1 }}
-                className="text-2xl inline-block"
-              >
-                🎭
-              </motion.div>
               <span className="group-hover:text-primary-container transition-colors">The Humours Hub</span>
           </Link>
           

@@ -7,10 +7,10 @@ export default function Footer() {
         The Humours Hub
       </div>
       <div className="flex flex-wrap justify-center gap-6 flex-1">
-        <Link className="text-on-surface-variant hover:text-on-surface hover:text-primary transition-colors" href="/">Shows</Link>
-        <Link className="text-on-surface-variant hover:text-on-surface hover:text-primary transition-colors" href="#">Gallery</Link>
-        <Link className="text-on-surface-variant hover:text-on-surface hover:text-primary transition-colors" href="#">About</Link>
-        <Link className="text-on-surface-variant hover:text-on-surface hover:text-primary transition-colors" href="#">Perform With Us</Link>
+        <Link className="text-on-surface-variant hover:text-on-surface hover:text-primary transition-colors" href="/shows">Shows</Link>
+        <Link className="text-on-surface-variant hover:text-on-surface hover:text-primary transition-colors" href="/gallery">Gallery</Link>
+        <Link className="text-on-surface-variant hover:text-on-surface hover:text-primary transition-colors" href="/about">About</Link>
+        <Link className="text-on-surface-variant hover:text-on-surface hover:text-primary transition-colors" href="/perform-with-us">Perform With Us</Link>
         <Link className="text-on-surface-variant hover:text-on-surface hover:text-primary transition-colors" href="#">Contact</Link>
       </div>
       <div className="flex items-center gap-4 flex-shrink-0">

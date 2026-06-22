@@ -593,8 +593,8 @@ export default function AdminPanel() {
                     <div className="relative overflow-hidden aspect-[16/10] bg-surface-variant flex items-center justify-center">
                       <span className="material-symbols-outlined text-6xl text-on-surface-variant/50">mic</span>
                       <div className="absolute top-4 left-4">
-                        <span className={`px-3 py-1 text-[10px] font-label-caps ${comedian.comedianProfile.status === 'approved' ? 'bg-green-500 text-white' : comedian.comedianProfile.status === 'declined' ? 'bg-red-500 text-white' : 'bg-primary text-on-primary'}`}>
-                          {comedian.comedianProfile.status.toUpperCase()}
+                        <span className={`px-3 py-1 text-[10px] font-label-caps ${comedian.comedianProfile?.status === 'approved' ? 'bg-green-500 text-white' : comedian.comedianProfile?.status === 'declined' ? 'bg-red-500 text-white' : 'bg-primary text-on-primary'}`}>
+                          {comedian.comedianProfile?.status?.toUpperCase() || 'PENDING'}
                         </span>
                       </div>
                     </div>
@@ -602,23 +602,23 @@ export default function AdminPanel() {
                       <div className="flex justify-between items-start">
                         <div>
                           <h4 className="text-headline-sm font-headline-md text-on-surface">{comedian.username}</h4>
-                          <p className="text-xs font-label-caps text-primary tracking-widest mt-1">{comedian.comedianProfile.comedianType.toUpperCase()}</p>
-                          <p className="text-xs text-on-surface-variant">{comedian.comedianProfile.speciality}</p>
+                          <p className="text-xs font-label-caps text-primary tracking-widest mt-1">{comedian.comedianProfile?.comedianType?.toUpperCase() || 'UNKNOWN'}</p>
+                          <p className="text-xs text-on-surface-variant">{comedian.comedianProfile?.speciality || 'N/A'}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] font-label-caps text-on-surface-variant">EXP.</p>
-                          <p className="text-body-md font-bold text-on-surface">{comedian.comedianProfile.experience}</p>
+                          <p className="text-body-md font-bold text-on-surface">{comedian.comedianProfile?.experience || '0 yrs'}</p>
                         </div>
                       </div>
-                      <p className="text-body-md font-body-md text-on-surface-variant line-clamp-3">{comedian.comedianProfile.bio}</p>
+                      <p className="text-body-md font-body-md text-on-surface-variant line-clamp-3">{comedian.comedianProfile?.bio || 'No bio provided.'}</p>
                       
-                      {comedian.comedianProfile.status === 'pending' && (
+                      {comedian.comedianProfile?.status === 'pending' && (
                         <div className="grid grid-cols-2 gap-2 mt-4">
                           <button onClick={() => handleComedianStatusUpdate(comedian._id, 'approved')} className="w-full py-2 bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500 hover:text-white transition-all font-headline-md text-sm rounded">Approve</button>
                           <button onClick={() => handleComedianStatusUpdate(comedian._id, 'declined')} className="w-full py-2 bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all font-headline-md text-sm rounded">Decline</button>
                         </div>
                       )}
-                      {comedian.comedianProfile.videoUrl && (
+                      {comedian.comedianProfile?.videoUrl && (
                         <a href={comedian.comedianProfile.videoUrl} target="_blank" rel="noopener noreferrer" className="block text-center mt-2 w-full py-2 border border-outline-variant hover:border-primary hover:text-primary transition-all font-headline-md text-sm">Watch Video</a>
                       )}
                     </div>
