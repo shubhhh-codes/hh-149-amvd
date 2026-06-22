@@ -1,105 +1,56 @@
+import { GetStaticProps } from 'next';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Home, Smile, Search } from 'lucide-react';
+import clientPromise from '../lib/mongodb';
 
-export default function Custom404() {
+interface CMSContent {
+  title?: string;
+  subtitle?: string; // Used for Description Message
+  content?: string; // Used for CTA Destination URL
+  category?: string; // Used for CTA Button Text
+  imageUrl?: string;
+}
+
+interface Custom404Props {
+  cmsData: CMSContent | null;
+}
+
+export default function Custom404({ cmsData }: Custom404Props) {
+  const title = cmsData?.title || 'Page Not Found';
+  const description = cmsData?.subtitle || "Looks like you've wandered into the digital comedy club. This page seems to have taken an unexpected intermission!";
+  const ctaText = cmsData?.category || 'Return Home';
+  const ctaDestination = cmsData?.content || '/';
+  const imageUrl = cmsData?.imageUrl;
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-purple-100 flex items-center justify-center p-4 overflow-hidden">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ 
-          type: "spring", 
-          stiffness: 300, 
-          damping: 20 
-        }}
-        className="text-center relative z-10 max-w-md w-full"
-      >
-        <motion.div 
-          className="relative inline-block"
-          animate={{
-            rotate: [0, 10, -10, 10, 0],
-            scale: [1, 1.1, 0.9, 1.1, 1],
-            transition: { 
-              duration: 1.5, 
-              repeat: Infinity,
-              type: "tween",
-              ease: "easeInOut"
-            }
-          }}
-        >
-          <div className="text-9xl mb-6 relative">
-            <span className="absolute -top-2 -left-2 text-purple-200 opacity-50 blur-md">4</span>
-            <span className="relative z-10">4</span>
-            <span className="absolute -top-2 -right-2 text-purple-200 opacity-50 blur-md">4</span>
+    <div className="antialiased min-h-screen flex flex-col relative overflow-x-hidden bg-[#0A0A0A] text-[#e5e2e1]">
+      <main className="flex-grow flex items-center justify-center relative px-margin-mobile md:px-margin-desktop py-[80px]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,107,26,0.1)_0%,rgba(10,10,10,0)_70%)] pointer-events-none z-0"></div>
+        <div className="max-w-[800px] w-full text-center relative z-10 space-y-8">
+          <h1 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-primary-container tracking-tighter" style={{ fontSize: 'clamp(120px, 20vw, 240px)', lineHeight: 1, textShadow: '0 0 40px rgba(255, 107, 26, 0.3)' }}>
+            404
+          </h1>
+          <div className="space-y-4">
+            <h2 className="font-headline-md text-headline-md text-on-surface">
+              {title}
+            </h2>
+            <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto whitespace-pre-wrap">
+              {description}
+            </p>
           </div>
-          <Smile 
-            size={120} 
-            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-purple-300 opacity-30" 
-            strokeWidth={1}
-          />
-        </motion.div>
-
-        <h1 className="text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">
-          Page Not Found
-        </h1>
-        <p className="text-gray-600 text-lg mb-8 leading-relaxed">
-          Looks like you've wandered into the digital comedy club. 
-          This page seems to have taken an unexpected intermission!
-        </p>
-
-        <div className="flex flex-col sm:flex-row justify-center gap-4">
-          <Link 
-            href="/"
-            className="flex items-center justify-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-full hover:bg-purple-700 transition-all duration-300 group"
-          >
-            <Home 
-              size={20} 
-              className="group-hover:animate-bounce"
-            />
-            Return Home
-          </Link>
-          <button 
-            onClick={() => window.history.back()}
-            className="flex items-center justify-center gap-2 border border-purple-600 text-purple-600 px-6 py-3 rounded-full hover:bg-purple-50 transition-all duration-300 group"
-          >
-            <Search 
-              size={20} 
-              className="group-hover:animate-pulse"
-            />
-            Previous Page
-          </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-8">
+            <Link className="bg-primary-container text-[#0A0A0A] font-headline-md text-headline-sm px-8 py-4 rounded-full hover:bg-primary transition-colors duration-300 w-full sm:w-auto flex justify-center items-center gap-2" href={ctaDestination}>
+              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
+              {ctaText}
+            </Link>
+            <button className="bg-transparent text-on-surface border border-white/20 font-headline-md text-headline-sm px-8 py-4 rounded-full hover:bg-white/5 transition-colors duration-300 w-full sm:w-auto flex justify-center items-center gap-2" onClick={() => { if (typeof window !== 'undefined') { window.history.back(); } }}>
+              <span className="material-symbols-outlined">arrow_back</span>
+              Previous Page
+            </button>
+          </div>
         </div>
-      </motion.div>
-
-      {/* Decorative Background Elements */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.5 }}
-        animate={{ 
-          opacity: [0.1, 0.2, 0.1],
-          scale: [0.5, 0.7, 0.5]
-        }}
-        transition={{
-          duration: 5,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-        className="absolute top-1/4 right-1/4 w-64 h-64 bg-purple-200 rounded-full mix-blend-multiply filter blur-2xl opacity-20"
-      />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.5 }}
-        animate={{ 
-          opacity: [0.1, 0.2, 0.1],
-          scale: [0.5, 0.7, 0.5]
-        }}
-        transition={{
-          duration: 5,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: 2.5
-        }}
-        className="absolute bottom-1/4 left-1/4 w-48 h-48 bg-pink-200 rounded-full mix-blend-multiply filter blur-2xl opacity-20"
-      />
+      </main>
     </div>
   );
 }

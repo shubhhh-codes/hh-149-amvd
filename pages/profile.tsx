@@ -217,301 +217,177 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-50 via-white to-purple-50">
+    <div className="font-body-md text-body-md antialiased min-h-screen flex flex-col bg-[#0A0A0A] text-[#e5e2e1]">
       <Navbar />
-      <main className="container mx-auto px-4 py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="max-w-4xl mx-auto space-y-6"
-        >
-          {/* Profile Card */}
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-            {/* Profile Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-8 py-12 text-white relative">
-              <div className="absolute top-4 right-4">
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="bg-white/20 hover:bg-white/30 transition-all rounded-full p-2"
-                  title="Edit Profile"
-                  aria-label="Edit Profile"
-                >
-                  <FiEdit2 className="text-white w-5 h-5" />
-                </button>
-              </div>
-              <div className="flex items-center space-x-6">
-                <motion.div 
-                  whileHover={{ scale: 1.05 }}
-                  className="relative w-24 h-24 rounded-full border-4 border-white/30 shadow-lg overflow-hidden"
-                >
-                  <Image
-                    src={getAvatarUrl(profile?.userId || 'default')}
-                    alt={profile?.username || 'User'}
-                    layout="fill"
-                    objectFit="cover"
-                    priority
-                  />
-                </motion.div>
-                <div>
-                  <h1 className="text-3xl font-bold mb-2">{profile?.username}</h1>
-                  <div className="flex items-center text-white/80">
-                    <FiCalendar className="mr-2" />
-                    <span>Member since {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : 'N/A'}</span>
-                  </div>
-                </div>
+      <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-12 md:py-24">
+        {/* Profile Header */}
+        <section className="mb-16 md:mb-24 relative">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 bg-primary-container opacity-5 blur-[100px] rounded-full pointer-events-none"></div>
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-8 relative z-10">
+            <div className="w-32 h-32 md:w-48 md:h-48 rounded-full overflow-hidden border-2 border-primary/20 bg-surface-container">
+              <img alt={profile?.username || 'User'} className="w-full h-full object-cover" src={getAvatarUrl(profile?.userId || 'default')} />
+            </div>
+            <div className="text-center md:text-left flex-grow">
+              <h1 className="font-headline-md text-headline-md text-on-surface mb-2">{profile?.username || 'Your Profile'}</h1>
+              <p className="font-body-md text-body-md text-on-surface-variant mb-6">Member since {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : 'October 2023'}</p>
+              <div className="flex flex-wrap justify-center md:justify-start gap-4">
+                {profile?.role === 'vip' && (
+                  <span className="inline-flex items-center gap-2 px-4 py-2 bg-[#141414] border border-white/5 rounded-DEFAULT font-label-caps text-label-caps text-on-surface">
+                    <span className="material-symbols-outlined text-[16px] text-primary">stars</span>
+                    VIP Member
+                  </span>
+                )}
               </div>
             </div>
+          </div>
+        </section>
 
-            {/* Profile Content */}
-            <div className="p-8">
+        {/* Bento Grid Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="md:col-span-8 flex flex-col gap-6">
+            <div className="bg-[#141414] border border-white/5 p-6 md:p-8 rounded-lg">
+              <div className="flex justify-between items-center mb-8 pb-4 border-b border-white/5">
+                <h2 className="font-headline-sm text-headline-sm text-on-surface">Personal Information</h2>
+                {!isEditing && (
+                  <button onClick={() => setIsEditing(true)} className="bg-transparent border border-white/20 text-white px-4 py-2 rounded-DEFAULT font-label-caps text-label-caps hover:bg-white/5 transition-colors">
+                    Edit Profile
+                  </button>
+                )}
+              </div>
               {isEditing ? (
                 <form onSubmit={handleUpdateProfile} className="space-y-6">
                   <div>
-                    <label htmlFor="username" className="block text-sm font-medium text-gray-700">Username</label>
-                    <input
-                      id="username"
-                      type="text"
-                      value={editForm.username}
-                      onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                      className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      placeholder="Enter username"
-                    />
+                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Username</label>
+                    <input type="text" value={editForm.username} onChange={(e) => setEditForm({ ...editForm, username: e.target.value })} className="w-full bg-[#080808] border border-white/10 rounded-DEFAULT px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:outline-none" />
                   </div>
                   <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Phone</label>
-                    <input
-                      id="phone"
-                      type="tel"
-                      value={editForm.phone}
-                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                      className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      placeholder="Enter phone number"
-                    />
+                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Phone</label>
+                    <input type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} className="w-full bg-[#080808] border border-white/10 rounded-DEFAULT px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:outline-none" />
                   </div>
                   <div>
-                    <label htmlFor="bio" className="block text-sm font-medium text-gray-700">Bio</label>
-                    <textarea
-                      id="bio"
-                      value={editForm.bio}
-                      onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-                      rows={4}
-                      className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      placeholder="Tell us about yourself"
-                    />
+                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Bio</label>
+                    <textarea rows={4} value={editForm.bio} onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })} className="w-full bg-[#080808] border border-white/10 rounded-DEFAULT px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:outline-none" />
                   </div>
-                  <div className="flex space-x-4">
-                    <button
-                      type="submit"
-                      className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2"
-                    >
-                      <FiSave className="w-4 h-4" />
-                      <span>Save Changes</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(false)}
-                      className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
-                    >
-                      Cancel
-                    </button>
+                  <div className="flex space-x-4 pt-4">
+                    <button type="submit" className="bg-primary text-[#0A0A0A] w-fit px-8 py-3 rounded-DEFAULT font-label-caps text-label-caps hover:opacity-90 transition-opacity">Save Changes</button>
+                    <button type="button" onClick={() => setIsEditing(false)} className="bg-transparent text-white border border-white/20 px-8 py-3 rounded-DEFAULT font-label-caps text-label-caps hover:bg-white/5 transition-colors">Cancel</button>
                   </div>
                 </form>
               ) : (
-                <div className="grid md:grid-cols-2 gap-8">
-                  {/* Personal Information */}
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
-                      <div className="space-y-4 bg-gray-50 rounded-xl p-4">
-                        <div className="flex items-center">
-                          <FiUser className="w-5 h-5 text-purple-600 mr-3" />
-                          <div>
-                            <p className="text-sm text-gray-500">Username</p>
-                            <p className="font-medium text-gray-900">{profile?.username}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center">
-                          <FiMail className="w-5 h-5 text-purple-600 mr-3" />
-                          <div>
-                            <p className="text-sm text-gray-500">Email</p>
-                            <p className="font-medium text-gray-900">{profile?.email}</p>
-                          </div>
-                        </div>
-                        {profile?.phone && (
-                          <div className="flex items-center">
-                            <FiPhone className="w-5 h-5 text-purple-600 mr-3" />
-                            <div>
-                              <p className="text-sm text-gray-500">Phone</p>
-                              <p className="font-medium text-gray-900">{profile.phone}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {profile?.bio && (
-                      <div className="bg-purple-50 rounded-xl p-4">
-                        <h3 className="text-lg font-semibold text-purple-900 mb-2">Bio</h3>
-                        <p className="text-gray-700">{profile.bio}</p>
-                      </div>
-                    )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Email Address</label>
+                    <div className="font-body-lg text-body-lg text-on-surface">{profile?.email || 'N/A'}</div>
                   </div>
-
-                  {/* Stats and Additional Info */}
-                  <div className="space-y-6">
-                    <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl p-6 text-white">
-                      <h3 className="text-lg font-semibold mb-4">Booking Statistics</h3>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="text-center">
-                          <div className="bg-white/10 rounded-lg p-3">
-                            <FiTrendingUp className="w-6 h-6 mx-auto mb-2" />
-                            <p className="text-sm opacity-80">Total</p>
-                            <p className="text-xl font-bold">{bookingStats.total}</p>
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="bg-white/10 rounded-lg p-3">
-                            <FiAward className="w-6 h-6 mx-auto mb-2" />
-                            <p className="text-sm opacity-80">Approved</p>
-                            <p className="text-xl font-bold">{bookingStats.approved}</p>
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="bg-white/10 rounded-lg p-3">
-                            <FiCalendar className="w-6 h-6 mx-auto mb-2" />
-                            <p className="text-sm opacity-80">Pending</p>
-                            <p className="text-xl font-bold">{bookingStats.pending}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {profile?.isComedian && profile.comedianProfile && (
-                      <div className="bg-blue-50 rounded-xl p-6">
-                        <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
-                          <FiMic className="w-5 h-5 mr-2" />
-                          Comedian Profile
-                        </h3>
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Type</span>
-                            <span className="font-medium text-blue-900">{profile.comedianProfile.comedianType}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Speciality</span>
-                            <span className="font-medium text-blue-900">{profile.comedianProfile.speciality}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Experience</span>
-                            <span className="font-medium text-blue-900">{profile.comedianProfile.experience}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Status</span>
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold 
-                              ${profile.comedianProfile.status === 'approved' ? 'bg-green-100 text-green-800' : 
-                                profile.comedianProfile.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                                'bg-red-100 text-red-800'}`}>
-                              {profile.comedianProfile.status}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                  <div>
+                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Phone Number</label>
+                    <div className="font-body-lg text-body-lg text-on-surface">{profile?.phone || 'Not provided'}</div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Bio</label>
+                    <p className="font-body-md text-body-md text-on-surface-variant">{profile?.bio || 'Tell us about yourself...'}</p>
                   </div>
                 </div>
               )}
             </div>
+
+            <div className="bg-[#141414] border border-white/5 p-6 md:p-8 rounded-lg">
+              <h2 className="font-headline-sm text-headline-sm text-on-surface mb-8 pb-4 border-b border-white/5">Security Settings</h2>
+              <form onSubmit={handlePasswordChange} className="flex flex-col gap-6 max-w-md">
+                <div>
+                  <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Current Password</label>
+                  <input type="password" value={passwordChangeForm.currentPassword} onChange={(e) => setPasswordChangeForm(prev => ({ ...prev, currentPassword: e.target.value }))} className="w-full bg-[#080808] border border-white/10 rounded-DEFAULT px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:outline-none" placeholder="••••••••" required />
+                </div>
+                <div>
+                  <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">New Password</label>
+                  <input type="password" value={passwordChangeForm.newPassword} onChange={(e) => setPasswordChangeForm(prev => ({ ...prev, newPassword: e.target.value }))} className="w-full bg-[#080808] border border-white/10 rounded-DEFAULT px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:outline-none" placeholder="••••••••" required minLength={8} />
+                </div>
+                <div>
+                  <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Confirm New Password</label>
+                  <input type="password" value={passwordChangeForm.confirmNewPassword} onChange={(e) => setPasswordChangeForm(prev => ({ ...prev, confirmNewPassword: e.target.value }))} className="w-full bg-[#080808] border border-white/10 rounded-DEFAULT px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:outline-none" placeholder="••••••••" required minLength={8} />
+                </div>
+                {passwordChangeError && (
+                  <div className="text-red-400 text-sm">{passwordChangeError}</div>
+                )}
+                <button type="submit" disabled={isChangingPassword} className="bg-primary text-[#0A0A0A] w-fit px-8 py-3 rounded-DEFAULT font-label-caps text-label-caps hover:opacity-90 transition-opacity mt-4 disabled:opacity-50">
+                  {isChangingPassword ? 'Updating...' : 'Update Password'}
+                </button>
+              </form>
+            </div>
+            
+            {profile?.isComedian && profile.comedianProfile && (
+              <div className="bg-[#141414] border border-white/5 p-6 md:p-8 rounded-lg mt-6">
+                <h2 className="font-headline-sm text-headline-sm text-primary-container mb-8 pb-4 border-b border-white/5 flex items-center gap-2">
+                  <span className="material-symbols-outlined">mic</span>
+                  Comedian Profile
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Type</label>
+                    <div className="font-body-md text-body-md text-on-surface">{profile.comedianProfile.comedianType}</div>
+                  </div>
+                  <div>
+                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Speciality</label>
+                    <div className="font-body-md text-body-md text-on-surface">{profile.comedianProfile.speciality}</div>
+                  </div>
+                  <div>
+                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Experience</label>
+                    <div className="font-body-md text-body-md text-on-surface">{profile.comedianProfile.experience}</div>
+                  </div>
+                  <div>
+                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Status</label>
+                    <div className={`font-label-caps text-label-caps px-3 py-1 rounded-full w-fit ${profile.comedianProfile.status === 'approved' ? 'bg-[#ffb596]/20 text-[#ffb596]' : profile.comedianProfile.status === 'pending' ? 'bg-[#c8c6c5]/20 text-[#c8c6c5]' : 'bg-[#ffb4ab]/20 text-[#ffb4ab]'}`}>
+                      {profile.comedianProfile.status.toUpperCase()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Password Change Section */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-              <FiLock className="w-5 h-5 mr-2" />
-              Change Password
-            </h2>
-            <form onSubmit={handlePasswordChange} className="space-y-4">
-              <div>
-                <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700">
-                  Current Password
-                </label>
-                <input
-                  type="password"
-                  id="currentPassword"
-                  value={passwordChangeForm.currentPassword}
-                  onChange={(e) => setPasswordChangeForm(prev => ({
-                    ...prev, 
-                    currentPassword: e.target.value
-                  }))}
-                  className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                  placeholder="Enter current password"
-                  required
-                />
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">
-                    New Password
-                  </label>
-                  <input
-                    type="password"
-                    id="newPassword"
-                    value={passwordChangeForm.newPassword}
-                    onChange={(e) => setPasswordChangeForm(prev => ({
-                      ...prev, 
-                      newPassword: e.target.value
-                    }))}
-                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    placeholder="Enter new password"
-                    required
-                    minLength={8}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="confirmNewPassword" className="block text-sm font-medium text-gray-700">
-                    Confirm New Password
-                  </label>
-                  <input
-                    type="password"
-                    id="confirmNewPassword"
-                    value={passwordChangeForm.confirmNewPassword}
-                    onChange={(e) => setPasswordChangeForm(prev => ({
-                      ...prev, 
-                      confirmNewPassword: e.target.value
-                    }))}
-                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    placeholder="Confirm new password"
-                    required
-                    minLength={8}
-                  />
+          <div className="md:col-span-4 flex flex-col gap-6">
+            <div className="grid grid-cols-1 gap-6">
+              <div className="bg-[#141414] border border-white/5 p-6 rounded-lg relative overflow-hidden group">
+                <div className="absolute inset-0 bg-primary-container/5 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                <div className="relative z-10">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="font-label-caps text-label-caps text-on-surface-variant">Total Bookings</span>
+                    <span className="material-symbols-outlined text-primary">confirmation_number</span>
+                  </div>
+                  <div className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface">
+                    {bookingStats.total}
+                  </div>
                 </div>
               </div>
-              {passwordChangeError && (
-                <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
-                  {passwordChangeError}
+              
+              <div className="bg-[#141414] border border-white/5 p-6 rounded-lg relative overflow-hidden group">
+                <div className="absolute inset-0 bg-primary-container/5 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                <div className="relative z-10">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="font-label-caps text-label-caps text-on-surface-variant">Approved Events</span>
+                    <span className="material-symbols-outlined text-primary">event_available</span>
+                  </div>
+                  <div className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface">
+                    {bookingStats.approved}
+                  </div>
                 </div>
-              )}
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isChangingPassword}
-                  className="flex items-center space-x-2 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
-                >
-                  {isChangingPassword ? (
-                    <>
-                      <FiLoader className="w-4 h-4 animate-spin" />
-                      <span>Changing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FiKey className="w-4 h-4" />
-                      <span>Change Password</span>
-                    </>
-                  )}
-                </button>
               </div>
-            </form>
+
+              <div className="bg-[#141414] border border-white/5 p-6 rounded-lg relative overflow-hidden group">
+                <div className="absolute inset-0 bg-primary-container/5 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                <div className="relative z-10">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="font-label-caps text-label-caps text-on-surface-variant">Pending Approvals</span>
+                    <span className="material-symbols-outlined text-on-surface-variant">hourglass_empty</span>
+                  </div>
+                  <div className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface-variant">
+                    {bookingStats.pending}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </motion.div>
+        </div>
       </main>
       <Footer />
     </div>
