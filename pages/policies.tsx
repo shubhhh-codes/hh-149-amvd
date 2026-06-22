@@ -30,7 +30,7 @@ export default function Policies({ policies }: PoliciesProps) {
             <header className="mb-16 text-center border-b border-white/5 pb-12">
               <span className="material-symbols-outlined text-primary-container text-[48px] mb-6 block" data-icon="gavel">gavel</span>
               <h1 className="font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-4">Policies &amp; Terms</h1>
-              <p className="font-body-lg text-body-lg text-on-surface-variant">Last updated: October 24, 2024</p>
+
             </header>
             <div className="font-body-lg text-body-lg text-on-surface space-y-12">
               {policies.length > 0 ? (
