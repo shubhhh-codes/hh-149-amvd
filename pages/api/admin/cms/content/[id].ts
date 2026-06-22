@@ -3,11 +3,14 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../auth/[...nextauth]';
 import clientPromise from '../../../../../lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { getGridFSBucket } from '../../../../../lib/gridfs';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const session = await getServerSession(req, res, authOptions);
+    console.log('Session in [id].ts:', session);
     if (!session?.user?.email || (session.user.role !== 'admin' && session.user.email !== 'admin@humorshub.com')) {
+      console.log('Failed auth check in [id].ts. Email:', session?.user?.email, 'Role:', session?.user?.role);
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -19,7 +22,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const client = await clientPromise;
     const db = client.db();
     
-    // Get user ObjectId for audit trailing
     const user = await db.collection('users').findOne({ email: session.user.email });
     if (!user) return res.status(403).json({ message: 'Admin user not found in DB' });
     const adminId = user._id;
@@ -27,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const objectId = new ObjectId(id);
 
     if (req.method === 'PUT') {
-      const { type, title, subtitle, content, imageId, metadata, displayOrder, isVisible } = req.body;
+      const { type, title, subtitle, content, imageUrl, category, metadata, displayOrder, isVisible } = req.body;
       
       const updateData: any = {
         updatedAt: new Date(),
@@ -38,7 +40,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (title !== undefined) updateData.title = title;
       if (subtitle !== undefined) updateData.subtitle = subtitle;
       if (content !== undefined) updateData.content = content;
-      if (imageId !== undefined) updateData.imageId = imageId ? new ObjectId(imageId) : null;
+      if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+      if (category !== undefined) updateData.category = category;
       if (metadata !== undefined) updateData.metadata = metadata;
       if (displayOrder !== undefined) updateData.displayOrder = displayOrder;
       if (isVisible !== undefined) updateData.isVisible = isVisible;
@@ -53,24 +56,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'DELETE') {
-      // Soft Delete
-      const result = await db.collection('homepage_content').updateOne(
-        { _id: objectId },
-        { 
-          $set: { 
-            isDeleted: true,
-            updatedAt: new Date(),
-            updatedBy: adminId,
-          } 
+      const { permanent } = req.query;
+
+      if (permanent === 'true') {
+        const content = await db.collection('homepage_content').findOne({ _id: objectId });
+        
+        if (content?.imageUrl && content.imageUrl.startsWith('/api/images/')) {
+          try {
+            const imageIdStr = content.imageUrl.split('/api/images/')[1];
+            if (ObjectId.isValid(imageIdStr)) {
+              const bucket = await getGridFSBucket();
+              await bucket.delete(new ObjectId(imageIdStr));
+            }
+          } catch (e) {
+            console.error('Failed to delete associated image from GridFS:', e);
+          }
         }
-      );
-      
-      if (result.matchedCount === 0) return res.status(404).json({ message: 'Content not found' });
-      return res.status(200).json({ message: 'Content archived successfully' });
+
+        const result = await db.collection('homepage_content').deleteOne({ _id: objectId });
+        if (result.deletedCount === 0) return res.status(404).json({ message: 'Content not found' });
+        return res.status(200).json({ message: 'Content deleted permanently' });
+      } else {
+        const result = await db.collection('homepage_content').updateOne(
+          { _id: objectId },
+          { 
+            $set: { 
+              isDeleted: true,
+              updatedAt: new Date(),
+              updatedBy: adminId,
+            } 
+          }
+        );
+        
+        if (result.matchedCount === 0) return res.status(404).json({ message: 'Content not found' });
+        return res.status(200).json({ message: 'Content archived successfully' });
+      }
     }
 
     if (req.method === 'PATCH') {
-      // Restore Soft Deleted item
       const { restore, isVisible } = req.body;
       const updateData: any = {
         updatedAt: new Date(),

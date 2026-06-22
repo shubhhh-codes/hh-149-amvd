@@ -2,8 +2,9 @@ import Head from 'next/head';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useEffect } from 'react';
+import clientPromise from '@/lib/mongodb';
 
-export default function PerformWithUsPage() {
+export default function PerformWithUsPage({ performHero }: { performHero: any }) {
   useEffect(() => {
     const observerOptions = {
         root: null,
@@ -85,13 +86,17 @@ export default function PerformWithUsPage() {
             <div className="flex flex-col gap-8 animate-enter">
               <div>
                 <h1 className="font-bold text-[40px] md:text-[64px] font-headline-md leading-[1.2] text-[#e5e2e1] mb-4">
-                    Give your art <br />an audience.
+                    {performHero?.title ? (
+                      <span dangerouslySetInnerHTML={{ __html: performHero.title.replace(/\n/g, '<br />') }} />
+                    ) : (
+                      <>Give your art <br />an audience.</>
+                    )}
                 </h1>
-                <p className="font-body-lg text-[18px] text-[rgba(255,255,255,0.7)] max-w-md">
-                    We're always looking for fresh voices, seasoned comics, and unique performers to hit our stage.
+                <p className="font-body-lg text-[18px] text-[rgba(255,255,255,0.7)] max-w-md whitespace-pre-wrap">
+                    {performHero?.subtitle || "We're always looking for fresh voices, seasoned comics, and unique performers to hit our stage."}
                 </p>
                 <p className="font-headline-md text-[24px] font-bold text-primary-container mt-6 italic">
-                    "Manch tumhara, mic tumhara."
+                    "{performHero?.content || 'Manch tumhara, mic tumhara.'}"
                 </p>
               </div>
               <ul className="flex flex-col gap-4 mt-4">
@@ -110,10 +115,9 @@ export default function PerformWithUsPage() {
               </ul>
               
               <div className="mt-8 relative rounded-lg overflow-hidden border border-[rgba(255,255,255,0.07)] aspect-[4/3] group delay-200 animate-enter">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img 
                   className="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700" 
-                  src="https://images.unsplash.com/photo-1585699324551-f6c309eedeca?auto=format&fit=crop&q=80&w=800"
+                  src={performHero?.imageUrl || "https://images.unsplash.com/photo-1585699324551-f6c309eedeca?auto=format&fit=crop&q=80&w=800"}
                   alt="A moody photograph of a stand-up comedian performing on a dark stage." 
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent opacity-80"></div>
@@ -182,4 +186,29 @@ export default function PerformWithUsPage() {
       <Footer />
     </>
   );
+}
+
+export async function getStaticProps() {
+  try {
+    const client = await clientPromise;
+    const db = client.db();
+
+    const content = await db.collection('homepage_content')
+      .findOne({ type: 'perform_hero', isVisible: true, isDeleted: { $ne: true } });
+
+    return {
+      props: {
+        performHero: JSON.parse(JSON.stringify(content || null)),
+      },
+      revalidate: 60,
+    };
+  } catch (error) {
+    console.error("Error fetching perform hero content in getStaticProps:", error);
+    return {
+      props: {
+        performHero: null,
+      },
+      revalidate: 60,
+    };
+  }
 }

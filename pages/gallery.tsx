@@ -3,96 +3,13 @@ import { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
+import clientPromise from '@/lib/mongodb';
 
-export default function GalleryPage() {
+export default function GalleryPage({ galleryItems }: { galleryItems: any[] }) {
   const [activeFilter, setActiveFilter] = useState('All');
 
-  const filters = ['All', 'On Stage', 'The Crowd', 'After The Show'];
-
-  // Mock data mimicking the HTML grid
-  const galleryItems = [
-    {
-      id: 1,
-      category: 'On Stage',
-      src: "https://images.unsplash.com/photo-1585699324551-f6c309eedeca?auto=format&fit=crop&q=80&w=800&h=1000",
-      alt: "A moody, high-contrast photograph...",
-      label: "Comedy Night",
-      title: "Laughter Therapy",
-      date: "Oct 12, 2023"
-    },
-    {
-      id: 2,
-      category: 'The Crowd',
-      src: "https://images.unsplash.com/photo-1529156069898-49953eb1b5ce?auto=format&fit=crop&q=80&w=800&h=1000",
-      alt: "A wide-angle shot...",
-      label: "The Crowd",
-      title: "Full House Vibing",
-      date: "Oct 12, 2023"
-    },
-    {
-      id: 3,
-      category: 'On Stage',
-      src: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&q=80&w=800&h=1000",
-      alt: "Close-up of a musician's hands...",
-      label: "Unplugged Sessions",
-      title: "Strings & Stories",
-      date: "Oct 15, 2023"
-    },
-    {
-      id: 4,
-      category: 'After The Show',
-      src: "https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=800&h=1000",
-      alt: "A backstage candid shot...",
-      label: "Backstage",
-      title: "Pre-Show Nerves",
-      date: "Oct 20, 2023"
-    },
-    {
-      id: 5,
-      category: 'On Stage',
-      src: "https://images.unsplash.com/photo-1478147424095-2c81fb395066?auto=format&fit=crop&q=80&w=800&h=1000",
-      alt: "An artistic shot of a microphone...",
-      label: "Open Mic",
-      title: "Voice of the City",
-      date: "Oct 22, 2023"
-    },
-    {
-      id: 6,
-      category: 'After The Show',
-      src: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=800&h=1000",
-      alt: "Candid street photography...",
-      label: "After The Show",
-      title: "The Post-Show Buzz",
-      date: "Nov 01, 2023"
-    },
-    {
-      id: 7,
-      category: 'On Stage',
-      src: "https://images.unsplash.com/photo-1516280440502-65f606822c1d?auto=format&fit=crop&q=80&w=800&h=1000",
-      alt: "A dynamic shot of a poet...",
-      label: "Poetry Slam",
-      title: "Rhythm & Rhyme",
-      date: "Nov 05, 2023"
-    },
-    {
-      id: 8,
-      category: 'On Stage',
-      src: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?auto=format&fit=crop&q=80&w=800&h=1000",
-      alt: "A long exposure shot of the audience...",
-      label: "Special Events",
-      title: "A Thousand Lights",
-      date: "Nov 10, 2023"
-    },
-    {
-      id: 9,
-      category: 'After The Show',
-      src: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&q=80&w=800&h=1000",
-      alt: "A high-angle shot looking down at the stage...",
-      label: "Setup",
-      title: "Soundcheck Ready",
-      date: "Nov 12, 2023"
-    }
-  ];
+  // Dynamically extract filters from items or use static list
+  const availableCategories = ['All', ...Array.from(new Set(galleryItems.map(item => item.category).filter(Boolean)))];
 
   const filteredItems = activeFilter === 'All' 
     ? galleryItems 
@@ -172,7 +89,7 @@ export default function GalleryPage() {
         {/* Filter Bar */}
         <section className="py-8 px-margin-mobile md:px-margin-desktop">
           <div className="max-w-container-max mx-auto flex flex-wrap gap-4">
-            {filters.map(filter => (
+            {availableCategories.map((filter: any) => (
               <button
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
@@ -192,21 +109,24 @@ export default function GalleryPage() {
         <section className="pb-24 px-margin-mobile md:px-margin-desktop">
           <div className="max-w-container-max mx-auto masonry-grid">
             {filteredItems.map(item => (
-              <div key={item.id} className="gallery-card group">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+              <div key={item._id} className="gallery-card group">
                 <img
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
-                  src={item.src}
-                  alt={item.alt}
+                  src={item.imageUrl}
+                  alt={item.title || "Gallery image"}
                 />
                 <div className="overlay"></div>
                 <div className="info-slide">
-                  <p className="font-label-caps text-label-caps text-primary mb-1">{item.label}</p>
+                  <p className="font-label-caps text-label-caps text-primary mb-1">{item.category}</p>
                   <h3 className="font-headline-sm text-headline-sm text-white">{item.title}</h3>
-                  <p className="text-sm text-white/60 font-body-md">{item.date}</p>
                 </div>
               </div>
             ))}
+            {filteredItems.length === 0 && (
+              <div className="col-span-1 md:col-span-3 py-12 text-center text-on-surface-variant">
+                No images found in this category.
+              </div>
+            )}
           </div>
         </section>
 
@@ -238,7 +158,33 @@ export default function GalleryPage() {
           Book Tickets
         </Link>
       </div>
-
     </>
   );
+}
+
+export async function getStaticProps() {
+  try {
+    const client = await clientPromise;
+    const db = client.db();
+
+    const content = await db.collection('homepage_content')
+      .find({ type: 'gallery', isVisible: true, isDeleted: { $ne: true } })
+      .sort({ displayOrder: 1, createdAt: -1 })
+      .toArray();
+
+    return {
+      props: {
+        galleryItems: JSON.parse(JSON.stringify(content)),
+      },
+      revalidate: 60, // revalidate every 60 seconds (or on-demand via API)
+    };
+  } catch (error) {
+    console.error("Error fetching gallery content in getStaticProps:", error);
+    return {
+      props: {
+        galleryItems: [],
+      },
+      revalidate: 60,
+    };
+  }
 }

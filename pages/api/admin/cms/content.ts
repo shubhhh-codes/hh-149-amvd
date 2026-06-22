@@ -2,21 +2,24 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import clientPromise from '../../../../lib/mongodb';
-import { ObjectId } from 'mongodb';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const session = await getServerSession(req, res, authOptions);
+    console.log('Session in content.ts:', session);
     if (!session?.user?.email || (session.user.role !== 'admin' && session.user.email !== 'admin@humorshub.com')) {
+      console.log('Failed auth check in content.ts. Email:', session?.user?.email, 'Role:', session?.user?.role);
       return res.status(403).json({ message: 'Not authorized' });
     }
 
     const client = await clientPromise;
     const db = client.db();
     
-    // Get user ObjectId for audit trailing
     const user = await db.collection('users').findOne({ email: session.user.email });
-    if (!user) return res.status(403).json({ message: 'Admin user not found in DB' });
+    if (!user) {
+      console.log('User not found in DB:', session.user.email);
+      return res.status(403).json({ message: 'Admin user not found in DB' });
+    }
     const adminId = user._id;
 
     if (req.method === 'GET') {
@@ -33,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
-      const { type, title, subtitle, content, imageId, metadata, displayOrder, isVisible } = req.body;
+      const { type, title, subtitle, content, imageUrl, category, metadata, displayOrder, isVisible } = req.body;
 
       if (!type) {
         return res.status(400).json({ message: 'Type is required' });
@@ -44,11 +47,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         title: title || '',
         subtitle: subtitle || '',
         content: content || '',
-        imageId: imageId ? new ObjectId(imageId) : null,
+        imageUrl: imageUrl || '',
+        category: category || '',
         metadata: metadata || {},
         displayOrder: displayOrder ?? 0,
         isVisible: isVisible ?? true,
-        isDeleted: false,
         createdAt: new Date(),
         updatedAt: new Date(),
         updatedBy: adminId,
