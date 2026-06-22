@@ -29,7 +29,7 @@ interface GalleryItem {
 interface NextShowItem {
   _id: string;
   title: string;
-  imageId?: string;
+  imageUrl?: string;
   metadata: {
     date: string;
     month: string;
@@ -203,7 +203,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
               <div className="lg:w-2/5 bg-brand-overlay relative min-h-[300px]">
                 <div 
                   className="absolute inset-0 bg-cover bg-center" 
-                  style={{ backgroundImage: `url('${nextShow.imageId ? `/api/images/${nextShow.imageId}` : 'https://images.unsplash.com/photo-1589189280918-cc442edfc628?q=80&w=2670&auto=format&fit=crop'}')` }}
+                  style={{ backgroundImage: `url('${nextShow.imageUrl || 'https://images.unsplash.com/photo-1589189280918-cc442edfc628?q=80&w=2670&auto=format&fit=crop'}')` }}
                 ></div>
                 <div className="absolute inset-0 bg-gradient-to-t from-brand-surface to-transparent lg:bg-gradient-to-l opacity-80"></div>
               </div>
@@ -419,7 +419,7 @@ export const getStaticProps: GetStaticProps = async () => {
     const nextShowDoc = await db.collection('homepage_content').findOne({
       type: 'next_show',
       isVisible: true,
-      isDeleted: false,
+      isDeleted: { $ne: true },
     });
 
     // Serialize MongoDB documents (convert ObjectIds to strings)
@@ -446,7 +446,7 @@ export const getStaticProps: GetStaticProps = async () => {
     const nextShow = nextShowDoc ? {
       _id: nextShowDoc._id.toString(),
       title: nextShowDoc.title || '',
-      imageId: nextShowDoc.imageId?.toString() || '',
+      imageUrl: nextShowDoc.imageUrl || '',
       metadata: {
         date: nextShowDoc.metadata?.date || '',
         month: nextShowDoc.metadata?.month || '',

@@ -34,85 +34,93 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       maxFileSize: 10 * 1024 * 1024, // 10MB limit
     });
 
-    form.parse(req, async (err, fields, files) => {
-      if (err) {
-        console.error('Formidable parse error:', err);
-        return res.status(400).json({ message: 'Error parsing file upload' });
-      }
-
-      const fileArray = files.file;
-      if (!fileArray || fileArray.length === 0) {
-        return res.status(400).json({ message: 'No file uploaded' });
-      }
-
-      const file = fileArray[0];
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-      
-      if (!file.mimetype || !validTypes.includes(file.mimetype)) {
-        return res.status(400).json({ message: 'Invalid file type. Only JPG, JPEG, and PNG are allowed.' });
-      }
-
-      try {
-        const fileBuffer = fs.readFileSync(file.filepath);
-
-        // Process image with Sharp
-        const { data: optimizedBuffer, info } = await sharp(fileBuffer)
-          .resize({
-            width: 1920,
-            withoutEnlargement: true,
-          })
-          .webp({ quality: 80 })
-          .toBuffer({ resolveWithObject: true });
-
-        const bucket = await getGridFSBucket();
-        const client = await clientPromise;
-        const db = client.db();
-        
-        // Get user ObjectId
-        const user = await db.collection('users').findOne({ email: session?.user?.email });
-        const uploadedBy = user ? user._id : null;
-
-        // Open GridFS upload stream
-        const filename = `${Date.now()}-optimized.webp`;
-        const uploadStream = bucket.openUploadStream(filename, {
-          metadata: {
-            originalFilename: file.originalFilename,
-            uploadedBy: uploadedBy,
-            uploadedAt: new Date(),
-            width: info.width,
-            height: info.height,
-            size: info.size, // optimized size in bytes
-            mimeType: file.mimetype,
-            contentType: 'image/webp',
-          }
-        });
-
-        uploadStream.end(optimizedBuffer);
-
-        uploadStream.on('finish', () => {
-          // Cleanup temp file
-          fs.unlinkSync(file.filepath);
-          
-          return res.status(200).json({ 
-            message: 'Image uploaded successfully',
-            imageId: uploadStream.id.toString(),
-            url: `/api/images/${uploadStream.id.toString()}`
-          });
-        });
-
-        uploadStream.on('error', (uploadErr) => {
-          console.error('GridFS upload error:', uploadErr);
-          fs.unlinkSync(file.filepath);
-          return res.status(500).json({ message: 'Error saving optimized image' });
-        });
-
-      } catch (sharpErr) {
-        console.error('Sharp processing error:', sharpErr);
-        if (fs.existsSync(file.filepath)) {
-          fs.unlinkSync(file.filepath);
+    await new Promise<void>((resolve, reject) => {
+      form.parse(req, async (err, fields, files) => {
+        if (err) {
+          console.error('Formidable parse error:', err);
+          res.status(400).json({ message: 'Error parsing file upload' });
+          return resolve();
         }
-        return res.status(500).json({ message: 'Error processing image' });
-      }
+
+        const fileArray = files.file;
+        if (!fileArray || fileArray.length === 0) {
+          res.status(400).json({ message: 'No file uploaded' });
+          return resolve();
+        }
+
+        const file = fileArray[0];
+        const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        
+        if (!file.mimetype || !validTypes.includes(file.mimetype)) {
+          res.status(400).json({ message: 'Invalid file type. Only JPG, JPEG, PNG, and WebP are allowed.' });
+          return resolve();
+        }
+
+        try {
+          const fileBuffer = fs.readFileSync(file.filepath);
+
+          // Process image with Sharp
+          const { data: optimizedBuffer, info } = await sharp(fileBuffer)
+            .resize({
+              width: 1920,
+              withoutEnlargement: true,
+            })
+            .webp({ quality: 80 })
+            .toBuffer({ resolveWithObject: true });
+
+          const bucket = await getGridFSBucket();
+          const client = await clientPromise;
+          const db = client.db();
+          
+          // Get user ObjectId
+          const user = await db.collection('users').findOne({ email: session?.user?.email });
+          const uploadedBy = user ? user._id : null;
+
+          // Open GridFS upload stream
+          const filename = `${Date.now()}-optimized.webp`;
+          const uploadStream = bucket.openUploadStream(filename, {
+            metadata: {
+              originalFilename: file.originalFilename,
+              uploadedBy: uploadedBy,
+              uploadedAt: new Date(),
+              width: info.width,
+              height: info.height,
+              size: info.size, // optimized size in bytes
+              mimeType: file.mimetype,
+              contentType: 'image/webp',
+            }
+          });
+
+          uploadStream.end(optimizedBuffer);
+
+          uploadStream.on('finish', () => {
+            // Cleanup temp file
+            if (fs.existsSync(file.filepath)) fs.unlinkSync(file.filepath);
+            
+            res.status(200).json({ 
+              message: 'Image uploaded successfully',
+              imageId: uploadStream.id.toString(),
+              url: `/api/images/${uploadStream.id.toString()}`
+            });
+            resolve();
+          });
+
+          uploadStream.on('error', (uploadErr) => {
+            console.error('GridFS upload error:', uploadErr);
+            if (fs.existsSync(file.filepath)) fs.unlinkSync(file.filepath);
+            res.status(500).json({ message: 'Error saving optimized image' });
+            resolve();
+          });
+
+        } catch (sharpErr) {
+          console.error('Sharp processing error:', sharpErr);
+          if (fs.existsSync(file.filepath)) {
+            fs.unlinkSync(file.filepath);
+          }
+          res.status(500).json({ message: 'Error processing image' });
+          resolve();
+        }
+      });
     });
 
   } catch (error) {
