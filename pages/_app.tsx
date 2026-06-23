@@ -11,11 +11,14 @@ import type { AppProps } from 'next/app';
 import 'react-toastify/dist/ReactToastify.css';
 import '@/styles/globals.css';
 
+import { SpeedInsights } from '@vercel/speed-insights/next';
+
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
   return (
     <SessionProvider session={session}>
       <ErrorBoundary>
         <Component {...pageProps} />
+        <SpeedInsights />
         <ToastContainer
           position="top-right"
           autoClose={5000}
