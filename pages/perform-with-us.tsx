@@ -3,10 +3,58 @@ import Head from 'next/head';
 import Image from 'next/image';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import clientPromise from '@/lib/mongodb';
 
 export default function PerformWithUsPage({ performHero }: { performHero: any }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    experience: '',
+    artform: '',
+    links: '',
+    bio: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitMessage(null);
+
+    try {
+      const res = await fetch('/api/comedians/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          comedianProfile: {
+            comedianType: formData.artform,
+            speciality: formData.artform, // Admin page displays this
+            experience: formData.experience, // We store the number of stages here
+            videoUrl: formData.links,
+            bio: formData.bio,
+            status: 'pending'
+          }
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Something went wrong');
+      
+      setSubmitMessage({ type: 'success', text: 'Application submitted! We will get back to you soon.' });
+      setFormData({ name: '', email: '', phone: '', experience: '', artform: '', links: '', bio: '' });
+    } catch (err: any) {
+      setSubmitMessage({ type: 'error', text: err.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     const observerOptions = {
         root: null,
@@ -137,19 +185,27 @@ export default function PerformWithUsPage({ performHero }: { performHero: any })
                 {/* Corner Accent */}
                 <div className="absolute top-0 right-0 w-16 h-16 bg-primary-container opacity-20" style={{clipPath: "polygon(100% 0, 0 0, 100% 100%)"}}></div>
                 
-                <form className="flex flex-col gap-6 relative z-10" onSubmit={(e) => e.preventDefault()}>
+                <form className="flex flex-col gap-6 relative z-10" onSubmit={handleSubmit}>
                   <div className="flex flex-col gap-2">
-                    <label className="font-bold text-[14px] tracking-[0.05em] text-[rgba(255,255,255,0.7)] uppercase font-headline-md" htmlFor="name">Full Name / Stage Name</label>
-                    <input className="bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none" id="name" placeholder="How should we introduce you?" type="text" />
+                    <label className="font-bold text-[14px] tracking-[0.05em] text-[rgba(255,255,255,0.7)] uppercase font-headline-md" htmlFor="name">Full Name / Stage Name *</label>
+                    <input required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none" id="name" placeholder="How should we introduce you?" type="text" />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="font-bold text-[14px] tracking-[0.05em] text-[rgba(255,255,255,0.7)] uppercase font-headline-md" htmlFor="city">City</label>
-                    <input className="bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none" id="city" placeholder="Where are you based?" type="text" />
+                    <label className="font-bold text-[14px] tracking-[0.05em] text-[rgba(255,255,255,0.7)] uppercase font-headline-md" htmlFor="email">Email Address *</label>
+                    <input required value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none" id="email" placeholder="you@example.com" type="email" />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="font-bold text-[14px] tracking-[0.05em] text-[rgba(255,255,255,0.7)] uppercase font-headline-md" htmlFor="artform">Art Form</label>
+                    <label className="font-bold text-[14px] tracking-[0.05em] text-[rgba(255,255,255,0.7)] uppercase font-headline-md" htmlFor="phone">Phone Number *</label>
+                    <input required value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/[^0-9+\s-]/g, '')})} className="bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none" id="phone" placeholder="+91 XXXXX XXXXX" type="tel" />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="font-bold text-[14px] tracking-[0.05em] text-[rgba(255,255,255,0.7)] uppercase font-headline-md" htmlFor="experience">Experience (Stages)</label>
+                    <input value={formData.experience} onChange={(e) => setFormData({...formData, experience: e.target.value.replace(/[^0-9]/g, '')})} className="bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none" id="experience" placeholder="How many stages have you done?" type="text" />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="font-bold text-[14px] tracking-[0.05em] text-[rgba(255,255,255,0.7)] uppercase font-headline-md" htmlFor="artform">Art Form *</label>
                     <div className="relative">
-                      <select className="w-full bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] appearance-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none cursor-pointer" id="artform" defaultValue="">
+                      <select required value={formData.artform} onChange={(e) => setFormData({...formData, artform: e.target.value})} className="w-full bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none cursor-pointer" id="artform">
                         <option disabled value="">Select your discipline</option>
                         <option value="standup">Stand-up Comedy</option>
                         <option value="improv">Improv</option>
@@ -157,24 +213,29 @@ export default function PerformWithUsPage({ performHero }: { performHero: any })
                         <option value="music">Music / Acoustic</option>
                         <option value="other">Other</option>
                       </select>
-                      <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-[rgba(255,255,255,0.7)] pointer-events-none">expand_more</span>
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="font-bold text-[14px] tracking-[0.05em] text-[rgba(255,255,255,0.7)] uppercase font-headline-md" htmlFor="links">Video Links / Socials</label>
-                    <input className="bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none" id="links" placeholder="YouTube, Instagram, etc." type="url" />
+                    <input value={formData.links} onChange={(e) => setFormData({...formData, links: e.target.value})} className="bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none" id="links" placeholder="YouTube, Instagram, etc." type="text" />
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="font-bold text-[14px] tracking-[0.05em] text-[rgba(255,255,255,0.7)] uppercase font-headline-md" htmlFor="bio">Short Bio</label>
-                    <textarea className="bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none resize-none" id="bio" placeholder="Tell us a bit about your act..." rows={4}></textarea>
+                    <textarea value={formData.bio} onChange={(e) => setFormData({...formData, bio: e.target.value})} className="bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none resize-none" id="bio" placeholder="Tell us a bit about your act..." rows={4}></textarea>
                   </div>
                   
+                  {submitMessage && (
+                    <div className={`p-4 rounded-lg ${submitMessage.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                      {submitMessage.text}
+                    </div>
+                  )}
+
                   <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                    <button className="cta-pulse flex-1 bg-primary-container text-[#0A0A0A] font-bold text-[14px] tracking-[0.05em] uppercase px-6 py-4 rounded-full flex items-center justify-center gap-2 hover:bg-[#ff8540] transition-all duration-200" type="submit">
-                        Send Application 
-                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    <button disabled={isSubmitting} className="cta-pulse flex-1 bg-primary-container text-[#0A0A0A] font-bold text-[14px] tracking-[0.05em] uppercase px-6 py-4 rounded-full flex items-center justify-center gap-2 hover:bg-[#ff8540] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none" type="submit">
+                        {isSubmitting ? 'Sending...' : 'Send Application'} 
+                        {!isSubmitting && <span className="material-symbols-outlined text-sm">arrow_forward</span>}
                     </button>
-                    <button className="flex-1 bg-transparent border border-white/20 text-[#e5e2e1] font-bold text-[14px] tracking-[0.05em] uppercase px-6 py-4 rounded-full flex items-center justify-center gap-2 hover:bg-white/5 hover:border-white/40 transition-all duration-200" type="button">
+                    <button className="flex-1 bg-transparent border border-white/20 text-[#e5e2e1] font-bold text-[14px] tracking-[0.05em] uppercase px-6 py-4 rounded-full flex items-center justify-center gap-2 hover:bg-white/5 hover:border-white/40 transition-all duration-200" type="button" onClick={() => window.open('https://wa.me/917984953372', '_blank')}>
                         WhatsApp Us
                         <span className="material-symbols-outlined text-sm">arrow_forward</span>
                     </button>

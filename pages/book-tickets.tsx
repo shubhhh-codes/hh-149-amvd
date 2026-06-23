@@ -25,7 +25,7 @@ export default function BookTickets() {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: name === 'phone' ? value.replace(/[^0-9+\s-]/g, '') : value
     }));
   };
 
