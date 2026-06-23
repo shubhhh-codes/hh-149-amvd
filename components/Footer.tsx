@@ -1,7 +1,25 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 export default function Footer() {
+  const [footerConfig, setFooterConfig] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/cms/footer')
+      .then(res => res.json())
+      .then(data => {
+        if (data.content) {
+          setFooterConfig(data.content.metadata);
+        }
+      })
+      .catch(err => console.error('Failed to load footer settings:', err));
+  }, []);
+
+  const showInstagram = footerConfig?.showInstagram !== false;
+  const showWhatsapp = footerConfig?.showWhatsapp !== false;
+  const instagramUrl = footerConfig?.instagramUrl || 'https://www.instagram.com/the.humourshub';
+  const whatsappUrl = footerConfig?.whatsappUrl || 'https://whatsapp.com';
+
   return (
     <footer className="bg-[#0A0A0A] border-t border-white/[0.07] font-body mt-24">
       <div className="max-w-[1280px] mx-auto px-margin-mobile lg:px-margin-desktop py-16 md:py-24">
@@ -16,15 +34,19 @@ export default function Footer() {
               </p>
             </div>
             <div className="flex items-center space-x-5 pt-2">
-              <a aria-label="Instagram" className="text-white/45 hover:text-primary-container transition-all duration-300 transform hover:-translate-y-1" href="https://www.instagram.com/the.humourshub" target="_blank" rel="noopener noreferrer">
-                <i className="fab fa-instagram text-xl"></i>
-              </a>
+              {showInstagram && (
+                <a aria-label="Instagram" className="text-white/45 hover:text-primary-container transition-all duration-300 transform hover:-translate-y-1" href={instagramUrl} target="_blank" rel="noopener noreferrer">
+                  <i className="fab fa-instagram text-xl"></i>
+                </a>
+              )}
               <a aria-label="Twitter X" className="text-white/45 hover:text-primary-container transition-all duration-300 transform hover:-translate-y-1" href="https://twitter.com" target="_blank" rel="noopener noreferrer">
                 <i className="fab fa-x-twitter text-xl"></i>
               </a>
-              <a aria-label="WhatsApp" className="text-white/45 hover:text-primary-container transition-all duration-300 transform hover:-translate-y-1" href="https://whatsapp.com" target="_blank" rel="noopener noreferrer">
-                <i className="fab fa-whatsapp text-xl"></i>
-              </a>
+              {showWhatsapp && (
+                <a aria-label="WhatsApp" className="text-white/45 hover:text-primary-container transition-all duration-300 transform hover:-translate-y-1" href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                  <i className="fab fa-whatsapp text-xl"></i>
+                </a>
+              )}
             </div>
           </div>
           {/* Column 2: Explore */}
@@ -43,7 +65,6 @@ export default function Footer() {
             <ul className="space-y-4 text-sm lg:text-base">
               <li><Link className="text-white/45 hover:text-white transition-colors" href="/perform-with-us">Perform With Us</Link></li>
               <li><Link className="text-white/45 hover:text-white transition-colors" href="/">Contact</Link></li>
-              <li><Link className="text-white/45 hover:text-white transition-colors" href="/">Venue Hire</Link></li>
               <li><Link className="text-white/45 hover:text-white transition-colors" href="/">Support</Link></li>
             </ul>
           </div>

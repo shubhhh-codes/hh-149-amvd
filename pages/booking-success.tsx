@@ -20,7 +20,15 @@ export default function BookingSuccess() {
 
   const handleDownloadTicket = useCallback(() => {
     if (!bookingId) return;
-    window.open(`/api/generate-ticket?bookingId=${bookingId}`, '_blank');
+    
+    // Direct DOM anchor — no fetch, no blob, no async.
+    const a = document.createElement('a');
+    a.href = `/api/generate-ticket?bookingId=${bookingId}`;
+    a.download = `HH-TICKET-${bookingId}.pdf`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }, [bookingId]);
 
   // Auto-download ticket on mount

@@ -35,7 +35,7 @@ interface CMSItem {
 }
 
 export default function SiteCMS() {
-  const [cmsTab, setCmsTab] = useState<'homepage' | 'gallery' | 'shows' | 'perform' | 'policies' | 'page404' | 'profile'>('homepage');
+  const [cmsTab, setCmsTab] = useState<'homepage' | 'gallery' | 'shows' | 'perform' | 'policies' | 'page404' | 'profile' | 'footer'>('homepage');
   
   const [performers, setPerformers] = useState<Comedian[]>([]);
   const [gallery, setGallery] = useState<CMSItem[]>([]);
@@ -52,6 +52,7 @@ export default function SiteCMS() {
   const [policies, setPolicies] = useState<CMSItem[]>([]);
   const [page404, setPage404] = useState<CMSItem | null>(null);
   const [profilePage, setProfilePage] = useState<CMSItem | null>(null);
+  const [footerSettings, setFooterSettings] = useState<CMSItem | null>(null);
   
   const [loading, setLoading] = useState(true);
   
@@ -115,6 +116,11 @@ export default function SiteCMS() {
         const data = await res.json();
         if (data.content && data.content.length > 0) setProfilePage(data.content[0]);
         else setProfilePage(null);
+      } else if (cmsTab === 'footer') {
+        const res = await fetch('/api/admin/cms/content?type=footer_settings');
+        const data = await res.json();
+        if (data.content && data.content.length > 0) setFooterSettings(data.content[0]);
+        else setFooterSettings(null);
       }
     } catch (error) {
       console.error(error);
@@ -571,6 +577,44 @@ export default function SiteCMS() {
     }
   };
 
+  const handleSaveFooter = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSavingStatus(true);
+    try {
+      const form = new FormData(e.currentTarget);
+      
+      const payload = {
+        type: 'footer_settings',
+        metadata: {
+          instagramUrl: form.get('instagramUrl'),
+          whatsappUrl: form.get('whatsappUrl'),
+          showInstagram: form.get('showInstagram') === 'true',
+          showWhatsapp: form.get('showWhatsapp') === 'true',
+        },
+        isVisible: true
+      };
+
+      const url = footerSettings ? `/api/admin/cms/content/${footerSettings._id}` : `/api/admin/cms/content`;
+      const method = footerSettings ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error('Failed to save footer settings');
+      toast.success('Footer Settings updated');
+      fetchData();
+      // Wait to revalidate
+      revalidatePaths(['/', '/shows', '/gallery', '/perform-with-us', '/policies', '/about', '/auth/login', '/404', '/profile']);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Sub-Tabs */}
@@ -616,6 +660,12 @@ export default function SiteCMS() {
           className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'page404' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         >
           404 Page
+        </button>
+        <button 
+          onClick={() => setCmsTab('footer')}
+          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'footer' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+        >
+          Footer Settings
         </button>
       </div>
 

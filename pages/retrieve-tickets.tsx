@@ -89,16 +89,28 @@ export default function RetrieveTickets() {
     const btn = e.currentTarget;
     const originalText = btn.innerHTML;
     btn.innerHTML = `<div class="loader !border-black !border-t-transparent w-5 h-5"></div>`;
-    setTimeout(() => {
-        btn.innerHTML = `<span class="material-symbols-outlined">check</span> DONE`;
-        btn.classList.add('bg-[#FF6B1A]', 'text-black', 'border-[#FF6B1A]');
-        setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.classList.remove('bg-[#FF6B1A]', 'text-black', 'border-[#FF6B1A]');
-        }, 3000);
-    }, 1000);
+    btn.disabled = true;
 
-    window.open(`/api/generate-ticket?bookingId=${bId}`, '_blank');
+    // Direct DOM anchor — no fetch, no blob, no async.
+    // The API sets Content-Disposition: attachment so the browser downloads in-place.
+    const a = document.createElement('a');
+    a.href = `/api/generate-ticket?bookingId=${bId}`;
+    a.download = `HH-TICKET-${bId}.pdf`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    // Reset button after a short delay (we can't track download completion)
+    setTimeout(() => {
+      btn.innerHTML = `<span class="material-symbols-outlined">check</span> DONE`;
+      btn.classList.add('bg-[#FF6B1A]', 'text-black', 'border-[#FF6B1A]');
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.classList.remove('bg-[#FF6B1A]', 'text-black', 'border-[#FF6B1A]');
+        btn.disabled = false;
+      }, 3000);
+    }, 2000);
   };
 
   return (
@@ -406,7 +418,7 @@ export default function RetrieveTickets() {
                                     >
                                         <span className="material-symbols-outlined">download</span> Download
                                     </button>
-                                    <a href="#" className="text-xs font-label-caps tracking-widest text-[#FF6B1A] hover:underline uppercase font-bold">Need Help?</a>
+                                    {/* <a href="#" className="text-xs font-label-caps tracking-widest text-[#FF6B1A] hover:underline uppercase font-bold">Need Help?</a> */}
                                 </div>
                             </div>
                         ))}
