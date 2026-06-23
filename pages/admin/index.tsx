@@ -7,6 +7,7 @@ import { toast } from 'react-toastify';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { formatCurrency } from '@/utils/format';
 import DownloadPaymentsButton from '@/components/UserDownloadPDF';
+import Image from 'next/image';
 
 interface Booking {
   _id: string;
@@ -35,6 +36,9 @@ interface ComedianProfile {
     bio: string;
     videoUrl: string;
     status: 'pending' | 'approved' | 'declined';
+    isFeatured?: boolean;
+    tagline?: string;
+    instagramUrl?: string;
   };
 }
 
@@ -65,7 +69,7 @@ interface PaymentStats {
 export default function AdminPanel() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'comedians' | 'payments' | 'cms'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'comedians' | 'payments' | 'cms'>('bookings');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [comedians, setComedians] = useState<ComedianProfile[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -82,8 +86,32 @@ export default function AdminPanel() {
   const [showCompModal, setShowCompModal] = useState(false);
   const [compForm, setCompForm] = useState({ fullName: '', email: '', phone: '', numberOfTickets: 1 });
 
-  // Search
+  // Add Comedian modal
+  const [showAddComedianModal, setShowAddComedianModal] = useState(false);
+  const [comedianForm, setComedianForm] = useState<{
+    id?: string;
+    username: string;
+    email: string;
+    phone: string;
+    speciality: string;
+    tagline: string;
+    instagramUrl: string;
+    isFeatured: boolean;
+    imageFile?: File | null;
+  }>({
+    username: '',
+    email: '',
+    phone: '',
+    speciality: '',
+    tagline: '',
+    instagramUrl: '',
+    isFeatured: false,
+    imageFile: null,
+  });
+
+  // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'CANCELLED'>('ALL');
 
   const fetchBookings = useCallback(async () => {
     const res = await fetch('/api/admin/bookings');
@@ -199,6 +227,27 @@ export default function AdminPanel() {
     }
   };
 
+  const handleComedianFeatureToggle = async (comedianId: string, currentFeatured: boolean) => {
+    try {
+      const response = await fetch('/api/admin/comedians', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comedianId, isFeatured: !currentFeatured }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || 'Failed to update featured status');
+      }
+
+      toast.success(!currentFeatured ? 'Comedian featured on homepage' : 'Comedian removed from homepage');
+      fetchComedians();
+    } catch (error: any) {
+      console.error('Feature toggle error:', error);
+      toast.error(error.message || 'Failed to update featured status');
+    }
+  };
+
   const handleCreateCompBooking = async () => {
     try {
       const res = await fetch('/api/admin/bookings', {
@@ -219,7 +268,57 @@ export default function AdminPanel() {
     }
   };
 
+  const handleSaveComedian = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      let photoId = undefined;
+      
+      if (comedianForm.imageFile) {
+        const formData = new FormData();
+        formData.append('file', comedianForm.imageFile);
+        const uploadRes = await fetch('/api/admin/cms/upload', {
+          method: 'POST',
+          body: formData
+        });
+        if (!uploadRes.ok) throw new Error('Failed to upload image');
+        const uploadData = await uploadRes.json();
+        photoId = uploadData.url.split('/').pop();
+      }
+
+      const payload: any = { ...comedianForm };
+      delete payload.imageFile;
+      if (photoId) payload.photoId = photoId;
+      if (payload.id) {
+        payload.name = payload.username; // PUT endpoint expects 'name'
+      }
+
+      const url = payload.id ? `/api/admin/comedians/${payload.id}` : '/api/admin/comedians';
+      const method = payload.id ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      toast.success(payload.id ? 'Comedian updated successfully' : 'Comedian added successfully');
+      setShowAddComedianModal(false);
+      setComedianForm({ username: '', email: '', phone: '', speciality: '', tagline: '', instagramUrl: '', isFeatured: false, imageFile: null });
+      fetchComedians();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save comedian');
+    }
+  };
+
   const filteredBookings = bookings.filter(b => {
+    if (filterStatus !== 'ALL') {
+      if (filterStatus === 'PENDING' && b.status !== 'pending') return false;
+      if (filterStatus === 'CONFIRMED' && b.status !== 'approved') return false;
+      if (filterStatus === 'CANCELLED' && b.status !== 'cancelled') return false;
+    }
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -232,111 +331,90 @@ export default function AdminPanel() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+      <div className="min-h-screen bg-[#131313] flex items-center justify-center">
         <LoadingSpinner />
       </div>
     );
   }
 
+  const navLinks = [
+    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', short: 'DASH' },
+    { id: 'bookings', label: 'Bookings', icon: 'calendar_today', short: 'BOOK' },
+    { id: 'cms', label: 'CMS', icon: 'settings_applications', isFab: true },
+    { id: 'comedians', label: 'Comedians', icon: 'theater_comedy', short: 'APPS' },
+    { id: 'payments', label: 'Payments', icon: 'payments', short: 'PAY' },
+  ];
+
   return (
-    <div className="flex min-h-screen bg-[#0A0A0A] text-[#e5e2e1] font-body-md overflow-x-hidden">
-      <style jsx>{`
-        .brutalist-card {
-            border: 1px solid rgba(255, 255, 255, 0.07);
-        }
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .stagger-row {
-            opacity: 0;
-            animation: fadeInUp 0.4s ease-out forwards;
-        }
-        .stagger-row:nth-child(1) { animation-delay: 0.04s; }
-        .stagger-row:nth-child(2) { animation-delay: 0.08s; }
-        .stagger-row:nth-child(3) { animation-delay: 0.12s; }
-        .stagger-row:nth-child(4) { animation-delay: 0.16s; }
-        .stagger-row:nth-child(5) { animation-delay: 0.20s; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #0A0A0A; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #353534; border-radius: 10px; }
-      `}</style>
-
-      {/* SideNavBar */}
-      <aside className="fixed left-0 top-0 h-screen w-[220px] bg-[#0D0D0D] flex flex-col py-8 z-50 border-r border-white/5">
-        <div className="px-6 mb-10">
-          <h1 className="text-primary-container font-headline-md text-[24px] tracking-tight leading-tight uppercase font-bold">The Humours<br/>Hub</h1>
-          <p className="text-[10px] text-on-surface-variant/50 font-label-caps mt-2 uppercase">Admin Portal</p>
-        </div>
-        <nav className="flex-1 space-y-1 px-3">
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 ${activeTab === 'dashboard' ? 'bg-primary-container text-[#0A0A0A]' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-            <span className="material-symbols-outlined text-[20px]" style={{fontVariationSettings: "'FILL' 1"}}>dashboard</span>
-            <span className="text-sm font-medium">Dashboard</span>
-          </button>
-          <button onClick={() => setActiveTab('bookings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 ${activeTab === 'bookings' ? 'bg-primary-container text-[#0A0A0A]' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-            <span className="material-symbols-outlined text-[20px]" style={{fontVariationSettings: "'FILL' 1"}}>calendar_today</span>
-            <span className="text-sm font-medium">Bookings</span>
-          </button>
-          <button onClick={() => setActiveTab('comedians')} className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 ${activeTab === 'comedians' ? 'bg-primary-container text-[#0A0A0A]' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-            <span className="material-symbols-outlined text-[20px]" style={{fontVariationSettings: "'FILL' 1"}}>theater_comedy</span>
-            <span className="text-sm font-medium">Comedian Apps</span>
-          </button>
-          <button onClick={() => setActiveTab('payments')} className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 ${activeTab === 'payments' ? 'bg-primary-container text-[#0A0A0A]' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-            <span className="material-symbols-outlined text-[20px]" style={{fontVariationSettings: "'FILL' 1"}}>payments</span>
-            <span className="text-sm font-medium">Payments</span>
-          </button>
-          <button onClick={() => setActiveTab('cms')} className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 ${activeTab === 'cms' ? 'bg-primary-container text-[#0A0A0A]' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-            <span className="material-symbols-outlined text-[20px]" style={{fontVariationSettings: "'FILL' 1"}}>settings_suggest</span>
-            <span className="text-sm font-medium">CMS</span>
-          </button>
-        </nav>
-        <div className="px-3 mt-auto border-t border-white/5 pt-6">
-          <button onClick={() => signOut({ callbackUrl: '/' })} className="w-full flex items-center gap-3 px-4 py-3 rounded text-error hover:bg-error/10 transition-colors">
-            <span className="material-symbols-outlined text-[20px]">logout</span>
-            <span className="text-sm font-medium">Logout</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Canvas */}
-      <main className="flex-1 ml-[220px] min-h-screen flex flex-col">
-        {/* TopNavBar */}
-        <header className="h-20 bg-[#0A0A0A]/80 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-8 md:px-margin-desktop sticky top-0 z-40">
-          <div className="flex items-center gap-6 w-1/2">
-            <div className="relative w-full max-w-md">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60">search</span>
-              <input
-                className="w-full bg-[#080808] border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-primary-container focus:outline-none transition-colors"
-                placeholder="Search bookings by ID, name, email, phone..."
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
+    <div className="bg-[#0e0e0e] text-[#e5e2e1] font-body-md antialiased overflow-hidden flex h-screen w-full">
+      
+      {/* Mobile Top App Bar */}
+      <header className="md:hidden flex justify-between items-center w-full px-5 h-20 bg-[#131313] border-b border-white/5 fixed top-0 left-0 z-50">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center text-primary-container font-bold">
+            HH
           </div>
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2 bg-[#353534]/20 px-3 py-1.5 rounded-full border border-white/5">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              <span className="text-[11px] font-label-caps text-on-surface tracking-widest uppercase">Cloud Engines Live</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-                <div className="text-right hidden sm:block">
-                  <p className="text-sm font-bold font-headline-md leading-none">Admin Hub</p>
-                  <p className="text-[10px] text-on-surface-variant/60 font-medium mt-1">{session?.user?.email}</p>
-                </div>
-                <div className="w-10 h-10 rounded-lg brutalist-card bg-primary/10 flex items-center justify-center text-primary font-bold">
-                  A
-                </div>
-              </div>
-            </div>
+          <h1 className="text-lg font-headline-sm text-primary-container tracking-tight font-bold uppercase">The Humours Hub</h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full brutalist-border overflow-hidden bg-[#353534] shrink-0 flex items-center justify-center font-bold text-primary-container">
+            {session?.user?.email?.[0]?.toUpperCase() || 'A'}
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* View Containers */}
-        <div className="p-8 md:p-margin-desktop space-y-10 custom-scrollbar overflow-y-auto flex-1">
+      {/* Desktop Side Navigation */}
+      <nav className="hidden md:flex flex-col h-screen fixed left-0 top-0 py-8 gap-4 bg-[#1c1b1b] border-r border-white/5 w-64 z-40 overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4 px-6 mb-8">
+          <div className="w-12 h-12 rounded-full bg-primary-container/20 border border-white/5 flex items-center justify-center text-primary-container font-bold text-xl">
+            HH
+          </div>
+          <div>
+            <h1 className="text-xl font-headline-sm text-primary-container font-bold uppercase tracking-wide">Admin Portal</h1>
+            <p className="text-[10px] text-on-surface/50 uppercase tracking-wider">Manage Platform</p>
+          </div>
+        </div>
+        
+        {/* Nav Links */}
+        <div className="flex-1 flex flex-col gap-2 px-4">
+          {navLinks.map((link) => (
+            <button
+              key={link.id}
+              onClick={() => setActiveTab(link.id as any)}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                activeTab === link.id 
+                  ? 'bg-primary-container text-[#0A0A0A] shadow-[0_0_15px_rgba(255,107,26,0.3)] font-bold' 
+                  : 'text-on-surface/70 hover:bg-white/5 hover:text-on-surface'
+              }`}
+            >
+              <span className="material-symbols-outlined" style={{fontVariationSettings: activeTab === link.id ? "'FILL' 1" : "'FILL' 0"}}>
+                {link.icon}
+              </span>
+              <span className="font-body-md text-sm">{link.label}</span>
+            </button>
+          ))}
+        </div>
+        
+        {/* Footer */}
+        <div className="mt-auto px-4">
+          <button 
+            onClick={() => signOut({ callbackUrl: '/' })} 
+            className="w-full flex items-center gap-3 px-4 py-3 text-error hover:bg-white/5 rounded-lg transition-all duration-200"
+          >
+            <span className="material-symbols-outlined">logout</span>
+            <span className="font-body-md text-sm font-medium">Logout</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Main Content Area */}
+      <main className="flex-1 md:ml-64 pt-24 md:pt-0 pb-24 md:pb-0 h-screen overflow-y-auto relative bg-[#0e0e0e]">
+        <div className="absolute inset-0 spotlight-glow pointer-events-none z-0"></div>
+        <div className="relative z-10 max-w-container-max mx-auto px-5 md:px-12 py-8 md:py-12">
+          
           {error && (
-            <div className="bg-error-container/20 border border-error p-4 rounded-lg flex items-center gap-2 text-error">
+            <div className="bg-error-container/20 border border-error p-4 rounded-lg flex items-center gap-2 text-error mb-8">
               <span className="material-symbols-outlined">error</span>
               <p>{error}</p>
             </div>
@@ -344,322 +422,529 @@ export default function AdminPanel() {
 
           {/* DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
-            <section className="space-y-10 animate-enter">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-[#141414] p-6 brutalist-card border-l-[3px] border-l-primary-container hover:translate-y-[-4px] transition-transform duration-300">
-                  <p className="text-on-surface-variant/60 text-[12px] font-label-caps mb-1 uppercase">Total Revenue</p>
-                  <h3 className="text-[24px] font-headline-md font-bold text-on-surface">{formatCurrency(paymentStats.totalAmount / 100)}</h3>
+            <section className="space-y-6 animate-enter">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                  <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Total Revenue</span>
+                  <div className="flex items-end justify-between mt-2">
+                    <span className="font-headline-md text-3xl font-bold leading-none text-primary-container">{formatCurrency(paymentStats.totalAmount / 100)}</span>
+                  </div>
                 </div>
-                <div className="bg-[#141414] p-6 brutalist-card border-l-[3px] border-l-primary-container hover:translate-y-[-4px] transition-transform duration-300">
-                  <p className="text-on-surface-variant/60 text-[12px] font-label-caps mb-1 uppercase">Active Bookings</p>
-                  <h3 className="text-[24px] font-headline-md font-bold text-on-surface">{bookings.filter(b => b.status !== 'cancelled').length}</h3>
+                <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                  <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Active Bookings</span>
+                  <div className="flex items-end justify-between mt-2">
+                    <span className="font-headline-md text-3xl font-bold leading-none">{bookings.filter(b => b.status !== 'cancelled').length}</span>
+                  </div>
                 </div>
-                <div className="bg-[#141414] p-6 brutalist-card border-l-[3px] border-l-primary-container hover:translate-y-[-4px] transition-transform duration-300">
-                  <p className="text-on-surface-variant/60 text-[12px] font-label-caps mb-1 uppercase">Pending Apps</p>
-                  <h3 className="text-[24px] font-headline-md font-bold text-on-surface">{comedians.filter(c => c.comedianProfile?.status === 'pending').length}</h3>
+                <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                  <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Pending Apps</span>
+                  <div className="flex items-end justify-between mt-2">
+                    <span className="font-headline-md text-3xl font-bold leading-none text-primary-container">{comedians.filter(c => c.comedianProfile?.status === 'pending').length}</span>
+                  </div>
                 </div>
-                <div className="bg-[#141414] p-6 brutalist-card border-l-[3px] border-l-primary-container hover:translate-y-[-4px] transition-transform duration-300">
-                  <p className="text-on-surface-variant/60 text-[12px] font-label-caps mb-1 uppercase">Total Tickets</p>
-                  <h3 className="text-[24px] font-headline-md font-bold text-on-surface">{bookings.reduce((sum, b) => sum + (b.numberOfTickets || 0), 0)}</h3>
+                <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                  <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Total Tickets</span>
+                  <div className="flex items-end justify-between mt-2">
+                    <span className="font-headline-md text-3xl font-bold leading-none">{bookings.reduce((sum, b) => sum + (b.numberOfTickets || 0), 0)}</span>
+                  </div>
                 </div>
               </div>
-
-              <div className="bg-[#141414] p-8 brutalist-card">
-                 <h2 className="text-[24px] font-headline-md font-bold mb-4">Welcome to The Humours Hub Admin Portal</h2>
-                 <p className="text-on-surface-variant">Select a tab on the left to manage Bookings, Comedian Applications, Payments, or update the Homepage CMS.</p>
+              <div className="bg-[#131313] p-6 rounded brutalist-border mt-4">
+                 <h2 className="text-xl font-headline-md font-bold mb-2 uppercase tracking-wide">Welcome to Admin Portal</h2>
+                 <p className="text-on-surface/70 text-sm">Use the navigation to manage Bookings, Comedian Applications, Payments, or update the Content Management System.</p>
               </div>
             </section>
           )}
 
           {/* BOOKINGS TAB */}
           {activeTab === 'bookings' && (
-            <section className="space-y-6 animate-enter">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h2 className="text-[32px] font-headline-md font-bold">Event Bookings</h2>
-                <button
-                  onClick={() => setShowCompModal(true)}
-                  className="bg-primary-container text-[#0A0A0A] px-4 py-2 font-headline-md font-bold rounded hover:opacity-90 transition-opacity flex items-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-lg">add</span>
-                  Create Complimentary Booking
-                </button>
-              </div>
-              <div className="bg-[#141414] brutalist-card overflow-hidden">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-[#0A0A0A] border-b border-white/5">
-                    <tr>
-                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Booking ID</th>
-                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Customer</th>
-                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Tickets</th>
-                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Type</th>
-                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Status</th>
-                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Attended</th>
-                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {filteredBookings.map((booking) => (
-                      <tr key={booking._id} className="stagger-row hover:bg-white/5 transition-colors group">
-                        <td className="px-4 py-4">
-                          <span className="font-mono text-primary-container font-bold text-xs">{booking.bookingId || 'N/A'}</span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex flex-col">
-                            <span className="font-bold">{booking.fullName}</span>
-                            <span className="text-[11px] text-on-surface-variant/60">{booking.email} | {booking.phone}</span>
+            <>
+              <section className="pb-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                    <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Pending Approval</span>
+                    <div className="flex items-end justify-between mt-2">
+                      <span className="font-headline-md text-3xl font-bold leading-none text-primary-container">{bookings.filter(b => b.status === 'pending').length}</span>
+                      <span className="material-symbols-outlined text-primary-container/50 text-xl">hourglass_empty</span>
+                    </div>
+                  </div>
+                  <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                    <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Today's Sales</span>
+                    <div className="flex items-end justify-between mt-2">
+                      <span className="font-headline-md text-3xl font-bold leading-none">{bookings.filter(b => b.status === 'approved' && new Date(b.createdAt).toDateString() === new Date().toDateString()).length}</span>
+                      <span className="material-symbols-outlined text-on-surface/30 text-xl">confirmation_number</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={() => setShowCompModal(true)}
+                    className="bg-primary-container text-[#0A0A0A] px-4 py-2 font-headline-sm text-sm font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 uppercase tracking-wider"
+                  >
+                    <span className="material-symbols-outlined text-lg">add</span>
+                    Create Comp Booking
+                  </button>
+                </div>
+              </section>
+
+              <section className="pb-6 sticky top-0 md:top-[-48px] z-30 bg-[#0e0e0e]/95 backdrop-blur-sm pt-2">
+                <div className="relative w-full h-12 flex items-center rounded brutalist-border bg-[#1c1b1b] focus-within:border-primary-container transition-colors overflow-hidden">
+                  <span className="material-symbols-outlined absolute left-3 text-on-surface/50">search</span>
+                  <input 
+                    className="w-full h-full bg-transparent border-none pl-11 pr-4 text-sm focus:ring-0 placeholder:text-on-surface/30 text-on-surface font-body-md outline-none" 
+                    placeholder="Search ID, Name, or Event..." 
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2 mt-4 overflow-x-auto pb-2 scrollbar-hide">
+                  {['ALL', 'PENDING', 'CONFIRMED', 'CANCELLED'].map((status) => (
+                    <button 
+                      key={status}
+                      onClick={() => setFilterStatus(status as any)}
+                      className={`shrink-0 px-4 py-1.5 rounded-full font-label-caps text-xs transition-colors ${
+                        filterStatus === status 
+                          ? 'bg-[#e5e2e1] text-[#0e0e0e]' 
+                          : 'brutalist-border text-[#e5e2e1]/70 hover:bg-white/5'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <div className="flex flex-col gap-4">
+                {filteredBookings.length === 0 ? (
+                  <div className="text-center py-12 text-on-surface/50">No bookings found.</div>
+                ) : (
+                  filteredBookings.map((booking) => (
+                    <article key={booking._id} className={`bg-[#131313] brutalist-border rounded p-4 relative overflow-hidden flex flex-col gap-5 ${booking.status === 'cancelled' ? 'opacity-60' : ''}`}>
+                      <div className={`absolute top-0 left-0 w-1 h-full ${booking.status === 'pending' ? 'bg-primary-container' : booking.status === 'approved' ? 'bg-white/20' : 'bg-red-500'}`}></div>
+                      <div className="flex justify-between items-start pl-3">
+                        <div>
+                          <div className="font-label-caps text-on-surface/50 text-[10px] mb-1">ID #{booking.bookingId}</div>
+                          <h2 className="font-headline-sm text-lg leading-tight uppercase font-bold">{booking.fullName}</h2>
+                          <div className="text-xs text-on-surface/70 mt-1 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">mail</span>
+                            {booking.email}
                           </div>
-                        </td>
-                        <td className="px-4 py-4">{booking.numberOfTickets} ticket(s)</td>
-                        <td className="px-4 py-4">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-label-caps uppercase tracking-widest ${
-                            booking.bookingType === 'complimentary'
-                              ? 'border border-yellow-500/50 text-yellow-500'
-                              : 'border border-primary-container/50 text-primary-container'
-                          }`}>
-                            {booking.bookingType || 'paid'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4">
-                              <span className={`px-2 py-1 text-[10px] font-bold tracking-wider rounded border ${
-                                booking.status === 'approved' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
-                                booking.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
-                                'bg-red-500/10 text-red-500 border-red-500/20'
-                              }`}>
-                                {booking.status === 'pending' && booking.bookingType === 'paid' ? 'PAYMENT PENDING' : booking.status.toUpperCase()}
-                              </span>
-                        </td>
-                        <td className="px-4 py-4">
-                          {booking.status === 'approved' && (
-                            <button
-                              onClick={() => handleAttendanceToggle(booking.bookingId, !!booking.attended)}
-                              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold transition-colors ${
-                                booking.attended
-                                  ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                                  : 'bg-white/5 text-on-surface-variant hover:bg-white/10'
-                              }`}
-                            >
-                              <span className="material-symbols-outlined text-base" style={{fontVariationSettings: booking.attended ? "'FILL' 1" : "'FILL' 0"}}>
-                                {booking.attended ? 'check_circle' : 'radio_button_unchecked'}
-                              </span>
-                              {booking.attended ? 'Present' : 'Mark'}
-                            </button>
-                          )}
-                        </td>
-                        <td className="px-4 py-4">
-                          {booking.status === 'pending' ? (
-                            <div className="flex gap-2">
-                              <button onClick={() => handleStatusUpdate(booking.bookingId, 'approved')} className="text-green-500 hover:text-green-400 font-bold text-xs uppercase">Approve</button>
-                              <button onClick={() => handleStatusUpdate(booking.bookingId, 'cancelled')} className="text-red-500 hover:text-red-400 font-bold text-xs uppercase">Cancel</button>
+                          {booking.phone && (
+                            <div className="text-xs text-on-surface/70 mt-1 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[14px]">call</span>
+                              {booking.phone}
                             </div>
-                          ) : booking.status === 'approved' ? (
-                            <button onClick={() => handleStatusUpdate(booking.bookingId, 'cancelled')} className="text-red-500 hover:text-red-400 font-bold text-xs uppercase">Cancel</button>
-                          ) : (
-                            <span className="text-on-surface-variant/60 text-xs">Cancelled</span>
                           )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                        <span className={`font-label-caps px-2 py-1 rounded text-[10px] brutalist-border ${
+                          booking.status === 'pending' ? 'bg-primary-container/10 text-primary-container border-primary-container/30' :
+                          booking.status === 'approved' ? 'bg-[#201f1f] text-on-surface/70' :
+                          'bg-red-500/10 text-red-500 border-red-500/30'
+                        }`}>
+                          {booking.status === 'approved' ? 'CONFIRMED' : booking.status.toUpperCase()}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-y-4 gap-x-4 pl-3 border-t border-white/5 pt-4">
+                        <div>
+                          <div className="font-label-caps text-on-surface/40 text-[10px] mb-1">TYPE</div>
+                          <div className="text-sm font-medium uppercase">{booking.bookingType}</div>
+                        </div>
+                        <div>
+                          <div className="font-label-caps text-on-surface/40 text-[10px] mb-1">DATE</div>
+                          <div className="text-sm">{new Date(booking.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                        </div>
+                        <div>
+                          <div className="font-label-caps text-on-surface/40 text-[10px] mb-1">TICKETS</div>
+                          <div className="text-sm">{booking.numberOfTickets} x General Admin</div>
+                        </div>
+                        <div>
+                          <div className="font-label-caps text-on-surface/40 text-[10px] mb-1">ATTENDANCE</div>
+                          <div className="text-sm font-headline-sm">
+                            {booking.attended ? <span className="text-green-400">Present</span> : <span className="text-on-surface/50">Pending</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 pl-3 pt-2">
+                        {booking.status === 'pending' ? (
+                          <>
+                            <button onClick={() => handleStatusUpdate(booking.bookingId, 'approved')} className="flex-1 bg-primary-container text-[#0e0e0e] font-headline-sm text-sm h-12 rounded-xl flex items-center justify-center active:scale-[0.98] transition-transform uppercase">APPROVE</button>
+                            <button onClick={() => handleStatusUpdate(booking.bookingId, 'cancelled')} className="flex-1 bg-transparent brutalist-border text-[#e5e2e1] font-headline-sm text-sm h-12 rounded-xl flex items-center justify-center active:bg-[#201f1f] transition-colors uppercase">DECLINE</button>
+                          </>
+                        ) : booking.status === 'approved' ? (
+                          <button 
+                            onClick={() => handleAttendanceToggle(booking.bookingId, !!booking.attended)}
+                            className={`w-full brutalist-border text-sm h-12 rounded-xl flex items-center justify-center gap-2 transition-colors uppercase font-bold tracking-wide ${booking.attended ? 'bg-[#201f1f] text-[#e5e2e1]' : 'bg-[#e5e2e1] text-[#0e0e0e]'}`}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              {booking.attended ? 'check_circle' : 'how_to_reg'}
+                            </span>
+                            {booking.attended ? 'UNMARK ATTENDANCE' : 'MARK ATTENDANCE'}
+                          </button>
+                        ) : (
+                          <div className="w-full text-center text-error font-label-caps text-xs py-2">CANCELLED</div>
+                        )}
+                      </div>
+                    </article>
+                  ))
+                )}
               </div>
-            </section>
+            </>
           )}
 
           {/* COMEDIANS TAB */}
           {activeTab === 'comedians' && (
             <section className="space-y-6 animate-enter">
-              <h2 className="text-[32px] font-headline-md font-bold">Comedian Applications</h2>
-              <div className="bg-[#141414] brutalist-card overflow-hidden">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-[#0A0A0A] border-b border-white/5">
-                    <tr>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Name</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Art Form</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Experience & Bio</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Status</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {comedians.map((comedian) => (
-                      <tr key={comedian._id} className="stagger-row hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4 font-bold">{comedian.username}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="font-bold">{comedian.comedianProfile?.comedianType || 'Unknown'}</span>
-                            <span className="text-[11px] text-on-surface-variant/60">{comedian.comedianProfile?.speciality || 'N/A'}</span>
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-headline-md font-bold uppercase tracking-wide">Comedian Apps</h2>
+                <button
+                  onClick={() => setShowAddComedianModal(true)}
+                  className="bg-primary-container text-[#0A0A0A] px-4 py-2 font-headline-sm text-sm font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 uppercase tracking-wider"
+                >
+                  <span className="material-symbols-outlined text-lg">person_add</span>
+                  Add Comedian
+                </button>
+              </div>
+              <div className="flex flex-col gap-4">
+                {comedians.map((comedian) => (
+                  <article key={comedian._id} className="bg-[#131313] brutalist-border rounded p-4 relative overflow-hidden flex flex-col gap-4">
+                     <div className={`absolute top-0 left-0 w-1 h-full ${comedian.comedianProfile?.status === 'pending' ? 'bg-primary-container' : comedian.comedianProfile?.status === 'approved' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                     <div className="flex justify-between items-start pl-3">
+                        <div>
+                          <h2 className="font-headline-sm text-lg leading-tight uppercase font-bold">{comedian.username}</h2>
+                          <div className="text-xs text-on-surface/70 mt-1 flex items-center gap-1 uppercase tracking-wider">
+                            {comedian.comedianProfile?.comedianType} • {comedian.comedianProfile?.speciality}
                           </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col max-w-xs">
-                            <span className="text-xs font-bold text-primary-container">{comedian.comedianProfile?.experience || '0 yrs'}</span>
-                            <span className="text-[11px] text-on-surface-variant/60 line-clamp-2">{comedian.comedianProfile?.bio}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          {comedian.comedianProfile?.status === 'pending' && <span className="border border-yellow-500/50 text-yellow-500 px-2 py-0.5 rounded text-[10px] font-label-caps uppercase tracking-widest">In Review</span>}
-                          {comedian.comedianProfile?.status === 'approved' && <span className="border border-green-500/50 text-green-500 px-2 py-0.5 rounded text-[10px] font-label-caps uppercase tracking-widest">Approved</span>}
-                          {comedian.comedianProfile?.status === 'declined' && <span className="border border-red-500/50 text-red-500 px-2 py-0.5 rounded text-[10px] font-label-caps uppercase tracking-widest">Declined</span>}
-                        </td>
-                        <td className="px-6 py-4">
-                          {comedian.comedianProfile?.status === 'pending' ? (
-                            <div className="flex flex-col gap-2">
-                               <button onClick={() => handleComedianStatusUpdate(comedian._id, 'approved')} className="bg-green-500/10 text-green-500 border border-green-500/20 px-3 py-1 rounded text-xs font-bold hover:bg-green-500 hover:text-white transition-colors">Approve</button>
-                               <button onClick={() => handleComedianStatusUpdate(comedian._id, 'declined')} className="bg-red-500/10 text-red-500 border border-red-500/20 px-3 py-1 rounded text-xs font-bold hover:bg-red-500 hover:text-white transition-colors">Decline</button>
-                            </div>
-                          ) : (
-                            <span className="text-on-surface-variant/60 text-xs">Processed</span>
-                          )}
-                          {comedian.comedianProfile?.videoUrl && (
-                             <a href={comedian.comedianProfile.videoUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block text-[10px] text-primary hover:underline">Watch Video</a>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                        <span className={`font-label-caps px-2 py-1 rounded text-[10px] brutalist-border ${
+                          comedian.comedianProfile?.status === 'pending' ? 'bg-primary-container/10 text-primary-container border-primary-container/30' :
+                          comedian.comedianProfile?.status === 'approved' ? 'bg-green-500/10 text-green-500 border-green-500/30' :
+                          'bg-red-500/10 text-red-500 border-red-500/30'
+                        }`}>
+                          {comedian.comedianProfile?.status?.toUpperCase()}
+                        </span>
+                     </div>
+                     <div className="pl-3 text-sm text-on-surface/80">
+                        <p className="mb-2"><strong className="text-primary-container uppercase tracking-wide text-xs">{comedian.comedianProfile?.experience} experience</strong></p>
+                        <p className="line-clamp-3">{comedian.comedianProfile?.bio}</p>
+                     </div>
+                     <div className="flex gap-3 pl-3 pt-2">
+                        {comedian.comedianProfile?.status === 'pending' && (
+                          <>
+                            <button onClick={() => handleComedianStatusUpdate(comedian._id, 'approved')} className="flex-1 bg-green-500 text-black font-headline-sm text-sm h-10 rounded-lg flex items-center justify-center active:scale-[0.98] transition-transform uppercase tracking-wider">APPROVE</button>
+                            <button onClick={() => handleComedianStatusUpdate(comedian._id, 'declined')} className="flex-1 bg-transparent brutalist-border text-red-500 font-headline-sm text-sm h-10 rounded-lg flex items-center justify-center active:bg-[#201f1f] transition-colors uppercase tracking-wider">DECLINE</button>
+                          </>
+                        )}
+                        {comedian.comedianProfile?.status === 'approved' && (
+                          <button 
+                            onClick={() => handleComedianFeatureToggle(comedian._id, !!comedian.comedianProfile?.isFeatured)} 
+                            className={`flex-1 font-headline-sm text-sm h-10 rounded-lg flex items-center justify-center transition-colors uppercase tracking-wider ${comedian.comedianProfile?.isFeatured ? 'bg-primary-container text-black' : 'bg-transparent brutalist-border text-primary-container'}`}
+                          >
+                            {comedian.comedianProfile?.isFeatured ? 'UNFEATURE' : 'FEATURE'}
+                          </button>
+                        )}
+                        {comedian.comedianProfile?.videoUrl && (
+                          <a href={comedian.comedianProfile.videoUrl} target="_blank" rel="noopener noreferrer" className="flex-1 bg-[#201f1f] brutalist-border text-[#e5e2e1] font-headline-sm text-sm h-10 rounded-lg flex items-center justify-center transition-colors uppercase tracking-wider">WATCH VIDEO</a>
+                        )}
+                        <button 
+                           onClick={() => {
+                             setComedianForm({
+                               id: comedian._id,
+                               username: comedian.username,
+                               email: comedian.email,
+                               phone: comedian.phone || '',
+                               speciality: comedian.comedianProfile?.speciality || '',
+                               tagline: comedian.comedianProfile?.tagline  || '',
+                               instagramUrl: comedian.comedianProfile?.instagramUrl || '',
+                               isFeatured: !!comedian.comedianProfile?.isFeatured,
+                               imageFile: null
+                             });
+                             setShowAddComedianModal(true);
+                           }} 
+                           className="flex-1 bg-transparent brutalist-border text-[#e5e2e1] font-headline-sm text-sm h-10 rounded-lg flex items-center justify-center transition-colors uppercase tracking-wider hover:bg-white/5"
+                        >
+                          EDIT
+                        </button>
+                     </div>
+                  </article>
+                ))}
               </div>
             </section>
           )}
 
           {/* PAYMENTS TAB */}
           {activeTab === 'payments' && (
-            <section className="space-y-8 animate-enter">
-              <div className="flex justify-between items-center">
-                 <h2 className="text-[32px] font-headline-md font-bold">Payments Records</h2>
-                 <DownloadPaymentsButton payments={payments} className="!bg-transparent !text-primary-container !border-none !shadow-none hover:underline underline-offset-4 flex items-center gap-2" />
+            <section className="space-y-6 animate-enter">
+              <div className="flex justify-between items-center mb-4">
+                 <h2 className="text-2xl font-headline-md font-bold uppercase tracking-wide">Payments</h2>
+                 <DownloadPaymentsButton payments={payments} className="!bg-[#201f1f] !text-[#e5e2e1] !text-xs !px-3 !py-1 !rounded brutalist-border" />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-[#141414] p-6 brutalist-card">
-                  <p className="text-[10px] font-label-caps text-on-surface-variant/60 uppercase">Total Processed</p>
-                  <h4 className="text-[24px] font-headline-md font-bold">{formatCurrency(paymentStats.totalAmount / 100)}</h4>
-                </div>
-                <div className="bg-[#141414] p-6 brutalist-card">
-                  <p className="text-[10px] font-label-caps text-on-surface-variant/60 text-green-400 uppercase">Successful Payments</p>
-                  <h4 className="text-[24px] font-headline-md font-bold">{paymentStats.successfulPayments}</h4>
-                </div>
-                <div className="bg-[#141414] p-6 brutalist-card">
-                  <p className="text-[10px] font-label-caps text-on-surface-variant/60 text-error uppercase">Failed Payments</p>
-                  <h4 className="text-[24px] font-headline-md font-bold">{paymentStats.failedPayments}</h4>
-                </div>
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                    <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Total Processed</span>
+                    <div className="flex items-end justify-between mt-2">
+                      <span className="font-headline-md text-2xl font-bold leading-none text-primary-container">{formatCurrency(paymentStats.totalAmount / 100)}</span>
+                    </div>
+                  </div>
+                  <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                    <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase text-green-400">Successful</span>
+                    <div className="flex items-end justify-between mt-2">
+                      <span className="font-headline-md text-2xl font-bold leading-none">{paymentStats.successfulPayments}</span>
+                    </div>
+                  </div>
               </div>
-              <div className="bg-[#141414] brutalist-card overflow-hidden">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-[#0A0A0A] border-b border-white/5">
-                    <tr>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Booking ID</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Customer</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Amount</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Razorpay ID</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {payments.map((payment) => (
-                      <tr key={payment._id} className="stagger-row hover:bg-white/5 transition-colors border-b border-white/5">
-                        <td className="px-6 py-4 font-mono text-[11px] text-primary-container font-bold">{payment.bookingId || payment.orderId}</td>
-                        <td className="px-6 py-4">
-                            <div className="flex flex-col">
-                                <span className="font-bold">{payment.bookingDetails?.fullName || 'N/A'}</span>
-                                <span className="text-[11px] text-on-surface-variant/60">{payment.bookingDetails?.email || 'N/A'}</span>
-                            </div>
-                        </td>
-                        <td className="px-6 py-4 font-bold text-primary-container">{formatCurrency(payment.amount / 100)}</td>
-                        <td className="px-6 py-4 text-on-surface-variant/60 font-mono text-xs">{payment.paymentId}</td>
-                        <td className="px-6 py-4">
-                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${payment.status === 'completed' ? 'bg-green-500/20 text-green-400' : payment.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                             {payment.status === 'completed' ? 'SUCCESS' : payment.status}
-                           </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="flex flex-col gap-4 mt-4">
+                {payments.map((payment) => (
+                  <article key={payment._id} className="bg-[#131313] brutalist-border rounded p-4 flex flex-col gap-2">
+                    <div className="flex justify-between items-start">
+                       <div>
+                          <div className="font-mono text-primary-container text-xs mb-1">{payment.bookingId || payment.orderId}</div>
+                          <h2 className="font-headline-sm text-base leading-tight font-bold uppercase">{payment.bookingDetails?.fullName || 'Guest'}</h2>
+                       </div>
+                       <span className="font-headline-md font-bold">{formatCurrency(payment.amount / 100)}</span>
+                    </div>
+                    <div className="flex justify-between items-end mt-2">
+                      <span className="text-xs text-on-surface/50 font-mono">{payment.paymentId}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${payment.status === 'completed' ? 'bg-green-500/20 text-green-400' : payment.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                         {payment.status === 'completed' ? 'SUCCESS' : payment.status}
+                      </span>
+                    </div>
+                  </article>
+                ))}
               </div>
             </section>
           )}
 
           {/* CMS TAB */}
           {activeTab === 'cms' && (
-            <section className="space-y-10 animate-enter">
-              <h2 className="text-[32px] font-headline-md font-bold">Homepage Content Management</h2>
-              <SiteCMS />
+            <section className="space-y-6 animate-enter">
+              <h2 className="text-2xl font-headline-md font-bold mb-4 uppercase tracking-wide">Content Management</h2>
+              <div className="bg-[#131313] brutalist-border rounded-lg overflow-hidden">
+                <SiteCMS />
+              </div>
             </section>
           )}
         </div>
-
-        <footer className="p-8 border-t border-white/5 bg-[#0A0A0A] text-[11px] font-label-caps text-on-surface-variant/30 flex justify-between uppercase">
-          <span>© 2024 THE HUMOURS HUB • BY SHUBHHH</span>
-          <span>HUMOURS HUB 2.0.0-GUEST</span>
-        </footer>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 w-full h-20 bg-[#1c1b1b] border-t border-white/5 z-50 px-2 flex justify-around items-center pb-safe">
+        {navLinks.map((link) => (
+          link.isFab ? (
+            <div key={link.id} className="relative -top-5">
+              <button 
+                onClick={() => setActiveTab(link.id as any)}
+                className={`w-14 h-14 rounded-xl flex items-center justify-center transition-transform ${
+                  activeTab === link.id ? 'bg-primary-container text-[#0e0e0e] shadow-[0_8px_16px_rgba(255,107,26,0.3)] scale-105' : 'bg-[#353534] text-on-surface/70'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[28px]">{link.icon}</span>
+              </button>
+            </div>
+          ) : (
+            <button 
+              key={link.id}
+              onClick={() => setActiveTab(link.id as any)}
+              className={`flex flex-col items-center justify-center w-16 h-16 gap-1 transition-colors ${
+                activeTab === link.id ? 'text-primary-container' : 'text-on-surface/50 hover:text-on-surface'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[24px]" style={{fontVariationSettings: activeTab === link.id ? "'FILL' 1" : "'FILL' 0"}}>{link.icon}</span>
+              <span className="text-[10px] font-label-caps tracking-wider">{link.short}</span>
+            </button>
+          )
+        ))}
+      </nav>
 
       {/* Complimentary Booking Modal */}
       {showCompModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-sm">
-          <div className="bg-[#141414] brutalist-card rounded-lg p-8 w-96">
-            <h2 className="text-[24px] font-headline-md font-bold text-on-surface mb-2">Complimentary Booking</h2>
-            <p className="text-sm text-on-surface-variant mb-6">Create a free booking for a guest.</p>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-sm px-4">
+          <div className="bg-[#131313] brutalist-border rounded-xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-headline-md font-bold text-[#e5e2e1] mb-2 uppercase tracking-wide">Comp Booking</h2>
+            <p className="text-xs text-[#e5e2e1]/70 mb-6">Create a free booking for a guest.</p>
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-[10px] font-label-caps text-on-surface-variant mb-2 uppercase">Full Name</label>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Full Name</label>
                 <input
                   type="text"
                   value={compForm.fullName}
                   onChange={e => setCompForm(p => ({ ...p, fullName: e.target.value }))}
-                  className="w-full bg-[#080808] px-4 py-3 border border-white/10 rounded-lg focus:outline-none focus:border-primary-container text-on-surface transition-colors"
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
                   placeholder="Guest full name"
                   required
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-label-caps text-on-surface-variant mb-2 uppercase">Email</label>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Email</label>
                 <input
                   type="email"
                   value={compForm.email}
                   onChange={e => setCompForm(p => ({ ...p, email: e.target.value }))}
-                  className="w-full bg-[#080808] px-4 py-3 border border-white/10 rounded-lg focus:outline-none focus:border-primary-container text-on-surface transition-colors"
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
                   placeholder="guest@email.com"
                   required
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-label-caps text-on-surface-variant mb-2 uppercase">Phone</label>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Phone</label>
                 <input
                   type="tel"
                   value={compForm.phone}
                   onChange={e => setCompForm(p => ({ ...p, phone: e.target.value }))}
-                  className="w-full bg-[#080808] px-4 py-3 border border-white/10 rounded-lg focus:outline-none focus:border-primary-container text-on-surface transition-colors"
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
                   placeholder="+91 XXXXX XXXXX"
                   required
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-label-caps text-on-surface-variant mb-2 uppercase">Number of Tickets</label>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Tickets</label>
                 <input
                   type="number"
                   min={1}
                   max={50}
                   value={compForm.numberOfTickets}
                   onChange={e => setCompForm(p => ({ ...p, numberOfTickets: Number(e.target.value) }))}
-                  className="w-full bg-[#080808] px-4 py-3 border border-white/10 rounded-lg focus:outline-none focus:border-primary-container text-on-surface transition-colors"
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-3">
+            <div className="flex gap-3">
               <button
                 onClick={() => setShowCompModal(false)}
-                className="px-6 py-2 border border-white/10 text-on-surface-variant rounded font-bold text-sm hover:bg-white/5 transition-colors"
+                className="flex-1 brutalist-border text-[#e5e2e1]/70 rounded-lg font-headline-sm text-sm h-12 hover:bg-white/5 transition-colors tracking-widest uppercase"
               >
-                Cancel
+                CANCEL
               </button>
               <button
                 onClick={handleCreateCompBooking}
-                className="px-6 py-2 bg-primary-container text-[#0A0A0A] rounded font-bold text-sm hover:opacity-90 transition-opacity uppercase tracking-wider"
+                className="flex-1 bg-primary-container text-[#0e0e0e] rounded-lg font-headline-sm text-sm h-12 hover:opacity-90 transition-opacity tracking-widest uppercase"
               >
-                Create Booking
+                CREATE
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Comedian Modal */}
+      {showAddComedianModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-sm px-4 overflow-y-auto py-10">
+          <div className="bg-[#131313] brutalist-border rounded-xl p-6 w-full max-w-md my-auto">
+            <h2 className="text-xl font-headline-md font-bold text-[#e5e2e1] mb-2 uppercase tracking-wide">{comedianForm.id ? 'Edit Comedian' : 'Add Comedian'}</h2>
+            <p className="text-xs text-[#e5e2e1]/70 mb-6">Manually {comedianForm.id ? 'edit' : 'create'} a comedian profile.</p>
+            <form onSubmit={handleSaveComedian} className="space-y-4 mb-6">
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Full Name / Stage Name *</label>
+                <input
+                  type="text"
+                  value={comedianForm.username}
+                  onChange={e => setComedianForm(p => ({ ...p, username: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="John Doe"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Email *</label>
+                <input
+                  type="email"
+                  value={comedianForm.email}
+                  onChange={e => setComedianForm(p => ({ ...p, email: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="comedian@email.com"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Phone</label>
+                <input
+                  type="tel"
+                  value={comedianForm.phone}
+                  onChange={e => setComedianForm(p => ({ ...p, phone: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="+91 XXXXX XXXXX"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Speciality / Art Form *</label>
+                <input
+                  type="text"
+                  value={comedianForm.speciality}
+                  onChange={e => setComedianForm(p => ({ ...p, speciality: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="e.g. Stand-up, Improv"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Tagline</label>
+                <input
+                  type="text"
+                  value={comedianForm.tagline}
+                  onChange={e => setComedianForm(p => ({ ...p, tagline: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="A quick funny quote..."
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Instagram URL</label>
+                <input
+                  type="url"
+                  value={comedianForm.instagramUrl}
+                  onChange={e => setComedianForm(p => ({ ...p, instagramUrl: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="https://instagram.com/..."
+                />
+              </div>
+              
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Profile Image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => {
+                    if (e.target.files && e.target.files[0]) {
+                      setComedianForm(p => ({ ...p, imageFile: e.target.files![0] }));
+                    }
+                  }}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors text-[#e5e2e1]"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="isFeatured"
+                  checked={comedianForm.isFeatured}
+                  onChange={e => setComedianForm(p => ({ ...p, isFeatured: e.target.checked }))}
+                  className="w-4 h-4 rounded border-white/20 bg-[#0e0e0e] text-primary-container focus:ring-primary-container focus:ring-offset-[#131313]"
+                />
+                <label htmlFor="isFeatured" className="text-sm text-[#e5e2e1]/90">
+                  Feature on Homepage
+                </label>
+              </div>
+              
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddComedianModal(false);
+                    setComedianForm({ username: '', email: '', phone: '', speciality: '', tagline: '', instagramUrl: '', isFeatured: false, imageFile: null });
+                  }}
+                  className="flex-1 brutalist-border text-[#e5e2e1]/70 rounded-lg font-headline-sm text-sm h-12 hover:bg-white/5 transition-colors tracking-widest uppercase"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-primary-container text-[#0e0e0e] rounded-lg font-headline-sm text-sm h-12 hover:opacity-90 transition-opacity tracking-widest uppercase"
+                >
+                  {comedianForm.id ? 'SAVE CHANGES' : 'ADD COMEDIAN'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

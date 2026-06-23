@@ -158,6 +158,46 @@ export default function SiteCMS() {
     return data.url;
   };
 
+  const handleUploadPerformerPhoto = async (performerId: string, file: File) => {
+    try {
+      setSavingStatus(true);
+      const url = await uploadFile(file);
+      const photoId = url.split('/').pop();
+      
+      const res = await fetch(`/api/admin/comedians/${performerId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoId })
+      });
+      if (!res.ok) throw new Error('Failed to update photo');
+      toast.success('Photo updated successfully');
+      fetchData();
+      revalidatePaths(['/']);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleDeletePerformer = async (performerId: string) => {
+    if (!confirm('Are you sure you want to delete this performer? This action cannot be undone.')) return;
+    try {
+      setSavingStatus(true);
+      const res = await fetch(`/api/admin/comedians/${performerId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete performer');
+      toast.success('Performer deleted successfully');
+      fetchData();
+      revalidatePaths(['/']);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   const handleSaveGallery = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSavingStatus(true);
@@ -534,46 +574,46 @@ export default function SiteCMS() {
   return (
     <div className="space-y-6">
       {/* Sub-Tabs */}
-      <div className="flex gap-4 border-b border-outline-variant pb-2 overflow-x-auto hide-scrollbar">
+      <div className="flex gap-6 border-b border-surface-variant overflow-x-auto whitespace-nowrap pb-0">
         <button 
           onClick={() => setCmsTab('homepage')}
-          className={`px-4 py-2 whitespace-nowrap font-label-caps tracking-widest text-sm transition-all ${cmsTab === 'homepage' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'homepage' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         >
           Homepage Performers
         </button>
         <button 
           onClick={() => setCmsTab('gallery')}
-          className={`px-4 py-2 whitespace-nowrap font-label-caps tracking-widest text-sm transition-all ${cmsTab === 'gallery' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'gallery' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         >
           Gallery Page
         </button>
         <button 
           onClick={() => setCmsTab('shows')}
-          className={`px-4 py-2 whitespace-nowrap font-label-caps tracking-widest text-sm transition-all ${cmsTab === 'shows' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'shows' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         >
           Shows Page
         </button>
-          <button 
+        <button 
           onClick={() => setCmsTab('perform')}
-          className={`px-4 py-2 whitespace-nowrap font-label-caps tracking-widest text-sm transition-all ${cmsTab === 'perform' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'perform' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         >
           Perform With Us
         </button>
         <button 
           onClick={() => setCmsTab('profile')}
-          className={`px-4 py-2 whitespace-nowrap font-label-caps tracking-widest text-sm transition-all ${cmsTab === 'profile' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'profile' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         >
           Profile Page
         </button>
         <button 
           onClick={() => setCmsTab('policies')}
-          className={`px-4 py-2 whitespace-nowrap font-label-caps tracking-widest text-sm transition-all ${cmsTab === 'policies' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'policies' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         >
           Policies
         </button>
         <button 
           onClick={() => setCmsTab('page404')}
-          className={`px-4 py-2 whitespace-nowrap font-label-caps tracking-widest text-sm transition-all ${cmsTab === 'page404' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'page404' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         >
           404 Page
         </button>
@@ -594,18 +634,49 @@ export default function SiteCMS() {
                     <tr className="bg-[#0A0A0A] border-b border-outline-variant">
                       <th className="px-6 py-4 text-label-caps text-on-surface-variant">Performer</th>
                       <th className="px-6 py-4 text-label-caps text-on-surface-variant">Speciality</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant">
                     {performers.map(p => (
                       <tr key={p._id} className="hover:bg-white/[0.02]">
-                        <td className="px-6 py-4 font-headline-md">{p.username}</td>
+                        <td className="px-6 py-4 flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-container-high shrink-0 relative flex justify-center items-center">
+                            {p.comedianProfile.photoId ? (
+                              <Image 
+                                src={`/api/images/${p.comedianProfile.photoId}`} 
+                                alt={p.username} 
+                                layout="fill" 
+                                objectFit="cover" 
+                              />
+                            ) : (
+                              <span className="material-symbols-outlined text-on-surface-variant">person</span>
+                            )}
+                          </div>
+                          <span className="font-headline-md">{p.username}</span>
+                        </td>
                         <td className="px-6 py-4">{p.comedianProfile.speciality}</td>
+                        <td className="px-6 py-4 text-right space-x-3">
+                          <label className="text-sm text-primary-container hover:underline cursor-pointer">
+                            Upload Photo
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleUploadPerformerPhoto(p._id, e.target.files[0]);
+                                }
+                              }} 
+                            />
+                          </label>
+                          <button onClick={() => handleDeletePerformer(p._id)} className="text-sm text-red-600 hover:underline font-bold">Delete</button>
+                        </td>
                       </tr>
                     ))}
                     {performers.length === 0 && (
                       <tr>
-                        <td colSpan={2} className="text-center py-8 text-on-surface-variant">No approved performers found.</td>
+                        <td colSpan={3} className="text-center py-8 text-on-surface-variant">No approved performers found.</td>
                       </tr>
                     )}
                   </tbody>

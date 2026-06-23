@@ -291,15 +291,17 @@ export default function Home({ performers, gallery, nextShow }: Props) {
               </div>
             ) : (
               performers.map((performer) => (
-                <div key={performer._id} className="flex flex-col items-center gap-3 shrink-0 group">
-                  <div className="w-32 h-32 rounded-full bg-brand-overlay border-2 border-transparent group-hover:border-primary-container transition-colors duration-300 overflow-hidden relative">
+                <div key={performer._id} className="flex flex-col items-center gap-1 shrink-0 group">
+                  <div className="w-32 h-32 rounded-full bg-brand-overlay border-2 border-transparent group-hover:border-primary-container transition-colors duration-300 overflow-hidden relative mb-2">
                     {performer.comedianProfile.photoId ? (
-                      <Image
+                        <Image
                         src={`/api/images/${performer.comedianProfile.photoId}`}
                         alt={performer.username}
                         className="w-full h-full object-cover"
-                        width={128}
-                        height={128}
+                        width={256}
+                        height={256}
+                        quality={95}
+                        unoptimized={false}
                       />
                     ) : (
                       <div className="w-full h-full bg-surface-container-high flex items-center justify-center absolute inset-0">
@@ -308,12 +310,12 @@ export default function Home({ performers, gallery, nextShow }: Props) {
                     )}
                   </div>
                   <span className="font-headline-sm text-base text-on-surface">{performer.username}</span>
-                  <span className="text-sm text-on-surface-variant">{performer.comedianProfile.speciality}</span>
+                  <span className="text-sm text-on-surface-variant leading-tight">{performer.comedianProfile.speciality}</span>
                   {performer.comedianProfile.tagline && (
-                    <span className="text-xs text-on-surface-variant/60 text-center max-w-[8rem]">{performer.comedianProfile.tagline}</span>
+                    <span className="text-xs text-on-surface-variant/60 text-center max-w-[8rem] mt-1 leading-tight">{performer.comedianProfile.tagline}</span>
                   )}
                   {performer.comedianProfile.instagramUrl && (
-                    <a href={performer.comedianProfile.instagramUrl} target="_blank" rel="noopener noreferrer" className="text-primary-container text-xs hover:underline">
+                    <a href={performer.comedianProfile.instagramUrl} target="_blank" rel="noopener noreferrer" className="text-primary-container text-xs hover:underline mt-1">
                       Instagram ↗
                     </a>
                   )}
@@ -321,8 +323,8 @@ export default function Home({ performers, gallery, nextShow }: Props) {
               ))
             )}
 
-            <Link href="/book-tickets?type=comedian" className="flex flex-col items-center gap-3 shrink-0 group cursor-pointer">
-              <div className="w-32 h-32 rounded-full border-2 border-dashed border-white/20 group-hover:border-primary-container flex items-center justify-center transition-colors duration-300">
+            <Link href="/perform-with-us" className="flex flex-col items-center gap-1 shrink-0 group cursor-pointer">
+              <div className="w-32 h-32 rounded-full border-2 border-dashed border-white/20 group-hover:border-primary-container flex items-center justify-center transition-colors duration-300 mb-2">
                 <span className="material-symbols-outlined text-3xl text-white/50 group-hover:text-primary-container">add</span>
               </div>
               <span className="font-headline-sm text-base text-primary-container">Your turn?</span>
@@ -380,7 +382,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
             <p className="font-body-lg text-body-lg text-on-surface-variant mb-10 max-w-2xl mx-auto">
               Stand-up, poetry, singing, guitar — any art form. Everyone is welcome on our stage. The stage is yours, the mic is yours. Let's create magic. Aao kabhi haveli pe.
             </p>
-            <Link href="/book-tickets?type=comedian" className="bg-primary-container text-brand-black font-headline-sm text-headline-sm rounded-full px-8 py-4 hover:bg-primary-container/90 transition-colors inline-flex items-center gap-2">
+            <Link href="/perform-with-us" className="bg-primary-container text-brand-black font-headline-sm text-headline-sm rounded-full px-8 py-4 hover:bg-primary-container/90 transition-colors inline-flex items-center gap-2">
               Apply to Perform →
             </Link>
           </div>
