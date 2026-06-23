@@ -271,8 +271,8 @@ export default function BookTickets() {
                   </h1>
                   <p className="font-body-md text-body-md text-on-surface-variant mt-2">
                     {bookingType === 'show' 
-                      ? 'Secure your spot for an unforgettable night! ðŸŽ­' 
-                      : 'Share your talent with our audience! ðŸŒŸ'}
+                      ? 'Secure your spot for an unforgettable night! 🎭' 
+                      : 'Share your talent with our audience! 🌟'}
                   </p>
                 </div>
               </div>
@@ -364,8 +364,8 @@ export default function BookTickets() {
                       </div>
                       <div className="text-right">
                         <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Total Amount</label>
-                        <div className="font-headline-md text-headline-md text-primary-container">â‚¹{149 * numberOfTickets}</div>
-                        <p className="font-body-md text-sm text-on-surface-variant/60">â‚¹149 per ticket</p>
+                        <div className="font-headline-md text-headline-md text-primary-container">₹{149 * numberOfTickets}</div>
+                        <p className="font-body-md text-sm text-on-surface-variant/60">₹149 per ticket</p>
                       </div>
                     </div>
                   </div>
@@ -482,7 +482,7 @@ export default function BookTickets() {
         <div className="flex flex-col md:flex-row justify-between items-center px-margin-mobile md:px-margin-desktop py-12 w-full max-w-container-max mx-auto space-y-8 md:space-y-0">
           <div className="flex flex-col items-center md:items-start space-y-4">
             <div className="font-headline-sm text-headline-sm font-bold text-primary">Humours Hub</div>
-            <p className="font-body-md text-body-md text-on-surface-variant">Â© 2024 Humours Hub Ahmedabad. All Rights Reserved.</p>
+            <p className="font-body-md text-body-md text-on-surface-variant">© 2024 Humours Hub Ahmedabad. All Rights Reserved.</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 md:flex md:space-x-12">
             <a className="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="/dashboard">Shows</a>

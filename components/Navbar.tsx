@@ -89,7 +89,7 @@ export default function Navbar() {
           </div>
           
           <Link href="/book-tickets" className="bg-primary-container text-brand-black font-label-caps text-label-caps px-5 py-2.5 rounded-full hover:brightness-110 active:scale-95 transition-all hidden md:block">
-            Book Tickets â†’
+            Book Tickets →
           </Link>
           
           <button className="md:hidden text-on-surface" onClick={toggleMenu}>
@@ -136,7 +136,7 @@ export default function Navbar() {
                 </>
               )}
               <Link href="/book-tickets" className="bg-primary-container text-brand-black text-center font-label-caps text-label-caps px-5 py-3 rounded-full mt-4 hover:brightness-110 transition-all" onClick={toggleMenu}>
-                Book Tickets â†’
+                Book Tickets →
               </Link>
             </div>
           </motion.div>

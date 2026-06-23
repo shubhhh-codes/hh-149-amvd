@@ -61,7 +61,7 @@ export default function Footer() {
         {/* Bottom Bar: Developer Credit & Copyright */}
         <div className="pt-10 border-t border-white/[0.05] flex flex-col md:flex-row justify-between items-center gap-6">
           <p className="text-[11px] uppercase tracking-[0.2em] text-white/30 text-center md:text-left">
-            Â© 2024 The Humours Hub. Cultivating Culture in Ahmedabad.
+            © 2024 The Humours Hub. Cultivating Culture in Ahmedabad.
           </p>
           <div className="group relative">
             <Link className="inline-flex items-center gap-x-2 px-4 py-2 rounded-full border border-white/10 bg-white/[0.02] transition-all duration-500 ease-out hover:border-primary-container/50 hover:bg-primary-container/[0.05] hover:drop-shadow-[0_0_15px_rgba(255,107,26,0.2)]" href="https://shubhhh.in" target="_blank" rel="noopener noreferrer">

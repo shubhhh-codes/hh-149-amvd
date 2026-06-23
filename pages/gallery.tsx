@@ -82,7 +82,7 @@ export default function GalleryPage({ galleryItems }: { galleryItems: any[] }) {
               Real nights. Real crowd.
             </h1>
             <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">
-              Every show leaves something behind â€” a laugh, a poem, a chord. Here's proof.
+              Every show leaves something behind — a laugh, a poem, a chord. Here's proof.
             </p>
           </div>
         </section>

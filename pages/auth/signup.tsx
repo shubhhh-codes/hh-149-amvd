@@ -85,7 +85,7 @@ export default function SignUp() {
   return (
     <>
       <Head>
-        <title>Sign Up â€” The Humours Hub</title>
+        <title>Sign Up — The Humours Hub</title>
         <meta name="description" content="Create your Humours Hub account and join Ahmedabad's best comedy community." />
       </Head>
 
@@ -95,7 +95,7 @@ export default function SignUp() {
         style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/carbon-fibre.png')" }}
       />
 
-      {/* Spotlight glow â€” follows mouse */}
+      {/* Spotlight glow — follows mouse */}
       <div
         ref={glowRef}
         className="fixed inset-0 z-0 pointer-events-none transition-all duration-300"
@@ -113,9 +113,9 @@ export default function SignUp() {
 
             {/* Header */}
             <div className="text-center mb-10">
-              <div className="text-4xl mb-4">ðŸŽª</div>
+              <div className="text-4xl mb-4">🎪</div>
               <h1 className="font-headline-md text-headline-md text-on-surface mb-2 tracking-tight">
-                Join the Comedy Community! ðŸŽ­
+                Join the Comedy Community! 🎭
               </h1>
               <p className="font-body-md text-body-md text-on-surface-variant opacity-80">
                 Create your account to start your comedy journey
@@ -196,7 +196,7 @@ export default function SignUp() {
                     required
                     value={formData.password}
                     onChange={handleChange}
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder="••••••••"
                     className={`${inputClass} pr-12`}
                   />
                   <button
@@ -225,7 +225,7 @@ export default function SignUp() {
                     required
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder="••••••••"
                     className={`${inputClass} pr-12`}
                   />
                   <button

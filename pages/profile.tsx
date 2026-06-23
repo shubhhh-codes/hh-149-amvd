@@ -297,15 +297,15 @@ export default function Profile() {
               <form onSubmit={handlePasswordChange} className="flex flex-col gap-6 max-w-md">
                 <div>
                   <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Current Password</label>
-                  <input type="password" value={passwordChangeForm.currentPassword} onChange={(e) => setPasswordChangeForm(prev => ({ ...prev, currentPassword: e.target.value }))} className="w-full bg-[#080808] border border-white/10 rounded-DEFAULT px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:outline-none" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
+                  <input type="password" value={passwordChangeForm.currentPassword} onChange={(e) => setPasswordChangeForm(prev => ({ ...prev, currentPassword: e.target.value }))} className="w-full bg-[#080808] border border-white/10 rounded-DEFAULT px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:outline-none" placeholder="••••••••" required />
                 </div>
                 <div>
                   <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">New Password</label>
-                  <input type="password" value={passwordChangeForm.newPassword} onChange={(e) => setPasswordChangeForm(prev => ({ ...prev, newPassword: e.target.value }))} className="w-full bg-[#080808] border border-white/10 rounded-DEFAULT px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:outline-none" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required minLength={8} />
+                  <input type="password" value={passwordChangeForm.newPassword} onChange={(e) => setPasswordChangeForm(prev => ({ ...prev, newPassword: e.target.value }))} className="w-full bg-[#080808] border border-white/10 rounded-DEFAULT px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:outline-none" placeholder="••••••••" required minLength={8} />
                 </div>
                 <div>
                   <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Confirm New Password</label>
-                  <input type="password" value={passwordChangeForm.confirmNewPassword} onChange={(e) => setPasswordChangeForm(prev => ({ ...prev, confirmNewPassword: e.target.value }))} className="w-full bg-[#080808] border border-white/10 rounded-DEFAULT px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:outline-none" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required minLength={8} />
+                  <input type="password" value={passwordChangeForm.confirmNewPassword} onChange={(e) => setPasswordChangeForm(prev => ({ ...prev, confirmNewPassword: e.target.value }))} className="w-full bg-[#080808] border border-white/10 rounded-DEFAULT px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:outline-none" placeholder="••••••••" required minLength={8} />
                 </div>
                 {passwordChangeError && (
                   <div className="text-red-400 text-sm">{passwordChangeError}</div>

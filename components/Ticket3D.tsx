@@ -26,7 +26,7 @@ export default function Ticket3D() {
           </div>
           
           <div className="flex flex-col items-center">
-            <span className="text-4xl font-bold text-purple-900">â‚¹149</span>
+            <span className="text-4xl font-bold text-purple-900">₹149</span>
             <span className="text-sm text-purple-600">Early Bird Special</span>
           </div>
 
