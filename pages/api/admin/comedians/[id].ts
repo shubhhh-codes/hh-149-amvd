@@ -16,7 +16,7 @@ export default async function handler(
   try {
     const session = await getServerSession(req, res, authOptions);
 
-    if (!session?.user?.email || (session.user.role !== 'admin' && session.user.email !== 'admin@humorshub.com')) {
+    if (session?.user?.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
 

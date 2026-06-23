@@ -22,8 +22,9 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Missing credentials');
         }
 
-        // Only allow admin login
-        if (credentials.email !== 'admin@humorshub.com') {
+        // Allow login if email matches environment variable (fallback to previous for safety)
+        const allowedAdminEmail = process.env.ADMIN_EMAIL;
+        if (!allowedAdminEmail || credentials.email !== allowedAdminEmail) {
           throw new Error('Admin access only');
         }
 

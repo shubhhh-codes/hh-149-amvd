@@ -9,7 +9,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const session = await getServerSession(req, res, authOptions);
     console.log('Session in [id].ts:', session);
-    if (!session?.user?.email || (session.user.role !== 'admin' && session.user.email !== 'admin@humorshub.com')) {
+    if (session?.user?.role !== 'admin') {
       console.log('Failed auth check in [id].ts. Email:', session?.user?.email, 'Role:', session?.user?.role);
       return res.status(403).json({ message: 'Not authorized' });
     }
