@@ -6,6 +6,7 @@ import React from 'react';
  */
 import { SessionProvider } from 'next-auth/react';
 import { ToastContainer } from 'react-toastify';
+import { Analytics } from '@vercel/analytics/next';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import type { AppProps } from 'next/app';
 import 'react-toastify/dist/ReactToastify.css';
@@ -31,6 +32,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
           pauseOnHover
           theme="light"
         />
+        <Analytics />
       </ErrorBoundary>
     </SessionProvider>
   );
