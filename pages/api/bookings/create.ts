@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 
@@ -17,16 +17,16 @@ export default async function handler(
   }
 
   try {
-    const { 
-      fullName, 
-      email, 
-      phone, 
+    const {
+      fullName,
+      email,
+      phone,
       numberOfTickets,
       isComedianBooking,
       comedianId,
       eventDate,
       eventLocation,
-      eventDuration 
+      eventDuration
     } = req.body;
 
     // Validate input
@@ -76,9 +76,9 @@ export default async function handler(
         updatedAt: new Date(),
       });
 
-      return res.status(201).json({ 
-        message: 'Comedian booking created successfully', 
-        bookingId: result.insertedId 
+      return res.status(201).json({
+        message: 'Comedian booking created successfully',
+        bookingId: result.insertedId
       });
     } else {
       // Regular show ticket booking
@@ -88,29 +88,29 @@ export default async function handler(
 
       // Validate number of tickets
       if (numberOfTickets && (numberOfTickets < 1 || numberOfTickets > 50)) {
-        return res.status(400).json({ 
-          message: 'Number of tickets must be between 1 and 50' 
+        return res.status(400).json({
+          message: 'Number of tickets must be between 1 and 50'
         });
       }
 
       // Check available seats
       const totalBookings = await db.collection('bookings')
         .aggregate([
-          { 
-            $match: { 
+          {
+            $match: {
               status: 'approved',
               isComedianBooking: { $ne: true }
-            } 
+            }
           },
           { $group: { _id: null, total: { $sum: '$numberOfTickets' } } }
         ])
         .toArray();
 
       const bookedSeats = totalBookings[0]?.total || 0;
-      
+
       if (bookedSeats + numberOfTickets > 50) {
-        return res.status(400).json({ 
-          message: 'Not enough seats available' 
+        return res.status(400).json({
+          message: 'Not enough seats available'
         });
       }
 
@@ -127,9 +127,9 @@ export default async function handler(
         updatedAt: new Date(),
       });
 
-      return res.status(201).json({ 
-        message: 'Show ticket booking created successfully', 
-        bookingId: result.insertedId 
+      return res.status(201).json({
+        message: 'Show ticket booking created successfully',
+        bookingId: result.insertedId
       });
     }
   } catch (error) {

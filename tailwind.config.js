@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/kunalg932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 /** @type {import('tailwindcss').Config} */

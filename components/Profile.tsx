@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 import { useSession } from 'next-auth/react';
@@ -14,7 +14,7 @@ export default function Profile() {
     return null;
   }
 
-  const memberSince = session.user.createdAt 
+  const memberSince = session.user.createdAt
     ? new Date(session.user.createdAt).toLocaleDateString()
     : new Date().toLocaleDateString();
 

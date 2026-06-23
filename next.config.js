@@ -10,8 +10,7 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
   compress: true,
 
-  // Next.js 16
-  turbopack: {},
+
 
   images: {
     dangerouslyAllowSVG: true,

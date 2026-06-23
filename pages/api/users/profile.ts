@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -23,7 +23,7 @@ export default async function handler(
 
     if (req.method === 'GET') {
       const { email } = req.query;
-      
+
       if (email !== session.user.email) {
         return res.status(403).json({ message: 'Not authorized' });
       }
@@ -45,13 +45,13 @@ export default async function handler(
 
       const result = await db.collection('users').updateOne(
         { email },
-        { 
-          $set: { 
+        {
+          $set: {
             username,
             phone,
             bio,
             updatedAt: new Date()
-          } 
+          }
         }
       );
 

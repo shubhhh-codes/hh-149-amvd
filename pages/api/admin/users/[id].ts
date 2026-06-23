@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -15,7 +15,7 @@ export default async function handler(
 ) {
   try {
     const session = await getServerSession(req, res, authOptions);
-    
+
     if (!session?.user?.email || session.user.email !== 'admin@humorshub.com') {
       return res.status(403).json({ message: 'Not authorized' });
     }
@@ -45,11 +45,11 @@ export default async function handler(
 
       const result = await db.collection('users').updateOne(
         { _id: new ObjectId(id as string) },
-        { 
-          $set: { 
+        {
+          $set: {
             role,
             updatedAt: new Date()
-          } 
+          }
         }
       );
 

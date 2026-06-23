@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 
@@ -28,8 +28,8 @@ export default async function handler(
     const client = await clientPromise;
     const db = client.db();
 
-    const user = await db.collection('users').findOne({ 
-      email: token.email 
+    const user = await db.collection('users').findOne({
+      email: token.email
     });
 
     if (!user) {

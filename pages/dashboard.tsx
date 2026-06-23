@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 
@@ -227,22 +227,20 @@ export default function Dashboard() {
         <nav className="flex space-x-4 mb-gutter">
           <button
             onClick={() => setActiveTab('bookings')}
-            className={`flex items-center px-8 py-4 rounded-xl font-label-caps text-label-caps transition-all border ${
-              activeTab === 'bookings'
+            className={`flex items-center px-8 py-4 rounded-xl font-label-caps text-label-caps transition-all border ${activeTab === 'bookings'
                 ? 'bg-tertiary/10 text-tertiary active-tab-glow border-tertiary/30'
                 : 'text-on-surface-variant hover:bg-surface-container-high border-transparent'
-            }`}
+              }`}
           >
             <span className="material-symbols-outlined mr-2">event</span>
             MY BOOKINGS
           </button>
           <button
             onClick={() => setActiveTab('payments')}
-            className={`flex items-center px-8 py-4 rounded-xl font-label-caps text-label-caps transition-all border ${
-              activeTab === 'payments'
+            className={`flex items-center px-8 py-4 rounded-xl font-label-caps text-label-caps transition-all border ${activeTab === 'payments'
                 ? 'bg-tertiary/10 text-tertiary active-tab-glow border-tertiary/30'
                 : 'text-on-surface-variant hover:bg-surface-container-high border-transparent'
-            }`}
+              }`}
           >
             <span className="material-symbols-outlined mr-2">payments</span>
             PAYMENT HISTORY
