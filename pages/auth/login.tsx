@@ -10,6 +10,7 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Head from 'next/head';
+import { startAuthentication } from '@simplewebauthn/browser';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
@@ -56,6 +57,34 @@ export default function Login() {
       }
     } catch {
       setError('An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasskeyLogin = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const resp = await fetch('/api/auth/webauthn/auth-options');
+      const { options, challengeId } = await resp.json();
+      
+      const authResponse = await startAuthentication(options);
+      
+      const result = await signIn('webauthn', {
+        redirect: false,
+        authResponse: JSON.stringify(authResponse),
+        challengeId,
+      });
+
+      if (result?.error) {
+        setError('Passkey login failed.');
+      } else {
+        router.push('/admin');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Passkey authentication failed');
     } finally {
       setIsLoading(false);
     }
@@ -210,6 +239,22 @@ export default function Login() {
                   <span className="material-symbols-outlined text-lg">arrow_forward</span>
                 </>
               )}
+            </button>
+
+            <div className="flex items-center justify-between mt-4 mb-4">
+              <hr className="w-full border-white/10" />
+              <span className="px-4 text-xs text-on-surface-variant font-label-caps uppercase">Or</span>
+              <hr className="w-full border-white/10" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handlePasskeyLogin}
+              disabled={isLoading}
+              className="w-full bg-[#1a1a1a] border border-white/10 text-on-surface font-headline-sm text-headline-sm font-bold py-4 active:scale-[0.98] hover:bg-white/5 transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="material-symbols-outlined text-lg">fingerprint</span>
+              Sign in with Passkey
             </button>
 
             {/* Admin only notice */}
