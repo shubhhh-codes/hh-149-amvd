@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import SiteCMS from '@/components/admin/SiteCMS';
 import { toast } from 'react-toastify';
@@ -85,16 +85,38 @@ export default function AdminPanel() {
   // Search
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    if (status === 'loading') return;
-    if (!session?.user?.email || session.user.email !== 'admin@humorshub.com') {
-      router.push('/auth/login');
-      return;
-    }
-    fetchData();
-  }, [session, status, router, activeTab]);
+  const fetchBookings = useCallback(async () => {
+    const res = await fetch('/api/admin/bookings');
+    if (!res.ok) throw new Error('Failed to fetch bookings');
+    const data = await res.json();
+    setBookings(data.bookings);
+  }, []);
 
-  const fetchData = async () => {
+  const fetchComedians = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/comedians');
+      if (!response.ok) throw new Error('Failed to fetch comedians');
+      const data = await response.json();
+      setComedians(data.comedians);
+    } catch (error) {
+      console.error('Fetch comedians error:', error);
+      setError('Failed to load comedians');
+    }
+  }, []);
+
+  const fetchPayments = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/payments');
+      if (!res.ok) throw new Error('Failed to fetch payments');
+      const data = await res.json();
+      setPayments(data.payments);
+      setPaymentStats(data.stats);
+    } catch (err) {
+      console.error('Fetch payments error:', err);
+    }
+  }, []);
+
+  const fetchData = useCallback(async () => {
     try {
       if (activeTab === 'dashboard') {
         await Promise.all([fetchBookings(), fetchComedians(), fetchPayments()]);
@@ -111,39 +133,16 @@ export default function AdminPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, fetchBookings, fetchComedians, fetchPayments]);
 
-  const fetchBookings = async () => {
-    const res = await fetch('/api/admin/bookings');
-    if (!res.ok) throw new Error('Failed to fetch bookings');
-    const data = await res.json();
-    setBookings(data.bookings);
-  };
-
-  const fetchComedians = async () => {
-    try {
-      const response = await fetch('/api/admin/comedians');
-      if (!response.ok) throw new Error('Failed to fetch comedians');
-      const data = await response.json();
-      setComedians(data.comedians);
-    } catch (error) {
-      console.error('Fetch comedians error:', error);
-      setError('Failed to load comedians');
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (!session?.user?.email || session.user.email !== 'admin@humorshub.com') {
+      router.push('/auth/login');
+      return;
     }
-  };
-
-  const fetchPayments = async () => {
-    try {
-      const res = await fetch('/api/admin/payments');
-      if (!res.ok) throw new Error('Failed to fetch payments');
-      const data = await res.json();
-      setPayments(data.payments);
-      setPaymentStats(data.stats);
-    } catch (err) {
-      console.error('Fetch payments error:', err);
-      setError('Failed to load payments');
-    }
-  };
+    fetchData();
+  }, [session, status, router, activeTab, fetchData]);
 
   const handleStatusUpdate = async (bookingId: string, bookingStatus: string) => {
     try {

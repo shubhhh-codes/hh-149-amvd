@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
+import Image from 'next/image';
 import clientPromise from '@/lib/mongodb';
 
 export default function GalleryPage({ galleryItems }: { galleryItems: any[] }) {
@@ -111,7 +112,9 @@ export default function GalleryPage({ galleryItems }: { galleryItems: any[] }) {
           <div className="max-w-container-max mx-auto masonry-grid">
             {filteredItems.map(item => (
               <div key={item._id} className="gallery-card group">
-                <img
+                <Image
+                  width={800}
+                  height={600}
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
                   src={item.imageUrl}
                   alt={item.title || "Gallery image"}

@@ -1,5 +1,6 @@
 import React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
@@ -66,11 +67,7 @@ export default function SiteCMS() {
 
   const [savingStatus, setSavingStatus] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, [cmsTab]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       if (cmsTab === 'homepage') {
@@ -125,7 +122,11 @@ export default function SiteCMS() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [cmsTab]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const revalidatePaths = async (paths: string[]) => {
     try {
@@ -638,7 +639,7 @@ export default function SiteCMS() {
                     {gallery.map(g => (
                       <tr key={g._id} className={`hover:bg-white/[0.02] ${g.isDeleted ? 'opacity-50' : ''}`}>
                         <td className="px-6 py-4 flex items-center gap-4">
-                          <img src={g.imageUrl} alt={g.title} className="w-20 h-20 object-cover rounded bg-surface-variant" />
+                          <Image width={80} height={80} src={g.imageUrl || '/'} alt={g.title || 'Image'} className="w-20 h-20 object-cover rounded bg-surface-variant" />
                           <p className="font-headline-md font-bold">{g.title || 'Untitled'}</p>
                         </td>
                         <td className="px-6 py-4">{g.category || 'Other'}</td>
@@ -802,7 +803,7 @@ export default function SiteCMS() {
                      {pastShows.map(show => (
                        <tr key={show._id} className={`hover:bg-white/[0.02] ${show.isDeleted ? 'opacity-50' : ''}`}>
                           <td className="px-4 py-3 flex items-center gap-3">
-                            <img src={show.imageUrl} alt={show.title} className="w-16 h-10 object-cover rounded border border-white/10" />
+                            <Image width={64} height={40} src={show.imageUrl || '/'} alt={show.title || 'Image'} className="w-16 h-10 object-cover rounded border border-white/10" />
                             <span className="font-bold">{show.title}</span>
                           </td>
                           <td className="px-4 py-3">

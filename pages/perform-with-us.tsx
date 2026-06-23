@@ -1,5 +1,6 @@
 import React from 'react';
 import Head from 'next/head';
+import Image from 'next/image';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useEffect } from 'react';
@@ -116,7 +117,9 @@ export default function PerformWithUsPage({ performHero }: { performHero: any })
               </ul>
               
               <div className="mt-8 relative rounded-lg overflow-hidden border border-[rgba(255,255,255,0.07)] aspect-[4/3] group delay-200 animate-enter">
-                <img 
+                <Image
+                  width={800}
+                  height={600}
                   className="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700" 
                   src={performHero?.imageUrl || "https://images.unsplash.com/photo-1585699324551-f6c309eedeca?auto=format&fit=crop&q=80&w=800"}
                   alt="A moody photograph of a stand-up comedian performing on a dark stage." 
