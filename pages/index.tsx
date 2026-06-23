@@ -1,5 +1,4 @@
 import React from 'react';
-import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -50,7 +49,6 @@ interface Props {
 }
 
 export default function Home({ performers, gallery, nextShow }: Props) {
-  const { data: session } = useSession();
   const [venueStatus, setVenueStatus] = useState<{
     totalApproved: number;
     isFull: boolean;
