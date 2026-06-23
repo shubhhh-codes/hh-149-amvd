@@ -83,6 +83,19 @@ export default async function handler(
       return res.status(200).json({ message: 'Comedian updated successfully' });
     }
 
+    if (req.method === 'DELETE') {
+      const result = await db.collection('users').deleteOne({
+        _id: new ObjectId(id),
+        isComedian: true
+      });
+
+      if (result.deletedCount === 0) {
+        return res.status(404).json({ message: 'Comedian not found' });
+      }
+
+      return res.status(200).json({ message: 'Comedian deleted successfully' });
+    }
+
     return res.status(405).json({ message: 'Method not allowed' });
   } catch (error) {
     console.error('Update comedian status error:', error);

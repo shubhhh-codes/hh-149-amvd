@@ -140,10 +140,23 @@ export default async function handler(
     }
 
     if (req.method === 'PUT') {
-      const { comedianId, status } = req.body;
+      const { comedianId, status, isFeatured } = req.body;
 
-      if (!comedianId || !status || !['pending', 'approved', 'declined'].includes(status)) {
-        return res.status(400).json({ message: 'Invalid request data' });
+      if (!comedianId) {
+        return res.status(400).json({ message: 'Comedian ID is required' });
+      }
+
+      const updateFields: any = { updatedAt: new Date() };
+
+      if (status) {
+        if (!['pending', 'approved', 'declined'].includes(status)) {
+          return res.status(400).json({ message: 'Invalid status' });
+        }
+        updateFields['comedianProfile.status'] = status;
+      }
+
+      if (isFeatured !== undefined) {
+        updateFields['comedianProfile.isFeatured'] = isFeatured;
       }
 
       const result = await db.collection('users').updateOne(
@@ -152,10 +165,7 @@ export default async function handler(
           isComedian: true
         },
         {
-          $set: {
-            'comedianProfile.status': status,
-            updatedAt: new Date()
-          }
+          $set: updateFields
         }
       );
 

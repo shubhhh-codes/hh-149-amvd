@@ -18,6 +18,10 @@ body { background-color: #0A0A0A; color: #e5e2e1; }
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
     z-index: -1;
 }
+
+.spotlight-glow {
+    background: radial-gradient(circle at center, rgba(255, 107, 26, 0.08) 0%, transparent 70%);
+}
 .brutal-card {
     background-color: #141414;
     border: 1px solid rgba(255, 255, 255, 0.07);
@@ -66,17 +70,20 @@ body { background-color: #0A0A0A; color: #e5e2e1; }
 .spotlight-glow {
   background: radial-gradient(circle at 50% 50%, rgba(255, 107, 26, 0.08) 0%, transparent 70%);
 }
+.spotlight-bg {
+  background: radial-gradient(circle at top right, rgba(255, 107, 26, 0.08) 0%, transparent 50%);
+}
 
-.brutal-border {
+.brutal-border, .brutalist-border {
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
 .nav-hidden { transform: translateY(-100%); }
 
 /* Hide scrollbar for horizontal scroll */
-.hide-scrollbar::-webkit-scrollbar {
+.hide-scrollbar::-webkit-scrollbar, .scrollbar-hide::-webkit-scrollbar {
     display: none;
 }
-.hide-scrollbar {
+.hide-scrollbar, .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
 }

@@ -51,7 +51,7 @@ export default async function handler(
       .toArray();
 
     // Separate active and cancelled bookings
-    const activeBookings = bookings.filter(b => b.status !== 'cancelled');
+    const activeBookings = bookings.filter(b => b.status === 'approved');
     const cancelledBookings = bookings.filter(b => b.status === 'cancelled');
 
     return res.status(200).json({
