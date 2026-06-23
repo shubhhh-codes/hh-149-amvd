@@ -1,3 +1,4 @@
+import React from 'react';
 /**
  * @copyright (c) 2024 - Present
  * @author github.com/shubhhh-codes
@@ -84,7 +85,7 @@ export default function SignUp() {
   return (
     <>
       <Head>
-        <title>Sign Up — The Humours Hub</title>
+        <title>Sign Up â€” The Humours Hub</title>
         <meta name="description" content="Create your Humours Hub account and join Ahmedabad's best comedy community." />
       </Head>
 
@@ -94,7 +95,7 @@ export default function SignUp() {
         style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/carbon-fibre.png')" }}
       />
 
-      {/* Spotlight glow — follows mouse */}
+      {/* Spotlight glow â€” follows mouse */}
       <div
         ref={glowRef}
         className="fixed inset-0 z-0 pointer-events-none transition-all duration-300"
@@ -112,9 +113,9 @@ export default function SignUp() {
 
             {/* Header */}
             <div className="text-center mb-10">
-              <div className="text-4xl mb-4">🎪</div>
+              <div className="text-4xl mb-4">ðŸŽª</div>
               <h1 className="font-headline-md text-headline-md text-on-surface mb-2 tracking-tight">
-                Join the Comedy Community! 🎭
+                Join the Comedy Community! ðŸŽ­
               </h1>
               <p className="font-body-md text-body-md text-on-surface-variant opacity-80">
                 Create your account to start your comedy journey
@@ -195,7 +196,7 @@ export default function SignUp() {
                     required
                     value={formData.password}
                     onChange={handleChange}
-                    placeholder="••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                     className={`${inputClass} pr-12`}
                   />
                   <button
@@ -224,7 +225,7 @@ export default function SignUp() {
                     required
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    placeholder="••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                     className={`${inputClass} pr-12`}
                   />
                   <button

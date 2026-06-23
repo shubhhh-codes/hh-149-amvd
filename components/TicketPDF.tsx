@@ -1,3 +1,4 @@
+import React from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import QRCode from 'qrcode';

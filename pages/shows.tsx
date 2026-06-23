@@ -1,3 +1,4 @@
+import React from 'react';
 import Head from 'next/head';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -166,7 +167,7 @@ export default function ShowsPage({ showsData }: { showsData: any }) {
                     </div>
                   </div>
                   <h4 className="text-[24px] font-bold headline-font text-white mb-2">{show.title}</h4>
-                  <p className="text-white/70 text-sm mb-4">{show.metadata?.date} • {show.metadata?.venue}</p>
+                  <p className="text-white/70 text-sm mb-4">{show.metadata?.date} â€¢ {show.metadata?.venue}</p>
                   <p className="text-[#e2bfb2] text-body-md line-clamp-2">{show.content}</p>
                 </div>
               ))}

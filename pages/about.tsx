@@ -1,3 +1,4 @@
+import React from 'react';
 import Head from 'next/head';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -71,7 +72,7 @@ export default function AboutPage() {
             </div>
             <div className="space-y-6 font-body-md text-[#bab8b7] leading-relaxed">
               <p>
-                  It started in the corners of crowded cafes where Ahmedabad's first comedic voices were trying to find their rhythm. We realized that talent wasn't the bottleneck—it was the infrastructure. Local artists needed more than just a microphone; they needed a home.
+                  It started in the corners of crowded cafes where Ahmedabad's first comedic voices were trying to find their rhythm. We realized that talent wasn't the bottleneckâ€”it was the infrastructure. Local artists needed more than just a microphone; they needed a home.
               </p>
               <p>
                   Today, The Humours Hub stands as Ahmedabad's definitive center for live performance. We curate nights that range from experimental open mics to polished specials, ensuring that the raw energy of the city is always preserved.
@@ -147,10 +148,10 @@ export default function AboutPage() {
             </p>
             <div className="flex flex-col md:flex-row gap-6 justify-center">
               <Link href="/book-tickets" className="bg-primary text-[#0A0A0A] font-bold text-[24px] px-10 py-4 rounded-lg hover:brightness-110 transition-all">
-                  Book Your Seat →
+                  Book Your Seat â†’
               </Link>
               <Link href="/perform-with-us" className="border border-white/20 text-[#e5e2e1] font-bold text-[24px] px-10 py-4 rounded-lg hover:bg-white/5 transition-all">
-                  Perform With Us →
+                  Perform With Us â†’
               </Link>
             </div>
           </div>
