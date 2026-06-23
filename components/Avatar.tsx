@@ -42,7 +42,7 @@ export default function Avatar({ src, name, size = 'md', className = '' }: Avata
       hash = name.charCodeAt(i) + ((hash << 5) - hash);
     }
     return Math.abs(hash % colors.length);
-  }, [name]);
+  }, [name, colors.length]);
 
   if (src) {
     return (

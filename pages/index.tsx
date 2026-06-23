@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useState, useEffect } from 'react';
@@ -293,11 +294,12 @@ export default function Home({ performers, gallery, nextShow }: Props) {
                 <div key={performer._id} className="flex flex-col items-center gap-3 shrink-0 group">
                   <div className="w-32 h-32 rounded-full bg-brand-overlay border-2 border-transparent group-hover:border-primary-container transition-colors duration-300 overflow-hidden relative">
                     {performer.comedianProfile.photoId ? (
-                      <img
+                      <Image
                         src={`/api/images/${performer.comedianProfile.photoId}`}
                         alt={performer.username}
                         className="w-full h-full object-cover"
-                        loading="lazy"
+                        width={128}
+                        height={128}
                       />
                     ) : (
                       <div className="w-full h-full bg-surface-container-high flex items-center justify-center absolute inset-0">
@@ -342,11 +344,12 @@ export default function Home({ performers, gallery, nextShow }: Props) {
             <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
               {gallery.map((item) => (
                 <div key={item._id} className="relative group rounded-card overflow-hidden bg-brand-overlay break-inside-avoid">
-                  <img
+                  <Image
                     src={`/api/images/${item.imageId}`}
                     alt={item.title || 'Show Moment'}
                     className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
+                    width={800}
+                    height={600}
                   />
                   {item.title && (
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">

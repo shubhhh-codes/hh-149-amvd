@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -18,10 +18,10 @@ export default function BookingSuccess() {
     }
   };
 
-  const handleDownloadTicket = () => {
+  const handleDownloadTicket = useCallback(() => {
     if (!bookingId) return;
     window.open(`/api/generate-ticket?bookingId=${bookingId}`, '_blank');
-  };
+  }, [bookingId]);
 
   // Auto-download ticket on mount
   useEffect(() => {
@@ -31,7 +31,7 @@ export default function BookingSuccess() {
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [bookingId]);
+  }, [bookingId, handleDownloadTicket]);
 
   return (
     <div className="bg-background min-h-screen flex flex-col overflow-x-hidden text-on-surface">
