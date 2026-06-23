@@ -578,7 +578,7 @@ export default function AdminPanel() {
         </div>
 
         <footer className="p-8 border-t border-white/5 bg-[#0A0A0A] text-[11px] font-label-caps text-on-surface-variant/30 flex justify-between uppercase">
-          <span>Â© 2024 THE HUMOURS HUB â€¢ BY SHUBHHH</span>
+          <span>© 2024 THE HUMOURS HUB • BY SHUBHHH</span>
           <span>HUMOURS HUB 1.0.0-DEV</span>
         </footer>
       </main>

@@ -183,7 +183,7 @@ export default function Dashboard() {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
             <div>
               <h1 className="font-headline-md text-headline-md text-on-surface mb-2">
-                Welcome back, {session?.user?.name || session?.user?.email?.split('@')[0] || 'Guest'}! ðŸ‘‹
+                Welcome back, {session?.user?.name || session?.user?.email?.split('@')[0] || 'Guest'}! 👋
               </h1>
               <p className="text-on-surface-variant font-body-lg text-body-lg">Manage your bookings and payments all in one place.</p>
             </div>
@@ -372,7 +372,7 @@ export default function Dashboard() {
         <div className="flex flex-col md:flex-row justify-between items-center px-margin-desktop max-w-container-max mx-auto gap-8">
           <div className="flex flex-col items-center md:items-start">
             <div className="font-headline-sm text-headline-sm font-bold text-primary mb-2">The Humours Hub</div>
-            <p className="font-body-md text-body-md text-on-secondary-container">Â© 2024 The Humours Hub. Built for Ahmedabad's Live Scene.</p>
+            <p className="font-body-md text-body-md text-on-secondary-container">© 2024 The Humours Hub. Built for Ahmedabad's Live Scene.</p>
           </div>
           <div className="flex flex-wrap justify-center gap-8">
             <Link href="/terms" className="font-label-caps text-label-caps text-on-secondary-container hover:text-primary underline transition-all duration-300">Terms of Service</Link>

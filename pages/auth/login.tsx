@@ -1,10 +1,11 @@
+import React from 'react';
 /**
  * @copyright (c) 2024 - Present
  * @author github.com/shubhhh-codes
  * @license MIT
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
