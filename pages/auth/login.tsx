@@ -52,7 +52,7 @@ export default function Login() {
       if (result?.error) {
         setError('Invalid email or password. Please try again.');
       } else {
-        router.push('/dashboard');
+        router.push('/admin');
       }
     } catch {
       setError('An error occurred. Please try again.');
@@ -212,13 +212,10 @@ export default function Login() {
               )}
             </button>
 
-            {/* Sign up link */}
+            {/* Admin only notice */}
             <div className="pt-6 text-center border-t border-white/5">
-              <p className="font-body-md text-body-md text-on-surface-variant">
-                Don&apos;t have an account?{' '}
-                <Link href="/auth/signup" className="text-primary-container font-bold hover:underline ml-1">
-                  Sign up
-                </Link>
+              <p className="font-body-md text-body-md text-on-surface-variant text-xs">
+                Restricted area. Only authorized personnel may access the admin portal.
               </p>
             </div>
           </form>

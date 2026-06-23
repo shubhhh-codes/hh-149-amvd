@@ -22,12 +22,17 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Missing credentials');
         }
 
+        // Only allow admin login
+        if (credentials.email !== 'admin@humorshub.com') {
+          throw new Error('Admin access only');
+        }
+
         const client = await clientPromise;
         const db = client.db();
         const user = await db.collection('users').findOne({ email: credentials.email });
 
         if (!user) {
-          throw new Error('No user found');
+          throw new Error('No admin account found');
         }
 
         const isValid = await compare(credentials.password, user.password);
@@ -38,12 +43,7 @@ export const authOptions: NextAuthOptions = {
         return {
           id: user._id.toString(),
           email: user.email,
-          username: user.username,
-          userId: user.userId,
-          role: user.role || 'user',
-          name: user.name || null,
-          image: user.image || null,
-          createdAt: user.createdAt?.toISOString() || null,
+          role: 'admin',
         };
       }
     })
@@ -54,12 +54,7 @@ export const authOptions: NextAuthOptions = {
       if (session?.user) {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
-        session.user.username = token.username as string;
-        session.user.userId = token.userId as string;
         session.user.role = token.role as string;
-        session.user.name = (token.name as string) || null;
-        session.user.image = (token.image as string) || null;
-        session.user.createdAt = (token.createdAt as string) || null;
       }
       return session;
     },
@@ -67,12 +62,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.email = user.email;
-        token.username = user.username;
-        token.userId = user.userId;
         token.role = user.role;
-        token.name = user.name;
-        token.image = user.image;
-        token.createdAt = user.createdAt;
       }
       return token;
     },
@@ -85,4 +75,4 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-export default NextAuth(authOptions); 
+export default NextAuth(authOptions);

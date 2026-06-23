@@ -8,22 +8,17 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import { formatCurrency } from '@/utils/format';
 import DownloadPaymentsButton from '@/components/UserDownloadPDF';
 
-interface User {
-  _id: string;
-  username: string;
-  email: string;
-  phone?: string;
-  createdAt: string;
-  role: string;
-}
-
 interface Booking {
   _id: string;
+  bookingId: string;
   fullName: string;
   email: string;
   phone: string;
-  status: 'pending' | 'approved' | 'declined';
+  status: 'pending' | 'approved' | 'cancelled';
+  bookingType: 'paid' | 'complimentary';
   numberOfTickets?: number;
+  attended?: boolean;
+  attendedAt?: string;
   createdAt: string;
 }
 
@@ -51,14 +46,12 @@ interface Payment {
   status: string;
   type: string;
   createdAt: string;
+  bookingId?: string;
   bookingDetails?: {
     numberOfTickets: number;
     fullName: string;
     phone: string;
-  };
-  user?: {
     email: string;
-    username: string;
   };
 }
 
@@ -72,9 +65,8 @@ interface PaymentStats {
 export default function AdminPanel() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'users' | 'comedians' | 'payments' | 'cms'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'comedians' | 'payments' | 'cms'>('dashboard');
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [comedians, setComedians] = useState<ComedianProfile[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [paymentStats, setPaymentStats] = useState<PaymentStats>({
@@ -85,14 +77,18 @@ export default function AdminPanel() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [passwordResetModal, setPasswordResetModal] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
+
+  // Complimentary booking modal
+  const [showCompModal, setShowCompModal] = useState(false);
+  const [compForm, setCompForm] = useState({ fullName: '', email: '', phone: '', numberOfTickets: 1 });
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (status === 'loading') return;
     if (!session?.user?.email || session.user.email !== 'admin@humorshub.com') {
-      router.push('/');
+      router.push('/auth/login');
       return;
     }
     fetchData();
@@ -101,11 +97,9 @@ export default function AdminPanel() {
   const fetchData = async () => {
     try {
       if (activeTab === 'dashboard') {
-        await Promise.all([fetchBookings(), fetchUsers(), fetchComedians(), fetchPayments()]);
+        await Promise.all([fetchBookings(), fetchComedians(), fetchPayments()]);
       } else if (activeTab === 'bookings') {
         await fetchBookings();
-      } else if (activeTab === 'users') {
-        await fetchUsers();
       } else if (activeTab === 'comedians') {
         await fetchComedians();
       } else if (activeTab === 'payments') {
@@ -124,13 +118,6 @@ export default function AdminPanel() {
     if (!res.ok) throw new Error('Failed to fetch bookings');
     const data = await res.json();
     setBookings(data.bookings);
-  };
-
-  const fetchUsers = async () => {
-    const res = await fetch('/api/admin/users');
-    if (!res.ok) throw new Error('Failed to fetch users');
-    const data = await res.json();
-    setUsers(data.users);
   };
 
   const fetchComedians = async () => {
@@ -175,6 +162,23 @@ export default function AdminPanel() {
     }
   };
 
+  const handleAttendanceToggle = async (bookingId: string, currentAttended: boolean) => {
+    try {
+      const res = await fetch('/api/admin/bookings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId, attended: !currentAttended }),
+      });
+
+      if (!res.ok) throw new Error('Failed to update attendance');
+      toast.success(`Attendance ${!currentAttended ? 'marked' : 'unmarked'}`);
+      fetchBookings();
+    } catch (err) {
+      console.error('Attendance error:', err);
+      toast.error('Failed to update attendance');
+    }
+  };
+
   const handleComedianStatusUpdate = async (comedianId: string, comedianStatus: string) => {
     try {
       const response = await fetch('/api/admin/comedians', {
@@ -196,33 +200,36 @@ export default function AdminPanel() {
     }
   };
 
-  const handleResetUserPassword = async () => {
-    if (!selectedUser) return;
+  const handleCreateCompBooking = async () => {
     try {
-      const res = await fetch('/api/admin/reset-password', {
+      const res = await fetch('/api/admin/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: selectedUser._id, newPassword }),
+        body: JSON.stringify(compForm),
       });
+
       const data = await res.json();
-      if (res.ok) {
-        toast.success('Password reset successfully');
-        setPasswordResetModal(false);
-        setNewPassword('');
-        setSelectedUser(null);
-      } else {
-        toast.error(data.message || 'Failed to reset password');
-      }
-    } catch (err) {
-      console.error('Password reset error:', err);
-      toast.error('An error occurred while resetting password');
+      if (!res.ok) throw new Error(data.message);
+
+      toast.success(`Complimentary booking created: ${data.bookingId}`);
+      setShowCompModal(false);
+      setCompForm({ fullName: '', email: '', phone: '', numberOfTickets: 1 });
+      fetchBookings();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create booking');
     }
   };
 
-  const handleResetPassword = (user: User) => {
-    setSelectedUser(user);
-    setPasswordResetModal(true);
-  };
+  const filteredBookings = bookings.filter(b => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      b.bookingId?.toLowerCase().includes(q) ||
+      b.fullName?.toLowerCase().includes(q) ||
+      b.email?.toLowerCase().includes(q) ||
+      b.phone?.includes(q)
+    );
+  });
 
   if (loading) {
     return (
@@ -271,10 +278,6 @@ export default function AdminPanel() {
             <span className="material-symbols-outlined text-[20px]" style={{fontVariationSettings: "'FILL' 1"}}>calendar_today</span>
             <span className="text-sm font-medium">Bookings</span>
           </button>
-          <button onClick={() => setActiveTab('users')} className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 ${activeTab === 'users' ? 'bg-primary-container text-[#0A0A0A]' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-            <span className="material-symbols-outlined text-[20px]" style={{fontVariationSettings: "'FILL' 1"}}>group</span>
-            <span className="text-sm font-medium">Users</span>
-          </button>
           <button onClick={() => setActiveTab('comedians')} className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 ${activeTab === 'comedians' ? 'bg-primary-container text-[#0A0A0A]' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
             <span className="material-symbols-outlined text-[20px]" style={{fontVariationSettings: "'FILL' 1"}}>theater_comedy</span>
             <span className="text-sm font-medium">Comedian Apps</span>
@@ -303,7 +306,13 @@ export default function AdminPanel() {
           <div className="flex items-center gap-6 w-1/2">
             <div className="relative w-full max-w-md">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60">search</span>
-              <input className="w-full bg-[#080808] border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-primary-container focus:outline-none transition-colors" placeholder="Global Search (Commands, Bookings, Events...)" type="text" />
+              <input
+                className="w-full bg-[#080808] border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-primary-container focus:outline-none transition-colors"
+                placeholder="Search bookings by ID, name, email, phone..."
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
           </div>
           <div className="flex items-center gap-8">
@@ -344,21 +353,21 @@ export default function AdminPanel() {
                 </div>
                 <div className="bg-[#141414] p-6 brutalist-card border-l-[3px] border-l-primary-container hover:translate-y-[-4px] transition-transform duration-300">
                   <p className="text-on-surface-variant/60 text-[12px] font-label-caps mb-1 uppercase">Active Bookings</p>
-                  <h3 className="text-[24px] font-headline-md font-bold text-on-surface">{bookings.length}</h3>
+                  <h3 className="text-[24px] font-headline-md font-bold text-on-surface">{bookings.filter(b => b.status !== 'cancelled').length}</h3>
                 </div>
                 <div className="bg-[#141414] p-6 brutalist-card border-l-[3px] border-l-primary-container hover:translate-y-[-4px] transition-transform duration-300">
                   <p className="text-on-surface-variant/60 text-[12px] font-label-caps mb-1 uppercase">Pending Apps</p>
                   <h3 className="text-[24px] font-headline-md font-bold text-on-surface">{comedians.filter(c => c.comedianProfile?.status === 'pending').length}</h3>
                 </div>
                 <div className="bg-[#141414] p-6 brutalist-card border-l-[3px] border-l-primary-container hover:translate-y-[-4px] transition-transform duration-300">
-                  <p className="text-on-surface-variant/60 text-[12px] font-label-caps mb-1 uppercase">Total Users</p>
-                  <h3 className="text-[24px] font-headline-md font-bold text-on-surface">{users.length}</h3>
+                  <p className="text-on-surface-variant/60 text-[12px] font-label-caps mb-1 uppercase">Total Tickets</p>
+                  <h3 className="text-[24px] font-headline-md font-bold text-on-surface">{bookings.reduce((sum, b) => sum + (b.numberOfTickets || 0), 0)}</h3>
                 </div>
               </div>
 
               <div className="bg-[#141414] p-8 brutalist-card">
                  <h2 className="text-[24px] font-headline-md font-bold mb-4">Welcome to The Humours Hub Admin Portal</h2>
-                 <p className="text-on-surface-variant">Select a tab on the left to manage Bookings, Users, Comedian Applications, Payments, or update the Homepage CMS.</p>
+                 <p className="text-on-surface-variant">Select a tab on the left to manage Bookings, Comedian Applications, Payments, or update the Homepage CMS.</p>
               </div>
             </section>
           )}
@@ -368,83 +377,86 @@ export default function AdminPanel() {
             <section className="space-y-6 animate-enter">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <h2 className="text-[32px] font-headline-md font-bold">Event Bookings</h2>
+                <button
+                  onClick={() => setShowCompModal(true)}
+                  className="bg-primary-container text-[#0A0A0A] px-4 py-2 font-headline-md font-bold rounded hover:opacity-90 transition-opacity flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-lg">add</span>
+                  Create Complimentary Booking
+                </button>
               </div>
               <div className="bg-[#141414] brutalist-card overflow-hidden">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-[#0A0A0A] border-b border-white/5">
                     <tr>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Date</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Customer</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Tickets</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Amount</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Status</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Actions</th>
+                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Booking ID</th>
+                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Customer</th>
+                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Tickets</th>
+                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Type</th>
+                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Status</th>
+                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Attended</th>
+                      <th className="px-4 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {bookings.map((booking) => (
+                    {filteredBookings.map((booking) => (
                       <tr key={booking._id} className="stagger-row hover:bg-white/5 transition-colors group">
-                        <td className="px-6 py-4 font-medium">{new Date(booking.createdAt).toLocaleDateString()}</td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
+                          <span className="font-mono text-primary-container font-bold text-xs">{booking.bookingId || 'N/A'}</span>
+                        </td>
+                        <td className="px-4 py-4">
                           <div className="flex flex-col">
                             <span className="font-bold">{booking.fullName}</span>
                             <span className="text-[11px] text-on-surface-variant/60">{booking.email} | {booking.phone}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4">{booking.numberOfTickets} ticket(s)</td>
-                        <td className="px-6 py-4 font-headline-md font-bold">{formatCurrency((booking.numberOfTickets || 0) * 149)}</td>
-                        <td className="px-6 py-4">
-                          {booking.status === 'pending' && <span className="border border-yellow-500/50 text-yellow-500 px-2 py-0.5 rounded text-[10px] font-label-caps uppercase tracking-widest">Pending</span>}
-                          {booking.status === 'approved' && <span className="border border-green-500/50 text-green-500 px-2 py-0.5 rounded text-[10px] font-label-caps uppercase tracking-widest">Approved</span>}
-                          {booking.status === 'declined' && <span className="border border-red-500/50 text-red-500 px-2 py-0.5 rounded text-[10px] font-label-caps uppercase tracking-widest">Declined</span>}
+                        <td className="px-4 py-4">{booking.numberOfTickets} ticket(s)</td>
+                        <td className="px-4 py-4">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-label-caps uppercase tracking-widest ${
+                            booking.bookingType === 'complimentary'
+                              ? 'border border-yellow-500/50 text-yellow-500'
+                              : 'border border-primary-container/50 text-primary-container'
+                          }`}>
+                            {booking.bookingType || 'paid'}
+                          </span>
                         </td>
-                        <td className="px-6 py-4">
-                          {booking.status === 'pending' ? (
-                            <div className="flex gap-2">
-                              <button onClick={() => handleStatusUpdate(booking._id, 'approved')} className="text-green-500 hover:text-green-400 font-bold text-xs uppercase">Approve</button>
-                              <button onClick={() => handleStatusUpdate(booking._id, 'declined')} className="text-red-500 hover:text-red-400 font-bold text-xs uppercase">Decline</button>
-                            </div>
-                          ) : (
-                            <span className="text-on-surface-variant/60 text-xs">Processed</span>
+                        <td className="px-4 py-4">
+                              <span className={`px-2 py-1 text-[10px] font-bold tracking-wider rounded border ${
+                                booking.status === 'approved' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                                booking.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                                'bg-red-500/10 text-red-500 border-red-500/20'
+                              }`}>
+                                {booking.status === 'pending' && booking.bookingType === 'paid' ? 'PAYMENT PENDING' : booking.status.toUpperCase()}
+                              </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          {booking.status === 'approved' && (
+                            <button
+                              onClick={() => handleAttendanceToggle(booking.bookingId, !!booking.attended)}
+                              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold transition-colors ${
+                                booking.attended
+                                  ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                                  : 'bg-white/5 text-on-surface-variant hover:bg-white/10'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-base" style={{fontVariationSettings: booking.attended ? "'FILL' 1" : "'FILL' 0"}}>
+                                {booking.attended ? 'check_circle' : 'radio_button_unchecked'}
+                              </span>
+                              {booking.attended ? 'Present' : 'Mark'}
+                            </button>
                           )}
                         </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-
-          {/* USERS TAB */}
-          {activeTab === 'users' && (
-            <section className="space-y-6 animate-enter">
-              <h2 className="text-[32px] font-headline-md font-bold">User Accounts</h2>
-              <div className="bg-[#141414] brutalist-card overflow-hidden">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-[#0A0A0A] border-b border-white/5">
-                    <tr>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">User Details</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Role</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Joined At</th>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {users.map((user) => (
-                      <tr key={user._id} className="stagger-row hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="font-bold font-headline-md text-lg">{user.username}</span>
-                            <span className="text-[11px] text-on-surface-variant/60">{user.email} | {user.phone || 'N/A'}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="border border-primary-container/50 text-primary-container px-2 py-0.5 rounded text-[10px] font-label-caps uppercase tracking-widest">{user.role}</span>
-                        </td>
-                        <td className="px-6 py-4">{new Date(user.createdAt).toLocaleDateString('en-IN')}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button onClick={() => handleResetPassword(user)} className="text-primary-container hover:underline font-label-caps text-xs">Reset Password</button>
+                        <td className="px-4 py-4">
+                          {booking.status === 'pending' ? (
+                            <div className="flex gap-2">
+                              <button onClick={() => handleStatusUpdate(booking.bookingId, 'approved')} className="text-green-500 hover:text-green-400 font-bold text-xs uppercase">Approve</button>
+                              <button onClick={() => handleStatusUpdate(booking.bookingId, 'cancelled')} className="text-red-500 hover:text-red-400 font-bold text-xs uppercase">Cancel</button>
+                            </div>
+                          ) : booking.status === 'approved' ? (
+                            <button onClick={() => handleStatusUpdate(booking.bookingId, 'cancelled')} className="text-red-500 hover:text-red-400 font-bold text-xs uppercase">Cancel</button>
+                          ) : (
+                            <span className="text-on-surface-variant/60 text-xs">Cancelled</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -536,7 +548,7 @@ export default function AdminPanel() {
                 <table className="w-full text-left text-sm">
                   <thead className="bg-[#0A0A0A] border-b border-white/5">
                     <tr>
-                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">ID</th>
+                      <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Booking ID</th>
                       <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Customer</th>
                       <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Amount</th>
                       <th className="px-6 py-4 font-label-caps text-xs text-on-surface-variant/60 uppercase">Razorpay ID</th>
@@ -546,11 +558,11 @@ export default function AdminPanel() {
                   <tbody className="divide-y divide-white/5">
                     {payments.map((payment) => (
                       <tr key={payment._id} className="stagger-row hover:bg-white/5 transition-colors border-b border-white/5">
-                        <td className="px-6 py-4 font-mono text-[11px] text-on-surface-variant">Order: {payment.orderId}</td>
+                        <td className="px-6 py-4 font-mono text-[11px] text-primary-container font-bold">{payment.bookingId || payment.orderId}</td>
                         <td className="px-6 py-4">
                             <div className="flex flex-col">
                                 <span className="font-bold">{payment.bookingDetails?.fullName || 'N/A'}</span>
-                                <span className="text-[11px] text-on-surface-variant/60">{payment.user?.email || 'N/A'}</span>
+                                <span className="text-[11px] text-on-surface-variant/60">{payment.bookingDetails?.email || 'N/A'}</span>
                             </div>
                         </td>
                         <td className="px-6 py-4 font-bold text-primary-container">{formatCurrency(payment.amount / 100)}</td>
@@ -579,46 +591,74 @@ export default function AdminPanel() {
 
         <footer className="p-8 border-t border-white/5 bg-[#0A0A0A] text-[11px] font-label-caps text-on-surface-variant/30 flex justify-between uppercase">
           <span>© 2024 THE HUMOURS HUB • BY SHUBHHH</span>
-          <span>HUMOURS HUB 1.0.0-DEV</span>
+          <span>HUMOURS HUB 2.0.0-GUEST</span>
         </footer>
       </main>
 
-      {/* Password Reset Modal */}
-      {passwordResetModal && selectedUser && (
+      {/* Complimentary Booking Modal */}
+      {showCompModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-sm">
           <div className="bg-[#141414] brutalist-card rounded-lg p-8 w-96">
-            <h2 className="text-[24px] font-headline-md font-bold text-on-surface mb-2">Reset Password</h2>
-            <p className="text-sm text-on-surface-variant mb-6">For user: <span className="font-bold">{selectedUser.username}</span></p>
-            <div className="mb-6">
-              <label htmlFor="newPassword" className="block text-[10px] font-label-caps text-on-surface-variant mb-2 uppercase">
-                NEW PASSWORD
-              </label>
-              <input
-                type="password"
-                id="newPassword"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full bg-[#080808] px-4 py-3 border border-white/10 rounded-lg focus:outline-none focus:border-primary-container text-on-surface transition-colors"
-                placeholder="Enter new password"
-                required
-              />
+            <h2 className="text-[24px] font-headline-md font-bold text-on-surface mb-2">Complimentary Booking</h2>
+            <p className="text-sm text-on-surface-variant mb-6">Create a free booking for a guest.</p>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-[10px] font-label-caps text-on-surface-variant mb-2 uppercase">Full Name</label>
+                <input
+                  type="text"
+                  value={compForm.fullName}
+                  onChange={e => setCompForm(p => ({ ...p, fullName: e.target.value }))}
+                  className="w-full bg-[#080808] px-4 py-3 border border-white/10 rounded-lg focus:outline-none focus:border-primary-container text-on-surface transition-colors"
+                  placeholder="Guest full name"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-on-surface-variant mb-2 uppercase">Email</label>
+                <input
+                  type="email"
+                  value={compForm.email}
+                  onChange={e => setCompForm(p => ({ ...p, email: e.target.value }))}
+                  className="w-full bg-[#080808] px-4 py-3 border border-white/10 rounded-lg focus:outline-none focus:border-primary-container text-on-surface transition-colors"
+                  placeholder="guest@email.com"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-on-surface-variant mb-2 uppercase">Phone</label>
+                <input
+                  type="tel"
+                  value={compForm.phone}
+                  onChange={e => setCompForm(p => ({ ...p, phone: e.target.value }))}
+                  className="w-full bg-[#080808] px-4 py-3 border border-white/10 rounded-lg focus:outline-none focus:border-primary-container text-on-surface transition-colors"
+                  placeholder="+91 XXXXX XXXXX"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-on-surface-variant mb-2 uppercase">Number of Tickets</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={compForm.numberOfTickets}
+                  onChange={e => setCompForm(p => ({ ...p, numberOfTickets: Number(e.target.value) }))}
+                  className="w-full bg-[#080808] px-4 py-3 border border-white/10 rounded-lg focus:outline-none focus:border-primary-container text-on-surface transition-colors"
+                />
+              </div>
             </div>
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => {
-                  setPasswordResetModal(false);
-                  setNewPassword('');
-                  setSelectedUser(null);
-                }}
+                onClick={() => setShowCompModal(false)}
                 className="px-6 py-2 border border-white/10 text-on-surface-variant rounded font-bold text-sm hover:bg-white/5 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleResetUserPassword}
+                onClick={handleCreateCompBooking}
                 className="px-6 py-2 bg-primary-container text-[#0A0A0A] rounded font-bold text-sm hover:opacity-90 transition-opacity uppercase tracking-wider"
               >
-                Reset Password
+                Create Booking
               </button>
             </div>
           </div>

@@ -1,8 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getToken } from 'next-auth/jwt';
 import crypto from 'crypto';
 import clientPromise from '../../../lib/mongodb';
-import { ObjectId } from 'mongodb';
 
 export default async function handler(
   req: NextApiRequest,
@@ -13,11 +11,6 @@ export default async function handler(
   }
 
   try {
-    const token = await getToken({ req });
-    if (!token?.email) {
-      return res.status(401).json({ message: 'Not authenticated' });
-    }
-
     const {
       razorpay_order_id,
       razorpay_payment_id,
@@ -36,7 +29,7 @@ export default async function handler(
       bookingId
     });
 
-    // Verify signature
+    // Verify Razorpay signature
     const shasum = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!);
     shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
     const digest = shasum.digest('hex');
@@ -52,21 +45,12 @@ export default async function handler(
     const client = await clientPromise;
     const db = client.db();
 
-    // Get booking details
-    const booking = await db.collection('bookings').findOne({ 
-      _id: new ObjectId(bookingId)
-    });
+    // Get booking details by human-friendly bookingId
+    const booking = await db.collection('bookings').findOne({ bookingId });
     
     if (!booking) {
       console.error('Booking not found:', bookingId);
       return res.status(404).json({ message: 'Booking not found' });
-    }
-
-    // Get user details
-    const user = await db.collection('users').findOne({ email: token.email });
-    if (!user) {
-      console.error('User not found:', token.email);
-      return res.status(404).json({ message: 'User not found' });
     }
 
     // Check if payment already processed
@@ -76,17 +60,15 @@ export default async function handler(
 
     if (existingPayment) {
       console.log('Payment already processed:', razorpay_order_id);
-      return res.status(200).json({ message: 'Payment already verified' });
+      return res.status(200).json({ message: 'Payment already verified', bookingId });
     }
 
-    // Create payment record
+    // Create payment record (no userId, guest-only)
     const payment = {
       orderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
       signature: razorpay_signature,
       bookingId: bookingId,
-      userId: user._id.toString(),
-      email: token.email,
       amount: booking.numberOfTickets * 14900, // ₹149 per ticket in paise
       status: 'completed',
       type: 'ticket_booking',
@@ -95,15 +77,17 @@ export default async function handler(
       bookingDetails: {
         numberOfTickets: booking.numberOfTickets,
         fullName: booking.fullName,
+        email: booking.email,
+        phone: booking.phone,
       }
     };
 
     await db.collection('payments').insertOne(payment);
     console.log('Payment record created:', payment.paymentId);
 
-    // Update booking status
+    // Update booking status to approved
     await db.collection('bookings').updateOne(
-      { _id: new ObjectId(bookingId) },
+      { bookingId },
       {
         $set: {
           status: 'approved',
@@ -115,7 +99,7 @@ export default async function handler(
     );
     console.log('Booking updated:', bookingId);
 
-    res.status(200).json({ message: 'Payment verified successfully' });
+    res.status(200).json({ message: 'Payment verified successfully', bookingId });
   } catch (error: any) {
     console.error('Payment verification error:', {
       message: error.message,

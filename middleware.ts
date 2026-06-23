@@ -14,7 +14,7 @@ export default withAuth(
 
     if (path.startsWith('/admin')) {
       if (!session?.email || session.email !== 'admin@humorshub.com') {
-        return NextResponse.redirect(new URL('/', req.url));
+        return NextResponse.redirect(new URL('/auth/login', req.url));
       }
     }
 
@@ -26,7 +26,7 @@ export default withAuth(
         if (req.nextUrl.pathname.startsWith('/admin')) {
           return token?.email === 'admin@humorshub.com';
         }
-        return !!token;
+        return true;
       },
     },
     pages: {
@@ -37,11 +37,7 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    '/dashboard',
-    '/profile',
     '/admin',
-    '/dashboard/:path*',
-    '/profile/:path*',
     '/admin/:path*',
   ],
-}; 
+};

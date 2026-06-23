@@ -7,7 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import clientPromise from '../../../lib/mongodb';
 
-const VENUE_CAPACITY = 50;
+const VENUE_CAPACITY = 150;
 
 export default async function handler(
   req: NextApiRequest,
@@ -26,7 +26,6 @@ export default async function handler(
         {
           $match: {
             status: 'approved',
-            isComedianBooking: { $ne: true }
           }
         },
         { $group: { _id: null, total: { $sum: '$numberOfTickets' } } }

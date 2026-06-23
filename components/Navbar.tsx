@@ -1,23 +1,9 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
-import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Home, 
-  Ticket, 
-  LayoutDashboard, 
-  UserCircle, 
-  LogOut, 
-  LogIn, 
-  UserPlus, 
-  ShieldCheck,
-  Menu,
-  X 
-} from 'lucide-react';  
 
 export default function Navbar() {
-  const { data: session } = useSession();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNavHidden, setIsNavHidden] = useState(false);
   const [lastScrollTop, setLastScrollTop] = useState(0);
@@ -40,10 +26,10 @@ export default function Navbar() {
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
   const navLinks = [
-    { href: "/shows", label: "Shows", requireAuth: false },
-    { href: "/gallery", label: "Gallery", requireAuth: false },
-    { href: "/about", label: "About", requireAuth: false },
-    { href: "/perform-with-us", label: "Perform With Us", requireAuth: false },
+    { href: "/shows", label: "Shows" },
+    { href: "/gallery", label: "Gallery" },
+    { href: "/about", label: "About" },
+    { href: "/perform-with-us", label: "Perform With Us" },
   ];
 
   return (
@@ -59,32 +45,17 @@ export default function Navbar() {
           
           <div className="hidden md:flex items-center gap-8 font-label-caps text-label-caps tracking-widest text-xs uppercase font-bold">
             {navLinks.map((link) => (
-              (!link.requireAuth || session) && (
-                <Link
-                  key={link.label}
-                  href={link.href}
-                  className="text-on-surface-variant dark:text-on-surface-variant hover:text-primary-container transition-colors transition-all duration-300"
-                >
-                  {link.label}
-                </Link>
-              )
+              <Link
+                key={link.label}
+                href={link.href}
+                className="text-on-surface-variant dark:text-on-surface-variant hover:text-primary-container transition-colors transition-all duration-300"
+              >
+                {link.label}
+              </Link>
             ))}
   
             <div className="flex items-center gap-6 border-l border-white/10 pl-6 ml-2">
-                {session ? (
-                  <>
-                    {session.user?.email === 'admin@humorshub.com' && (
-                      <Link href="/admin" className="text-on-surface-variant hover:text-primary-container transition-colors">Admin</Link>
-                    )}
-                    <Link href="/profile" className="text-on-surface-variant hover:text-primary-container transition-colors">Profile</Link>
-                    <button onClick={() => signOut()} className="text-error hover:text-error-container transition-colors uppercase font-bold">Logout</button>
-                  </>
-                ) : (
-                  <>
-                    <Link href="/auth/login" className="text-on-surface-variant hover:text-primary-container transition-colors">Login</Link>
-                    <Link href="/auth/signup" className="text-on-surface-variant hover:text-primary-container transition-colors">Sign Up</Link>
-                  </>
-                )}
+              <Link href="/retrieve-tickets" className="text-on-surface-variant hover:text-primary-container transition-colors">My Tickets</Link>
             </div>
           </div>
           
@@ -121,23 +92,10 @@ export default function Navbar() {
                   </Link>
                ))}
                <hr className="border-white/10 my-2" />
-               {session ? (
-                <>
-                  {session.user?.email === 'admin@humorshub.com' && (
-                    <Link href="/admin" className="text-on-surface-variant hover:text-primary-container transition-colors" onClick={toggleMenu}>Admin</Link>
-                  )}
-                  <Link href="/profile" className="text-on-surface-variant hover:text-primary-container transition-colors" onClick={toggleMenu}>Profile</Link>
-                  <button onClick={() => { signOut(); toggleMenu(); }} className="text-error hover:text-error-container text-left transition-colors uppercase font-bold">Logout</button>
-                </>
-              ) : (
-                <>
-                  <Link href="/auth/login" className="text-on-surface-variant hover:text-primary-container transition-colors" onClick={toggleMenu}>Login</Link>
-                  <Link href="/auth/signup" className="text-on-surface-variant hover:text-primary-container transition-colors" onClick={toggleMenu}>Sign Up</Link>
-                </>
-              )}
-              <Link href="/book-tickets" className="bg-primary-container text-brand-black text-center font-label-caps text-label-caps px-5 py-3 rounded-full mt-4 hover:brightness-110 transition-all" onClick={toggleMenu}>
-                Book Tickets →
-              </Link>
+               <Link href="/retrieve-tickets" className="text-on-surface-variant hover:text-primary-container transition-colors" onClick={toggleMenu}>My Tickets</Link>
+               <Link href="/book-tickets" className="bg-primary-container text-brand-black text-center font-label-caps text-label-caps px-5 py-3 rounded-full mt-4 hover:brightness-110 transition-all" onClick={toggleMenu}>
+                 Book Tickets →
+               </Link>
             </div>
           </motion.div>
         )}

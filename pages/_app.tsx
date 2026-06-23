@@ -4,7 +4,6 @@ import React from 'react';
  * @author github.com/shubhhh-codes
  * @license MIT
  */
-
 import { SessionProvider } from 'next-auth/react';
 import { ToastContainer } from 'react-toastify';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -14,8 +13,8 @@ import '@/styles/globals.css';
 
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
   return (
-    <ErrorBoundary>
-      <SessionProvider session={session}>
+    <SessionProvider session={session}>
+      <ErrorBoundary>
         <Component {...pageProps} />
         <ToastContainer
           position="top-right"
@@ -29,7 +28,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
           pauseOnHover
           theme="light"
         />
-      </SessionProvider>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </SessionProvider>
   );
 }

@@ -25,7 +25,7 @@ export default async function handler(
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    const { numberOfTickets } = req.body;
+    const { numberOfTickets, bookingId } = req.body;
 
     if (!numberOfTickets || numberOfTickets < 1) {
       return res.status(400).json({ message: 'Invalid number of tickets' });
@@ -37,7 +37,7 @@ export default async function handler(
     const options = {
       amount,
       currency,
-      receipt: `receipt_${Date.now()}`,
+      receipt: bookingId || `receipt_${Date.now()}`,
     };
 
     console.log('Creating Razorpay order with options:', {
