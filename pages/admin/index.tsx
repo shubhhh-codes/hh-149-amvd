@@ -165,7 +165,7 @@ export default function AdminPanel() {
 
   useEffect(() => {
     if (status === 'loading') return;
-    if (!session?.user?.email || session.user.email !== 'admin@humorshub.com') {
+    if (session?.user?.role !== 'admin') {
       router.push('/auth/login');
       return;
     }
@@ -957,3 +957,4 @@ export default function AdminPanel() {
     </div>
   );
 }
+

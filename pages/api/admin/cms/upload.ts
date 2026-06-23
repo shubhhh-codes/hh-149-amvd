@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!session?.user?.email || session.user.role !== 'admin') {
       // Fallback for current project setup since role might not be explicitly populated in session yet
       // but the prompt asked for `session.user.role === "admin"`. If not, we will still check email.
-      if (session?.user?.email !== 'admin@humorshub.com') {
+      if (session?.user?.role !== 'admin') {
         return res.status(403).json({ message: 'Not authorized' });
       }
     }
@@ -128,3 +128,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
+

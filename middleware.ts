@@ -13,7 +13,7 @@ export default withAuth(
     const session = req.nextauth.token;
 
     if (path.startsWith('/admin')) {
-      if (!session?.email || session.email !== 'admin@humorshub.com') {
+      if (session?.role !== 'admin') {
         return NextResponse.redirect(new URL('/auth/login', req.url));
       }
     }
@@ -24,7 +24,7 @@ export default withAuth(
     callbacks: {
       authorized: ({ req, token }) => {
         if (req.nextUrl.pathname.startsWith('/admin')) {
-          return token?.email === 'admin@humorshub.com';
+          return token?.role === 'admin';
         }
         return true;
       },
