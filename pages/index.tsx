@@ -1,3 +1,4 @@
+import React from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
@@ -103,7 +104,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
             <h1 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface font-bold reveal-text" id="heroHeading" style={{ fontSize: "clamp(32px, 6.5vw, 64px)", opacity: 1 }}>
               Ahmedabad's own<br /><span className="text-primary-container">comedy night.</span>
             </h1>
-            <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto scroll-enter">Stand-up · Poetry · Singing · Guitar Jams — all in one night.</p>
+            <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto scroll-enter">Stand-up Â· Poetry Â· Singing Â· Guitar Jams â€” all in one night.</p>
 
             <div className="flex flex-wrap justify-center gap-4 text-on-surface-variant font-label-caps text-label-caps scroll-enter">
               <div className="flex items-center gap-2 bg-brand-surface border border-white/10 px-4 py-2 rounded-full">
@@ -112,7 +113,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
               </div>
               <div className="flex items-center gap-2 bg-brand-surface border border-white/10 px-4 py-2 rounded-full">
                 <span className="material-symbols-outlined text-primary-container text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>payments</span>
-                ₹149 Ticket
+                â‚¹149 Ticket
               </div>
               <div className="flex items-center gap-2 bg-brand-surface border border-white/10 px-4 py-2 rounded-full">
                 <span className="material-symbols-outlined text-primary-container text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>groups</span>
@@ -122,7 +123,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
 
             <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-8 scroll-enter">
               <Link href="/book-tickets" className="w-full sm:w-auto bg-primary-container text-brand-black text-[18px] font-bold rounded-full px-6 py-3 hover:bg-primary-container/90 transition-colors animate-pulse-slow">
-                Book Your Seat →
+                Book Your Seat â†’
               </Link>
               <button className="w-full sm:w-auto bg-transparent border border-white/20 text-on-surface font-headline-sm text-headline-sm rounded-full px-6 py-3 hover:bg-white/5 transition-colors">
                 Watch past shows
@@ -138,22 +139,22 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         {/* TICKER */}
         <div className="w-full bg-[#141414] border-y border-white/10 overflow-hidden py-4 flex whitespace-nowrap">
           <div className="animate-marquee inline-block font-label-caps text-label-caps text-primary-container tracking-widest uppercase">
-            <span className="mx-8">12+ shows performed</span> ·
-            <span className="mx-8">Ahmedabad</span> ·
-            <span className="mx-8">₹149 only</span> ·
-            <span className="mx-8">Comedy</span> ·
-            <span className="mx-8">Poetry</span> ·
-            <span className="mx-8">Music</span> ·
-            <span className="mx-8">Guitar</span> ·
-            <span className="mx-8 text-on-surface">Performers wanted →</span> ·
-            <span className="mx-8">12+ shows performed</span> ·
-            <span className="mx-8">Ahmedabad</span> ·
-            <span className="mx-8">₹149 only</span> ·
-            <span className="mx-8">Comedy</span> ·
-            <span className="mx-8">Poetry</span> ·
-            <span className="mx-8">Music</span> ·
-            <span className="mx-8">Guitar</span> ·
-            <span className="mx-8 text-on-surface">Performers wanted →</span>
+            <span className="mx-8">12+ shows performed</span> Â·
+            <span className="mx-8">Ahmedabad</span> Â·
+            <span className="mx-8">â‚¹149 only</span> Â·
+            <span className="mx-8">Comedy</span> Â·
+            <span className="mx-8">Poetry</span> Â·
+            <span className="mx-8">Music</span> Â·
+            <span className="mx-8">Guitar</span> Â·
+            <span className="mx-8 text-on-surface">Performers wanted â†’</span> Â·
+            <span className="mx-8">12+ shows performed</span> Â·
+            <span className="mx-8">Ahmedabad</span> Â·
+            <span className="mx-8">â‚¹149 only</span> Â·
+            <span className="mx-8">Comedy</span> Â·
+            <span className="mx-8">Poetry</span> Â·
+            <span className="mx-8">Music</span> Â·
+            <span className="mx-8">Guitar</span> Â·
+            <span className="mx-8 text-on-surface">Performers wanted â†’</span>
           </div>
         </div>
 
@@ -234,7 +235,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
                 <div className="flex flex-wrap items-center gap-6 mb-8 pt-6 border-t border-white/10">
                   <div className="flex flex-col">
                     <span className="font-label-caps text-label-caps text-on-surface-variant mb-1">Ticket Price</span>
-                    <span className="font-headline-sm text-headline-sm text-on-surface">{nextShow.metadata?.ticketPrice || '₹149'}</span>
+                    <span className="font-headline-sm text-headline-sm text-on-surface">{nextShow.metadata?.ticketPrice || 'â‚¹149'}</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="font-label-caps text-label-caps text-on-surface-variant mb-1">Status</span>
@@ -246,11 +247,11 @@ export default function Home({ performers, gallery, nextShow }: Props) {
 
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Link href="/book-tickets" className="flex-1 bg-primary-container text-brand-black font-headline-sm text-headline-sm rounded-full px-6 py-4 text-center hover:bg-primary-container/90 transition-colors">
-                    Book on Our Website →
+                    Book on Our Website â†’
                   </Link>
                   {nextShow.metadata?.bookMyShowUrl && (
                     <a href={nextShow.metadata.bookMyShowUrl} target="_blank" rel="noopener noreferrer" className="flex-1 bg-transparent border border-white/20 text-on-surface font-headline-sm text-headline-sm rounded-full px-6 py-4 text-center hover:bg-white/5 transition-colors">
-                      Book on BookMyShow →
+                      Book on BookMyShow â†’
                     </a>
                   )}
                 </div>
@@ -309,7 +310,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
                   )}
                   {performer.comedianProfile.instagramUrl && (
                     <a href={performer.comedianProfile.instagramUrl} target="_blank" rel="noopener noreferrer" className="text-primary-container text-xs hover:underline">
-                      Instagram ↗
+                      Instagram â†—
                     </a>
                   )}
                 </div>
@@ -372,10 +373,10 @@ export default function Home({ performers, gallery, nextShow }: Props) {
           <div className="max-w-4xl mx-auto px-margin-mobile md:px-margin-desktop text-center">
             <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-6">Want to perform with us?</h2>
             <p className="font-body-lg text-body-lg text-on-surface-variant mb-10 max-w-2xl mx-auto">
-              Stand-up, poetry, singing, guitar — any art form. Everyone is welcome on our stage. The stage is yours, the mic is yours. Let's create magic. Aao kabhi haveli pe.
+              Stand-up, poetry, singing, guitar â€” any art form. Everyone is welcome on our stage. The stage is yours, the mic is yours. Let's create magic. Aao kabhi haveli pe.
             </p>
             <Link href="/book-tickets?type=comedian" className="bg-primary-container text-brand-black font-headline-sm text-headline-sm rounded-full px-8 py-4 hover:bg-primary-container/90 transition-colors inline-flex items-center gap-2">
-              Apply to Perform →
+              Apply to Perform â†’
             </Link>
           </div>
         </section>
