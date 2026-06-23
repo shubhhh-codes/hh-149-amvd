@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 
@@ -92,7 +92,7 @@ export default function Profile() {
           if (booking.status === 'pending') acc.pending++;
           return acc;
         }, { total: 0, approved: 0, pending: 0 });
-        
+
         setBookingStats(stats);
       } catch (err) {
         console.error('Failed to fetch booking stats:', err);
@@ -314,7 +314,7 @@ export default function Profile() {
                 </button>
               </form>
             </div>
-            
+
             {profile?.isComedian && profile.comedianProfile && (
               <div className="bg-[#141414] border border-white/5 p-6 md:p-8 rounded-lg mt-6">
                 <h2 className="font-headline-sm text-headline-sm text-primary-container mb-8 pb-4 border-b border-white/5 flex items-center gap-2">
@@ -359,7 +359,7 @@ export default function Profile() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-[#141414] border border-white/5 p-6 rounded-lg relative overflow-hidden group">
                 <div className="absolute inset-0 bg-primary-container/5 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
                 <div className="relative z-10">

@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -15,7 +15,7 @@ export default async function handler(
 ) {
   try {
     const session = await getServerSession(req, res, authOptions);
-    
+
     if (!session?.user?.email || (session.user.role !== 'admin' && session.user.email !== 'admin@humorshub.com')) {
       return res.status(403).json({ message: 'Not authorized' });
     }
@@ -29,17 +29,17 @@ export default async function handler(
     const db = client.db();
 
     if (req.method === 'PUT') {
-      const { 
-        status, 
-        name, 
-        speciality, 
-        tagline, 
-        instagramUrl, 
-        photoId, 
-        displayOrder, 
-        isFeatured 
+      const {
+        status,
+        name,
+        speciality,
+        tagline,
+        instagramUrl,
+        photoId,
+        displayOrder,
+        isFeatured
       } = req.body;
-      
+
       const updateData: any = {
         updatedAt: new Date()
       };
@@ -57,7 +57,7 @@ export default async function handler(
         }
         updateData['comedianProfile.status'] = status;
       }
-      
+
       if (name !== undefined) updateData.username = name;
       if (speciality !== undefined) updateData['comedianProfile.speciality'] = speciality;
       if (tagline !== undefined) updateData['comedianProfile.tagline'] = tagline;
@@ -67,12 +67,12 @@ export default async function handler(
       if (isFeatured !== undefined) updateData['comedianProfile.isFeatured'] = isFeatured;
 
       const result = await db.collection('users').updateOne(
-        { 
+        {
           _id: new ObjectId(id),
-          isComedian: true 
+          isComedian: true
         },
-        { 
-          $set: updateData 
+        {
+          $set: updateData
         }
       );
 

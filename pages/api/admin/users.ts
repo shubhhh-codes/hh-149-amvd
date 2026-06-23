@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -14,7 +14,7 @@ export default async function handler(
 ) {
   try {
     const session = await getServerSession(req, res, authOptions);
-    
+
     if (!session?.user?.email || session.user.email !== 'admin@humorshub.com') {
       return res.status(403).json({ message: 'Not authorized' });
     }
