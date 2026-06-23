@@ -199,11 +199,12 @@ export default function Home({ performers, gallery, nextShow }: Props) {
           </div>
         </section>
 
-        {/* NEXT SHOW */}
-        {nextShow ? (
-          <section className="py-8 md:py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
-            <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-8">Next Show Details</h2>
-            <div className="brutal-card p-0 flex flex-col lg:flex-row overflow-hidden border-white/20 shadow-2xl rounded-card">
+        {/* NEXT SHOW & RECOVERY PORTAL */}
+        <section className="py-8 md:py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter flex flex-col gap-8">
+          {nextShow ? (
+            <div>
+              <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-8">Next Show Details</h2>
+              <div className="brutal-card p-0 flex flex-col lg:flex-row overflow-hidden border-white/20 shadow-2xl rounded-card">
               <div className="lg:w-2/5 bg-brand-overlay relative min-h-[300px]">
                 <div
                   className="absolute inset-0 bg-cover bg-center"
@@ -268,17 +269,30 @@ export default function Home({ performers, gallery, nextShow }: Props) {
                 )}
               </div>
             </div>
-          </section>
-        ) : (
-          <section className="py-8 md:py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
-            <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-8">Next Show Details</h2>
-            <div className="brutal-card p-12 text-center text-on-surface-variant border-white/20 shadow-2xl rounded-card">
+            </div>
+          ) : (
+            <div>
+              <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-8">Next Show Details</h2>
+              <div className="brutal-card p-12 text-center text-on-surface-variant border-white/20 shadow-2xl rounded-card">
               <span className="material-symbols-outlined text-5xl mb-4 opacity-40">event_busy</span>
               <p className="font-headline-sm">We're brewing up something special.</p>
               <p className="font-body-md mt-2">No upcoming shows scheduled right now. Check back soon!</p>
             </div>
-          </section>
-        )}
+            </div>
+          )}
+
+          {/* RECOVERY PORTAL */}
+          <div className="brutal-card p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-8 border-white/10">
+            <div className="max-w-2xl text-left">
+              <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-3">Already booked your seat?</h2>
+              <p className="font-body-lg text-body-lg text-on-surface-variant">Lost your ticket? Don't worry, you can retrieve it instantly using your booking details.</p>
+            </div>
+            <Link href="/retrieve-tickets" className="whitespace-nowrap bg-primary-container text-brand-black font-bold px-8 py-4 rounded-full hover:bg-primary-container/90 transition-colors flex items-center justify-center gap-2">
+              <span className="material-symbols-outlined">search</span>
+              Find My Ticket
+            </Link>
+          </div>
+        </section>
 
         {/* WHO PERFORMS HERE - DYNAMIC */}
         <section className="py-8 md:py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter overflow-hidden">
