@@ -32,7 +32,7 @@ interface ComedianProfile {
   comedianProfile: {
     comedianType: string;
     speciality: string;
-    experience: string;
+    experience: number;
     bio: string;
     videoUrl: string;
     status: 'pending' | 'approved' | 'declined';
@@ -614,8 +614,14 @@ export default function AdminPanel() {
                      <div className="flex justify-between items-start pl-3">
                         <div>
                           <h2 className="font-headline-sm text-lg leading-tight uppercase font-bold">{comedian.username}</h2>
-                          <div className="text-xs text-on-surface/70 mt-1 flex items-center gap-1 uppercase tracking-wider">
-                            {comedian.comedianProfile?.comedianType} • {comedian.comedianProfile?.speciality}
+                          <div className="text-xs text-on-surface/70 mt-1 flex flex-col gap-1">
+                            <span className="uppercase tracking-wider">{comedian.comedianProfile?.comedianType} • {comedian.comedianProfile?.speciality}</span>
+                            {comedian.email && (
+                              <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">mail</span>{comedian.email}</span>
+                            )}
+                            {comedian.phone && (
+                              <a href={`https://wa.me/${comedian.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-primary-container transition-colors w-fit"><span className="material-symbols-outlined text-[14px]">chat</span>{comedian.phone}</a>
+                            )}
                           </div>
                         </div>
                         <span className={`font-label-caps px-2 py-1 rounded text-[10px] brutalist-border ${
@@ -627,26 +633,26 @@ export default function AdminPanel() {
                         </span>
                      </div>
                      <div className="pl-3 text-sm text-on-surface/80">
-                        <p className="mb-2"><strong className="text-primary-container uppercase tracking-wide text-xs">{comedian.comedianProfile?.experience} experience</strong></p>
+                        <p className="mb-2"><strong className="text-primary-container uppercase tracking-wide text-xs">{comedian.comedianProfile?.experience} Stage Experience</strong></p>
                         <p className="line-clamp-3">{comedian.comedianProfile?.bio}</p>
                      </div>
-                     <div className="flex gap-3 pl-3 pt-2">
+                     <div className="flex flex-wrap gap-2 pl-3 pt-2">
                         {comedian.comedianProfile?.status === 'pending' && (
                           <>
-                            <button onClick={() => handleComedianStatusUpdate(comedian._id, 'approved')} className="flex-1 bg-green-500 text-black font-headline-sm text-sm h-10 rounded-lg flex items-center justify-center active:scale-[0.98] transition-transform uppercase tracking-wider">APPROVE</button>
-                            <button onClick={() => handleComedianStatusUpdate(comedian._id, 'declined')} className="flex-1 bg-transparent brutalist-border text-red-500 font-headline-sm text-sm h-10 rounded-lg flex items-center justify-center active:bg-[#201f1f] transition-colors uppercase tracking-wider">DECLINE</button>
+                            <button onClick={() => handleComedianStatusUpdate(comedian._id, 'approved')} className="px-4 py-2 bg-green-500 text-black font-headline-sm text-xs rounded-lg flex items-center justify-center active:scale-[0.98] transition-transform uppercase tracking-wider whitespace-nowrap">APPROVE</button>
+                            <button onClick={() => handleComedianStatusUpdate(comedian._id, 'declined')} className="px-4 py-2 bg-transparent brutalist-border text-red-500 font-headline-sm text-xs rounded-lg flex items-center justify-center active:bg-[#201f1f] transition-colors uppercase tracking-wider whitespace-nowrap">DECLINE</button>
                           </>
                         )}
                         {comedian.comedianProfile?.status === 'approved' && (
                           <button 
                             onClick={() => handleComedianFeatureToggle(comedian._id, !!comedian.comedianProfile?.isFeatured)} 
-                            className={`flex-1 font-headline-sm text-sm h-10 rounded-lg flex items-center justify-center transition-colors uppercase tracking-wider ${comedian.comedianProfile?.isFeatured ? 'bg-primary-container text-black' : 'bg-transparent brutalist-border text-primary-container'}`}
+                            className={`px-4 py-2 font-headline-sm text-xs rounded-lg flex items-center justify-center transition-colors uppercase tracking-wider whitespace-nowrap ${comedian.comedianProfile?.isFeatured ? 'bg-primary-container text-black' : 'bg-transparent brutalist-border text-primary-container'}`}
                           >
                             {comedian.comedianProfile?.isFeatured ? 'UNFEATURE' : 'FEATURE'}
                           </button>
                         )}
                         {comedian.comedianProfile?.videoUrl && (
-                          <a href={comedian.comedianProfile.videoUrl} target="_blank" rel="noopener noreferrer" className="flex-1 bg-[#201f1f] brutalist-border text-[#e5e2e1] font-headline-sm text-sm h-10 rounded-lg flex items-center justify-center transition-colors uppercase tracking-wider">WATCH VIDEO</a>
+                          <a href={comedian.comedianProfile.videoUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-[#201f1f] brutalist-border text-[#e5e2e1] font-headline-sm text-xs rounded-lg flex items-center justify-center transition-colors uppercase tracking-wider whitespace-nowrap">WATCH VIDEO</a>
                         )}
                         <button 
                            onClick={() => {
@@ -663,7 +669,7 @@ export default function AdminPanel() {
                              });
                              setShowAddComedianModal(true);
                            }} 
-                           className="flex-1 bg-transparent brutalist-border text-[#e5e2e1] font-headline-sm text-sm h-10 rounded-lg flex items-center justify-center transition-colors uppercase tracking-wider hover:bg-white/5"
+                           className="px-4 py-2 bg-transparent brutalist-border text-[#e5e2e1] font-headline-sm text-xs rounded-lg flex items-center justify-center transition-colors uppercase tracking-wider hover:bg-white/5 whitespace-nowrap"
                         >
                           EDIT
                         </button>
@@ -792,7 +798,7 @@ export default function AdminPanel() {
                 <input
                   type="tel"
                   value={compForm.phone}
-                  onChange={e => setCompForm(p => ({ ...p, phone: e.target.value }))}
+                  onChange={e => setCompForm(p => ({ ...p, phone: e.target.value.replace(/[^0-9+\s-]/g, '') }))}
                   className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
                   placeholder="+91 XXXXX XXXXX"
                   required
@@ -862,7 +868,7 @@ export default function AdminPanel() {
                 <input
                   type="tel"
                   value={comedianForm.phone}
-                  onChange={e => setComedianForm(p => ({ ...p, phone: e.target.value }))}
+                  onChange={e => setComedianForm(p => ({ ...p, phone: e.target.value.replace(/[^0-9+\s-]/g, '') }))}
                   className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
                   placeholder="+91 XXXXX XXXXX"
                 />

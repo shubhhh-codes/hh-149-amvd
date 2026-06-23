@@ -162,8 +162,8 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         </div>
 
         {/* WHAT HAPPENS HERE */}
-        <section className="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
-          <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-12">What happens in a show?</h2>
+        <section className="py-8 md:py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
+          <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-8">What happens in a show?</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="brutal-card p-8 group">
               <div className="w-12 h-12 bg-primary-container/10 flex items-center justify-center mb-6 rounded-md">
@@ -201,8 +201,8 @@ export default function Home({ performers, gallery, nextShow }: Props) {
 
         {/* NEXT SHOW */}
         {nextShow ? (
-          <section className="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
-            <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-12">Next Show Details</h2>
+          <section className="py-8 md:py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
+            <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-8">Next Show Details</h2>
             <div className="brutal-card p-0 flex flex-col lg:flex-row overflow-hidden border-white/20 shadow-2xl rounded-card">
               <div className="lg:w-2/5 bg-brand-overlay relative min-h-[300px]">
                 <div
@@ -270,8 +270,8 @@ export default function Home({ performers, gallery, nextShow }: Props) {
             </div>
           </section>
         ) : (
-          <section className="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
-            <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-12">Next Show Details</h2>
+          <section className="py-8 md:py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
+            <h2 className="font-headline-md text-headline-md text-primary-container font-bold mb-8">Next Show Details</h2>
             <div className="brutal-card p-12 text-center text-on-surface-variant border-white/20 shadow-2xl rounded-card">
               <span className="material-symbols-outlined text-5xl mb-4 opacity-40">event_busy</span>
               <p className="font-headline-sm">We're brewing up something special.</p>
@@ -281,8 +281,8 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         )}
 
         {/* WHO PERFORMS HERE - DYNAMIC */}
-        <section className="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter overflow-hidden">
-          <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-12">Who Performs Here?</h2>
+        <section className="py-8 md:py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter overflow-hidden">
+          <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-8">Who Performs Here?</h2>
           <div className="flex gap-6 overflow-x-auto hide-scrollbar pb-8">
             {performers.length === 0 ? (
               <div className="flex-1 text-center py-12 text-on-surface-variant">
@@ -334,8 +334,8 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         </section>
 
         {/* REAL SHOW MOMENTS - DYNAMIC */}
-        <section className="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
-          <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-12">Real Show Moments</h2>
+        <section className="py-8 md:py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter">
+          <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-8">Real Show Moments</h2>
 
           {gallery.length === 0 ? (
             <div className="text-center py-16 text-on-surface-variant border border-outline-variant rounded-card">
@@ -366,7 +366,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         </section>
 
         {/* COMMUNITY PROOF */}
-        <section className="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter text-center">
+        <section className="py-8 md:py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter text-center">
           <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-8">What the Community Says</h2>
           <div className="max-w-3xl mx-auto brutal-card p-12">
             <span className="material-symbols-outlined text-4xl text-primary-container mb-4 opacity-50">format_quote</span>
@@ -376,7 +376,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         </section>
 
         {/* COMMUNITY / PERFORM */}
-        <section className="py-16 bg-brand-surface border-y border-white/5 scroll-enter glow-spotlight w-full">
+        <section className="py-12 bg-brand-surface border-y border-white/5 scroll-enter glow-spotlight w-full">
           <div className="max-w-4xl mx-auto px-margin-mobile md:px-margin-desktop text-center">
             <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-6">Want to perform with us?</h2>
             <p className="font-body-lg text-body-lg text-on-surface-variant mb-10 max-w-2xl mx-auto">

@@ -259,7 +259,7 @@ export default function RetrieveTickets() {
                                 placeholder="+91" 
                                 type="tel"
                                 value={phone}
-                                onChange={e => setPhone(e.target.value)}
+                                onChange={e => setPhone(e.target.value.replace(/[^0-9+\s-]/g, ''))}
                                 required
                             />
                         </div>
@@ -332,7 +332,7 @@ export default function RetrieveTickets() {
                                 placeholder="+91" 
                                 type="tel"
                                 value={phone}
-                                onChange={e => setPhone(e.target.value)}
+                                onChange={e => setPhone(e.target.value.replace(/[^0-9+\s-]/g, ''))}
                                 required={!email}
                             />
                         </div>
