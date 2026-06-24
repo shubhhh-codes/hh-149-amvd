@@ -72,7 +72,7 @@ export default async function handler(
       paymentId: razorpay_payment_id,
       signature: razorpay_signature,
       bookingId: bookingId,
-      amount: booking.numberOfTickets * 100, // ₹149 per ticket in paise
+      amount: booking.numberOfTickets * 14900, // ₹149 per ticket in paise
       status: 'completed',
       type: 'ticket_booking',
       createdAt: new Date(),

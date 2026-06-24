@@ -557,7 +557,7 @@ export default function AdminPanel() {
                 <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
                   <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Total Tickets</span>
                   <div className="flex items-end justify-between mt-2">
-                    <span className="font-headline-md text-3xl font-bold leading-none">{bookings.reduce((sum, b) => sum + (b.numberOfTickets || 0), 0)}</span>
+                    <span className="font-headline-md text-3xl font-bold leading-none">{bookings.filter(b => b.status === 'approved').reduce((sum, b) => sum + (b.numberOfTickets || 0), 0)}</span>
                   </div>
                 </div>
               </div>
@@ -583,7 +583,7 @@ export default function AdminPanel() {
                   <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
                     <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Today's Sales</span>
                     <div className="flex items-end justify-between mt-2">
-                      <span className="font-headline-md text-3xl font-bold leading-none">{bookings.filter(b => b.status === 'approved' && new Date(b.createdAt).toDateString() === new Date().toDateString()).length}</span>
+                      <span className="font-headline-md text-3xl font-bold leading-none">{bookings.filter(b => b.status === 'approved' && new Date(b.createdAt).toDateString() === new Date().toDateString()).reduce((sum, b) => sum + (b.numberOfTickets || 0), 0)}</span>
                       <span className="material-symbols-outlined text-on-surface/30 text-xl">confirmation_number</span>
                     </div>
                   </div>

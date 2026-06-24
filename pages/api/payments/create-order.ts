@@ -31,7 +31,7 @@ export default async function handler(
       return res.status(400).json({ message: 'Invalid number of tickets' });
     }
 
-    const amount = numberOfTickets * 100; // ₹149 per ticket in paise
+    const amount = numberOfTickets * 14900; // ₹149 per ticket in paise
     const currency = 'INR';
 
     const options = {

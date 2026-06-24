@@ -29,7 +29,9 @@ export default async function handler(
 
       // Calculate statistics
       const stats = {
-        totalAmount: payments.reduce((sum: number, p: Document) => sum + ((p.amount as number) || 0), 0),
+        totalAmount: payments
+          .filter((p: Document) => p.status === 'completed')
+          .reduce((sum: number, p: Document) => sum + ((p.amount as number) || 0), 0),
         totalPayments: payments.length,
         successfulPayments: payments.filter((p: Document) => p.status === 'completed').length,
         failedPayments: payments.filter((p: Document) => p.status !== 'completed').length,
