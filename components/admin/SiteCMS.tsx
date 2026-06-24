@@ -36,9 +36,10 @@ interface CMSItem {
 
 interface SiteCMSProps {
   onNavigateToApps?: () => void;
+  onNavigateToFeedbacks?: () => void;
 }
 
-export default function SiteCMS({ onNavigateToApps }: SiteCMSProps = {}) {
+export default function SiteCMS({ onNavigateToApps, onNavigateToFeedbacks }: SiteCMSProps = {}) {
   const [cmsTab, setCmsTab] = useState<'hub' | 'homepage' | 'gallery' | 'shows' | 'perform' | 'policies' | 'page404' | 'profile' | 'footer' | 'faq'>('hub');
   
   // Intercept hardware/browser back button to return to Hub
@@ -831,6 +832,18 @@ export default function SiteCMS({ onNavigateToApps }: SiteCMSProps = {}) {
                  <div>
                     <h3 className="font-headline font-bold text-lg leading-tight uppercase">FAQ Hub</h3>
                     <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Help desk, Q&amp;A</p>
+                 </div>
+              </div>
+
+              {/* Card 11: User Feedbacks */}
+              <div onClick={onNavigateToFeedbacks} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">reviews</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Feedbacks</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">User Reviews</p>
                  </div>
               </div>
            </div>

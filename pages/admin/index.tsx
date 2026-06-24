@@ -77,14 +77,25 @@ interface PaymentStats {
   failedPayments: number;
 }
 
+interface Feedback {
+  _id: string;
+  fullName: string;
+  email: string;
+  category: string;
+  vibe: string;
+  comment: string;
+  createdAt: string;
+}
+
 export default function AdminPanel() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'comedians' | 'payments' | 'messages' | 'cms'>('bookings');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'comedians' | 'payments' | 'messages' | 'cms' | 'feedbacks'>('bookings');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [comedians, setComedians] = useState<ComedianProfile[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [paymentStats, setPaymentStats] = useState<PaymentStats>({
     totalAmount: 0,
     totalPayments: 0,
@@ -167,10 +178,21 @@ export default function AdminPanel() {
     }
   }, []);
 
+  const fetchFeedbacks = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/feedbacks');
+      if (!res.ok) throw new Error('Failed to fetch feedbacks');
+      const data = await res.json();
+      setFeedbacks(data.feedbacks);
+    } catch (err) {
+      console.error('Fetch feedbacks error:', err);
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       if (activeTab === 'dashboard') {
-        await Promise.all([fetchBookings(), fetchComedians(), fetchPayments(), fetchMessages()]);
+        await Promise.all([fetchBookings(), fetchComedians(), fetchPayments(), fetchMessages(), fetchFeedbacks()]);
       } else if (activeTab === 'bookings') {
         await fetchBookings();
       } else if (activeTab === 'comedians') {
@@ -179,6 +201,8 @@ export default function AdminPanel() {
         await fetchPayments();
       } else if (activeTab === 'messages') {
         await fetchMessages();
+      } else if (activeTab === 'feedbacks') {
+        await fetchFeedbacks();
       }
     } catch (err) {
       console.error('Fetch error:', err);
@@ -186,7 +210,7 @@ export default function AdminPanel() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, fetchBookings, fetchComedians, fetchPayments, fetchMessages]);
+  }, [activeTab, fetchBookings, fetchComedians, fetchPayments, fetchMessages, fetchFeedbacks]);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -560,6 +584,12 @@ export default function AdminPanel() {
                     <span className="font-headline-md text-3xl font-bold leading-none">{bookings.filter(b => b.status === 'approved').reduce((sum, b) => sum + (b.numberOfTickets || 0), 0)}</span>
                   </div>
                 </div>
+                <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                  <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Total Feedbacks</span>
+                  <div className="flex items-end justify-between mt-2">
+                    <span className="font-headline-md text-3xl font-bold leading-none text-primary-container">{feedbacks.length}</span>
+                  </div>
+                </div>
               </div>
               <div className="bg-[#131313] p-6 rounded brutalist-border mt-4">
                  <h2 className="text-xl font-headline-md font-bold mb-2 uppercase tracking-wide">Welcome to Admin Portal</h2>
@@ -704,6 +734,71 @@ export default function AdminPanel() {
                 )}
               </div>
             </>
+          )}
+
+          {/* FEEDBACKS TAB */}
+          {activeTab === 'feedbacks' && (
+            <section className="space-y-6 animate-enter mb-24">
+              <button 
+                type="button"
+                onClick={() => setActiveTab('cms')}
+                className="flex w-fit items-center gap-2 px-4 py-2 bg-[#201f1f] brutalist-border rounded-lg text-sm font-label-caps tracking-widest text-on-surface/80 hover:text-on-surface hover:bg-[#2a2a2a] transition-colors uppercase mt-2 mb-4"
+              >
+                <span className="material-symbols-outlined text-lg">arrow_back</span>
+                Back to Hub
+              </button>
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-headline-md font-bold uppercase tracking-wide">User Feedbacks</h2>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {feedbacks.length === 0 ? (
+                  <div className="col-span-full text-center py-12 text-on-surface/50">No feedback submitted yet.</div>
+                ) : (
+                  feedbacks.map((fb) => {
+                    const vibeIcon = fb.vibe === 'hilarious' ? 'sentiment_very_satisfied' :
+                                     fb.vibe === 'great' ? 'theater_comedy' :
+                                     fb.vibe === 'good' ? 'sentiment_satisfied' :
+                                     fb.vibe === 'needs-work' ? 'build' : 'sentiment_dissatisfied';
+                    const vibeScore = fb.vibe === 'hilarious' ? 5 :
+                                      fb.vibe === 'great' ? 4 :
+                                      fb.vibe === 'good' ? 3 :
+                                      fb.vibe === 'needs-work' ? 2 : 1;
+                    return (
+                      <article key={fb._id} className="bg-[#131313] brutalist-border rounded-xl p-5 relative overflow-hidden flex flex-col gap-4">
+                         <div className="flex flex-col sm:flex-row sm:justify-between items-start gap-4 sm:gap-0">
+                            <div className="min-w-0 flex-1 pr-0 sm:pr-4">
+                              <h2 className="font-headline-sm text-lg leading-tight uppercase font-bold break-words">{fb.fullName}</h2>
+                              <div className="text-xs text-on-surface/70 mt-1 flex items-start gap-1">
+                                <span className="material-symbols-outlined text-[14px] shrink-0 mt-0.5">mail</span>
+                                <span className="break-all">{fb.email}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                               <span className="font-headline font-bold text-xl text-primary">{vibeScore}/5</span>
+                               <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary border border-primary/20 shrink-0">
+                                  <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>{vibeIcon}</span>
+                               </div>
+                            </div>
+                         </div>
+                         <div className="text-sm bg-surface-container-low p-3 rounded border border-white/5 text-on-surface/90 italic">
+                            "{fb.comment}"
+                         </div>
+                         <div className="flex justify-between items-end mt-auto pt-2 border-t border-white/5">
+                            <div>
+                               <span className="font-label-caps text-[10px] text-on-surface/50">CATEGORY</span>
+                               <div className="text-xs uppercase tracking-wide font-bold text-on-surface/80">{fb.category}</div>
+                            </div>
+                            <div className="text-right">
+                               <span className="font-label-caps text-[10px] text-on-surface/50">DATE</span>
+                               <div className="text-xs">{new Date(fb.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                            </div>
+                         </div>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+            </section>
           )}
 
           {/* COMEDIANS TAB */}
@@ -896,7 +991,10 @@ export default function AdminPanel() {
           {/* CMS TAB */}
           {activeTab === 'cms' && (
             <section className="animate-enter">
-              <SiteCMS onNavigateToApps={() => setActiveTab('comedians')} />
+              <SiteCMS 
+                onNavigateToApps={() => setActiveTab('comedians')} 
+                onNavigateToFeedbacks={() => setActiveTab('feedbacks')}
+              />
             </section>
           )}
         </div>

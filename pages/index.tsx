@@ -385,12 +385,33 @@ export default function Home({ performers, gallery, nextShow }: Props) {
         </section>
 
         {/* COMMUNITY PROOF */}
-        <section className="py-8 md:py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto scroll-enter text-center">
-          <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-8">What the Community Says</h2>
-          <div className="max-w-3xl mx-auto brutal-card p-12">
-            <span className="material-symbols-outlined text-4xl text-primary-container mb-4 opacity-50">format_quote</span>
-            <p className="font-body-lg text-xl md:text-2xl text-on-surface italic mb-6">"The best underground comedy scene in Ahmedabad. It feels like family here. Ekdum paisa vasool!"</p>
-            <div className="font-headline-sm text-base text-primary-container">- Regular Audience Member</div>
+        <section className="py-16 px-5 max-w-2xl mx-auto scroll-enter">
+          <h2 className="text-3xl md:text-5xl font-bold text-center mb-12 uppercase tracking-tight text-on-surface" style={{ fontFamily: "'Hind', sans-serif" }}>WHAT THE COMMUNITY SAYS</h2>
+          <div className="flex flex-col">
+            {/* Card 1: Community Testimonial */}
+            <div className="bg-[#141414] border border-white/10 p-8 rounded-t-3xl text-center">
+              <div className="mb-6">
+                <span className="material-symbols-outlined text-primary-container text-5xl" style={{ fontVariationSettings: "'FILL' 1" }}>format_quote</span>
+              </div>
+              <blockquote className="text-xl md:text-2xl italic mb-8 leading-relaxed text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                "The best underground comedy scene in Ahmedabad. It feels like family here. Ekdum paisa vasool!"
+              </blockquote>
+              <cite className="text-primary-container font-bold uppercase tracking-widest text-sm not-italic" style={{ fontFamily: "'Hind', sans-serif" }}>
+                — REGULAR AUDIENCE MEMBER
+              </cite>
+            </div>
+            
+            {/* Card 2: Feedback CTA */}
+            <div className="bg-primary-container p-8 rounded-b-3xl text-center">
+              <h3 className="text-2xl md:text-3xl font-bold text-brand-black mb-4 uppercase tracking-tight" style={{ fontFamily: "'Hind', sans-serif" }}>HELP US GET BETTER.</h3>
+              <p className="text-brand-black mb-8 leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                The feedback form helps us identify where we're making mistakes and what we're doing wrong. Even the least engaged user will fill it out.
+              </p>
+              <Link href="/feedback" className="inline-flex items-center gap-3 bg-brand-black text-white font-bold px-8 py-4 rounded-full hover:scale-105 transition-transform uppercase tracking-wider text-sm" style={{ fontFamily: "'Hind', sans-serif" }}>
+                <span className="material-symbols-outlined">edit_note</span>
+                GIVE FEEDBACK
+              </Link>
+            </div>
           </div>
         </section>
 
