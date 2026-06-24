@@ -12,6 +12,9 @@ export default withAuth(
     const path = req.nextUrl.pathname;
     const session = req.nextauth.token;
 
+    // Force Vercel CLI to print every request live in the terminal
+    console.log(`[Vercel Terminal] ⚡ ${req.method} ${path}`);
+
     if (path.startsWith('/admin')) {
       if (session?.role !== 'admin') {
         return NextResponse.redirect(new URL('/auth/login', req.url));
@@ -37,7 +40,12 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    '/admin',
-    '/admin/:path*',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

@@ -69,7 +69,7 @@ export default function Login() {
       const resp = await fetch('/api/auth/webauthn/auth-options');
       const { options, challengeId } = await resp.json();
       
-      const authResponse = await startAuthentication(options);
+      const authResponse = await startAuthentication({ optionsJSON: options });
       
       const result = await signIn('webauthn', {
         redirect: false,
