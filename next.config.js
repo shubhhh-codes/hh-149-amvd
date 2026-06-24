@@ -11,7 +11,26 @@ const nextConfig = {
   compress: true,
 
   experimental: {
-    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
+    // ── CRITICAL: Force Vercel NFT to include Chromium binary files ───────────
+    // @sparticuz/chromium decompresses its Chromium binary from .br files at
+    // runtime using executablePath(). These files are in the package's bin/
+    // directory and are never imported via JS, so Next.js's file tracer (NFT)
+    // cannot discover them automatically.
+    //
+    // Without this, the Vercel deployment is missing:
+    //   node_modules/@sparticuz/chromium/bin/chromium.br       (~62 MB)
+    //   node_modules/@sparticuz/chromium/bin/fonts.tar.br      (~179 KB)
+    //   node_modules/@sparticuz/chromium/bin/swiftshader.tar.br (~3.4 MB)
+    //   node_modules/@sparticuz/chromium/bin/al2023.tar.br     (~1 MB)
+    //
+    // The route key is matched via picomatch against the normalized route string.
+    // Source: next/dist/build/collect-build-traces.js:527–536
+    outputFileTracingIncludes: {
+      '/api/generate-ticket': [
+        './node_modules/@sparticuz/chromium/bin/**/*',
+      ],
+    },
+    // ─────────────────────────────────────────────────────────────────────────
   },
 
   images: {
@@ -53,6 +72,22 @@ const nextConfig = {
         },
       ],
     });
+
+    // ── CRITICAL: Prevent Webpack from bundling Chromium ─────────────────────
+    // @sparticuz/chromium is a pure ESM package ("type":"module") that uses
+    // import.meta.url inside paths.js to locate its .br binary files on disk.
+    // When Webpack bundles the module, import.meta.url no longer points to the
+    // package's actual on-disk location, so executablePath() throws:
+    //   "The input directory does not exist... you must externalize @sparticuz/chromium"
+    // Marking these as externals tells Webpack: "leave them alone, require() at runtime".
+    // This applies to Pages Router API routes. The experimental.serverComponentsExternalPackages
+    // key only affects App Router Server Components and has zero effect here.
+    config.externals = [
+      ...(Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean)),
+      'puppeteer-core',
+      '@sparticuz/chromium',
+    ];
+    // ─────────────────────────────────────────────────────────────────────────
 
     return config;
   },

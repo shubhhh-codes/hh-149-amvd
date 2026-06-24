@@ -38,12 +38,11 @@ async function getBrowser(): Promise<Browser> {
         args: [
           ...chromium.args,
           '--disable-dev-shm-usage', // prevent /dev/shm OOM on Lambda
-          '--no-zygote',             // skip zygote process — faster cold start
-          '--single-process',        // single process for Lambda memory limits
+          // '--no-zygote' and '--single-process' are already in chromium.args — do not duplicate
         ],
         defaultViewport: { width: 600, height: 1000 },
         executablePath: await chromium.executablePath(),
-        headless: true,
+        headless: 'shell' as any, // @sparticuz/chromium ships chrome-headless-shell, not chrome
       });
     }
     console.log('[generate-ticket] Browser launched');
@@ -252,10 +251,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw renderErr;
     }
 
-  } catch (error) {
-    console.error('[generate-ticket] Error:', error);
-    res.status(500).json({
-      message: 'Failed to generate ticket. Please try again in a few seconds.',
+  } catch (err: any) {
+    console.error('[generate-ticket] PDF generation failed:', err);
+    return res.status(500).json({
+      message: `Error: ${err.message}`,
+      error: err.stack,
     });
   }
 }
