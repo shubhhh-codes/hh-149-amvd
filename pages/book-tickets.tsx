@@ -80,8 +80,10 @@ export default function BookTickets() {
             const verifyData = await verifyRes.json();
             if (!verifyRes.ok) throw new Error(verifyData.message);
 
-            // Redirect to success page with booking ID
-            router.push(`/booking-success?id=${bookingId}`);
+            // Pass the signed download token through the URL so booking-success
+            // can call generate-ticket in production without needing retrieve auth
+            const dlToken = verifyData.downloadToken ? `&token=${encodeURIComponent(verifyData.downloadToken)}` : '';
+            router.push(`/booking-success?id=${bookingId}${dlToken}`);
           } catch (err) {
             console.error('Payment verification error:', err);
             setError('Payment verification failed. Please contact support.');

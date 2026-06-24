@@ -1,121 +1,345 @@
+/**
+ * Ticket HTML template — fully self-contained, zero external CDN dependencies.
+ * Uses system font stack so Puppeteer renders immediately without network calls.
+ */
+
 export interface TicketTemplateData {
-  ticketNumber: string;
+  ticketNumber: string;       // e.g. "#HH-2026-000013"
   fullName: string;
   eventName: string;
-  eventDate: string; // e.g. "24 Nov, Sun"
-  eventTime: string; // e.g. "8:00 PM"
-  venueName: string; // e.g. "The Studio"
-  venueLocation: string; // e.g. "SG Highway"
-  seatType: string; // e.g. "General"
-  bookingType: string; // e.g. "Standard"
-  qrCodeDataUri: string;
+  eventDate: string;          // e.g. "24 Jun, Tue"
+  eventTime: string;          // e.g. "8:00 PM"
+  venueName: string;          // e.g. "The Studio"
+  venueLocation: string;      // e.g. "SG Highway, Ahmedabad"
+  seatType: string;           // e.g. "General"
+  bookingType: string;        // e.g. "paid" | "complimentary"
+  numberOfTickets?: number;
+  qrCodeDataUri: string;      // base64 PNG data URI
 }
 
 export function generateTicketHtml(data: TicketTemplateData): string {
+  const isComplimentary = data.bookingType?.toLowerCase() === 'complimentary';
+  const badgeText  = isComplimentary ? 'COMPLIMENTARY' : 'CONFIRMED';
+  const badgeColor = isComplimentary ? '#F59E0B' : '#FF6B1A';
+  const badgeBg    = isComplimentary ? 'rgba(245,158,11,0.12)' : 'rgba(255,107,26,0.12)';
+  const badgeBorder= isComplimentary ? 'rgba(245,158,11,0.3)' : 'rgba(255,107,26,0.3)';
+
   return `<!DOCTYPE html>
-<html class="dark" lang="en">
+<html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>The Humours Hub - Ticket</title>
-<!-- Fonts & Icons -->
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Hind:wght@400;500;700&amp;family=Dm+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<!-- Tailwind -->
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">
-tailwind.config = {
-  darkMode: "class",
-  theme: {
-    extend: {
-      colors: {
-        "tertiary-fixed-dim": "#8dcdff", "on-primary-container": "#591e00", "surface-container-low": "#1c1b1b",
-        "on-primary-fixed-variant": "#7d2d00", surface: "#131313", "tertiary-fixed": "#cae6ff",
-        "on-tertiary-container": "#003550", "surface-container-high": "#2a2a2a", "primary-fixed": "#ffdbcd",
-        "on-primary-fixed": "#360f00", "on-tertiary": "#00344f", error: "#ffb4ab", "on-background": "#e5e2e1",
-        "on-tertiary-fixed": "#001e30", "on-secondary-fixed-variant": "#474646", "on-error": "#690005",
-        "on-secondary-container": "#bab8b7", "outline-variant": "#5a4137", primary: "#ffb596",
-        "error-container": "#93000a", "on-surface": "#e5e2e1", "inverse-on-surface": "#313030",
-        "surface-variant": "#353534", "on-surface-variant": "#e2bfb2", "tertiary-container": "#00a2eb",
-        "on-secondary-fixed": "#1c1b1b", "on-primary": "#581e00", "secondary-fixed": "#e5e2e1",
-        "inverse-primary": "#a43e00", "primary-container": "#ff6b1a", "inverse-surface": "#e5e2e1",
-        "surface-container": "#201f1f", "surface-dim": "#131313", "on-secondary": "#313030",
-        "surface-container-lowest": "#0e0e0e", outline: "#a98a7e", "on-tertiary-fixed-variant": "#004b70",
-        tertiary: "#8dcdff", "secondary-fixed-dim": "#c8c6c5", "surface-container-highest": "#353534",
-        "on-error-container": "#ffdad6", "secondary-container": "#4a4949", "surface-bright": "#3a3939",
-        "primary-fixed-dim": "#ffb596", background: "#131313", "surface-tint": "#ffb596", secondary: "#c8c6c5",
-        "brand-black": "#0A0A0A", "brand-surface": "#141414", "brand-overlay": "#1F1F1F"
-      },
-      borderRadius: {DEFAULT: "0.125rem", lg: "0.25rem", xl: "0.5rem", full: "0.75rem"},
-      fontFamily: {
-        "label-caps": ["Hind"], "headline-sm": ["Hind"], "body-lg": ["DM Sans"],
-        "display-lg-mobile": ["Hind"], "body-md": ["DM Sans"], "display-lg": ["Hind"],
-        "headline-md": ["Hind"], headline: ["Hind"], display: ["Hind"], body: ["Dm Sans"], label: ["Hind"]
-      }
-    }
-  }
-};
-</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Humours Hub — Ticket ${data.ticketNumber}</title>
 <style>
-  /* Custom Utilities */
-  body { background-color: #0A0A0A; color: #e5e2e1; }
-  .noise-bg {
-    /* Removed feTurbulence SVG noise because it causes 50MB PDF bloat in Chromium print engine */
+  /* ── Reset ────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Base ─────────────────────────────────────────────── */
+  html, body {
+    background: #0A0A0A;
+    color: #E5E2E1;
+    /* System font stack — zero network calls, renders instantly */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                 Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+
+  /* ── Wrapper ──────────────────────────────────────────── */
+  .wrap {
+    width: 100%;
+    max-width: 440px;
+    margin: 0 auto;
+  }
+
+  /* ── Card ─────────────────────────────────────────────── */
+  .card {
+    background: #141414;
+    border-radius: 24px;
+    overflow: visible;
+    box-shadow:
+      0 0 0 1px rgba(255, 107, 26, 0.14),
+      0 32px 64px rgba(0, 0, 0, 0.7);
+    position: relative;
+  }
+
+  /* ── Stub (top) ───────────────────────────────────────── */
+  .stub {
+    background: #1C1C1C;
+    border-radius: 24px 24px 0 0;
+    padding: 28px 28px 32px;
+    text-align: center;
+    position: relative;
+    border-bottom: 2px dashed rgba(255, 255, 255, 0.10);
+  }
+
+  /* Perforation circles */
+  .stub::before,
+  .stub::after {
+    content: '';
     position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
+    bottom: -16px;
+    width: 30px;
+    height: 30px;
+    background: #0A0A0A;
+    border-radius: 50%;
+    z-index: 2;
+  }
+  .stub::before { left: -15px; }
+  .stub::after  { right: -15px; }
+
+  .stub-eyebrow {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #555;
+    margin-bottom: 10px;
+  }
+
+  .stub-id {
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    color: #FF6B1A;
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+
+  .stub-badge {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 100px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    background: ${badgeBg};
+    color: ${badgeColor};
+    border: 1px solid ${badgeBorder};
+  }
+
+  /* ── Body ─────────────────────────────────────────────── */
+  .body {
+    padding: 36px 28px 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .event-name {
+    font-size: 24px;
+    font-weight: 900;
+    line-height: 1.2;
+    color: #FFFFFF;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+
+  .admitting {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 28px;
+    letter-spacing: 0.01em;
+  }
+  .admitting strong {
+    color: #E5E2E1;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Info Grid ────────────────────────────────────────── */
+  .grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .cell {
+    padding: 16px 18px;
+    text-align: left;
+  }
+  .cell:first-child {
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .cell-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: #444;
+    margin-bottom: 5px;
+  }
+  .cell-value {
+    font-size: 17px;
+    font-weight: 800;
+    color: #FFFFFF;
+    line-height: 1.15;
+  }
+  .cell-sub {
+    font-size: 12px;
+    color: #666;
+    margin-top: 3px;
+    font-weight: 400;
+  }
+
+  /* ── Ticket Count Pill ────────────────────────────────── */
+  .count-pill {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 18px;
+    background: rgba(255, 107, 26, 0.06);
+    border: 1px solid rgba(255, 107, 26, 0.14);
+    border-radius: 10px;
+    margin-bottom: 24px;
+  }
+  .count-pill-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #555;
+  }
+  .count-pill-value {
+    font-size: 18px;
+    font-weight: 900;
+    color: #FF6B1A;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── QR ───────────────────────────────────────────────── */
+  .qr-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+  }
+  .qr-halo {
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    background: radial-gradient(circle, rgba(255, 107, 26, 0.20) 0%, transparent 72%);
+    border-radius: 50%;
     pointer-events: none;
-    opacity: 0.02;
-    background-color: #1a1a1a;
+  }
+  .qr-box {
+    position: relative;
+    z-index: 1;
+    background: #FFFFFF;
+    padding: 10px;
+    border-radius: 16px;
+    box-shadow: 0 0 48px rgba(255, 107, 26, 0.10);
+  }
+  .qr-box img {
+    display: block;
+    width: 132px;
+    height: 132px;
+  }
+  .qr-hint {
+    font-size: 11px;
+    color: #444;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── Footer ───────────────────────────────────────────── */
+  .foot {
+    background: #0F0F0F;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 0 0 24px 24px;
+    padding: 13px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .foot-brand {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #FF6B1A;
+  }
+  .foot-type {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #333;
   }
 </style>
 </head>
-<body class="font-body-md antialiased overflow-x-hidden min-h-screen flex flex-col">
-<div class="noise-bg z-[-1]"></div>
-<main class="flex-grow flex items-center justify-center p-4 sm:p-8">
-<div class="max-w-md w-full mx-auto relative z-10">
-<!-- Ticket Container -->
-<div class="bg-brand-surface rounded-3xl overflow-hidden flex flex-col shadow-2xl relative">
-<!-- Top Tear-away Stub (Inverted) -->
-<div class="p-6 border-b-2 border-dashed border-white/20 bg-[#1A1A1A] text-center relative">
-<!-- Left Notch -->
-<div class="absolute -bottom-4 -left-4 w-8 h-8 rounded-full bg-[#0A0A0A] transform rotate-45"></div>
-<!-- Right Notch -->
-<div class="absolute -bottom-4 -right-4 w-8 h-8 rounded-full bg-[#0A0A0A] transform -rotate-45"></div>
-<p class="font-label-caps text-label-caps text-on-surface-variant tracking-widest uppercase mb-2">Digital Ticket</p>
-<h1 class="font-headline-md text-3xl font-bold text-primary-container tracking-wide">${data.ticketNumber}</h1>
+<body>
+<div class="wrap">
+  <div class="card">
+
+    <!-- Top Stub -->
+    <div class="stub">
+      <p class="stub-eyebrow">Digital Ticket</p>
+      <p class="stub-id">${data.ticketNumber}</p>
+      <span class="stub-badge">${badgeText}</span>
+    </div>
+
+    <!-- Body -->
+    <div class="body">
+
+      <h1 class="event-name">${data.eventName}</h1>
+      <p class="admitting">Admitting &nbsp;<strong>${data.fullName}</strong></p>
+
+      <!-- Date / Venue Grid -->
+      <div class="grid">
+        <div class="cell">
+          <p class="cell-label">Date</p>
+          <p class="cell-value">${data.eventDate}</p>
+          <p class="cell-sub">${data.eventTime}</p>
+        </div>
+        <div class="cell">
+          <p class="cell-label">Venue</p>
+          <p class="cell-value">${data.venueName}</p>
+          <p class="cell-sub">${data.venueLocation}</p>
+        </div>
+      </div>
+
+      <!-- Ticket count -->
+      ${data.numberOfTickets ? `
+      <div class="count-pill">
+        <span class="count-pill-label">Tickets</span>
+        <span class="count-pill-value">${data.numberOfTickets}&times; ${data.seatType}</span>
+      </div>` : ''}
+
+      <!-- QR Code -->
+      <div class="qr-wrap">
+        <div class="qr-halo"></div>
+        <div class="qr-box">
+          <img src="${data.qrCodeDataUri}" alt="Ticket QR Code" width="132" height="132"/>
+        </div>
+      </div>
+      <p class="qr-hint">Scan at the entrance</p>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="foot">
+      <span class="foot-brand">Humours Hub</span>
+      <span class="foot-type">${data.seatType} Admission</span>
+    </div>
+
+  </div>
 </div>
-<!-- Main Body -->
-<div class="p-8 sm:p-10 flex flex-col items-center text-center">
-<!-- Typography: Extreme contrast -->
-<h2 class="font-headline-md text-[32px] leading-tight font-bold text-on-surface mb-2">${data.eventName}</h2>
-<p class="font-body-lg text-lg text-on-surface-variant font-light mb-10">Admitting <span class="font-bold text-on-surface">${data.fullName}</span></p>
-<div class="w-full grid grid-cols-2 gap-x-4 mb-12 text-left">
-<div class="flex flex-col gap-1">
-<p class="font-label-caps text-xs text-on-surface-variant uppercase tracking-widest">Date</p>
-<p class="font-headline-sm text-xl font-bold text-on-surface leading-none">${data.eventDate}</p>
-<p class="font-body-md text-sm text-on-surface-variant font-light">${data.eventTime}</p>
-</div>
-<div class="flex flex-col gap-1">
-<p class="font-label-caps text-xs text-on-surface-variant uppercase tracking-widest">Venue</p>
-<p class="font-headline-sm text-xl font-bold text-on-surface leading-none">${data.venueName}</p>
-<p class="font-body-md text-sm text-on-surface-variant font-light">${data.venueLocation}</p>
-</div>
-</div>
-<!-- QR Code with Minimalist Spotlight Halo -->
-<div class="relative flex justify-center items-center w-full pt-4 pb-2">
-<!-- Glowing Halo -->
-<div class="absolute inset-0 bg-primary-container opacity-30 blur-[60px] rounded-full w-48 h-48 mx-auto pointer-events-none"></div>
-<div class="relative z-10 bg-white p-3 rounded-2xl shadow-[0_0_40px_rgba(255,107,26,0.15)]">
-<img alt="QR Code" class="w-[140px] h-[140px]" src="${data.qrCodeDataUri}"/>
-</div>
-</div>
-<p class="font-body-md text-sm text-on-surface-variant mt-6 font-light">Scan at the entrance</p>
-</div>
-</div>
-</div>
-</main>
 </body>
 </html>`;
 }

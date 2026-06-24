@@ -1,631 +1,999 @@
 # 🎟️ Humours Hub — Ticket System Deep Dive
-
-> **Full analysis of the PDF ticket generation pipeline, booking flow, retrieval system, all current issues, and a complete optimization roadmap.**
+> **Full analysis of the PDF ticket generation pipeline, booking flow, retrieval system, all real issues, and a complete copy-paste-ready optimization plan. No auth service. No WhatsApp. Zero extra cost.**
 
 ---
 
 ## Table of Contents
 
 1. [System Architecture Overview](#1-system-architecture-overview)
-2. [Complete Booking Flow (User Books a Ticket)](#2-complete-booking-flow)
-3. [Retrieve My Ticket — Page & API Flow](#3-retrieve-my-ticket-flow)
-4. [PDF Generation Pipeline — How It Works](#4-pdf-generation-pipeline)
+2. [Complete Booking Flow](#2-complete-booking-flow)
+3. [Retrieve My Ticket — How It Works](#3-retrieve-my-ticket--how-it-works)
+4. [PDF Generation Pipeline — Full Breakdown](#4-pdf-generation-pipeline--full-breakdown)
 5. [QR Code Generation](#5-qr-code-generation)
-6. [Current Issues & Pain Points](#6-current-issues--pain-points)
-7. [Optimization Roadmap](#7-optimization-roadmap)
-8. [Recommended File Changes](#8-recommended-file-changes)
+6. [Security Model — How Identity Works Without Auth](#6-security-model--how-identity-works-without-auth)
+7. [All Current Issues & Root Causes](#7-all-current-issues--root-causes)
+8. [Optimization Roadmap — Copy-Paste Ready](#8-optimization-roadmap--copy-paste-ready)
+9. [File Change Summary](#9-file-change-summary)
+10. [Timing: Before vs After](#10-timing-before-vs-after)
 
 ---
 
 ## 1. System Architecture Overview
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                      Next.js 14 App                          │
-│  Pages Router · Vercel (bom1 region) · MongoDB Atlas         │
-└──────────────────────────────────────────────────────────────┘
-         │                         │
-   ┌─────▼──────┐          ┌───────▼────────┐
-   │  /book-    │          │  /retrieve-    │
-   │  tickets   │          │  tickets       │
-   └─────┬──────┘          └───────┬────────┘
-         │                         │
-   ┌─────▼──────┐          ┌───────▼────────┐
-   │  Razorpay  │          │  /api/bookings │
-   │  Payment   │          │  /retrieve     │
-   └─────┬──────┘          └───────┬────────┘
-         │                         │
-   ┌─────▼──────────────────────────▼────────┐
-   │           MongoDB (bookings collection)  │
-   └─────────────────┬────────────────────────┘
-                     │
-              ┌──────▼──────┐
-              │  /api/      │
-              │  generate-  │
-              │  ticket     │
-              └──────┬──────┘
-                     │
-         ┌───────────┼──────────────┐
-         ▼           ▼              ▼
-   lib/mongodb  lib/secure-qr  lib/ticket-template
-         │           │              │
-         └───────────┴──────────────┘
-                     │
-              ┌──────▼──────┐
-              │  Puppeteer  │  (dev: full, prod: puppeteer-core
-              │  + Chromium │   + @sparticuz/chromium)
-              └──────┬──────┘
-                     │
-              ┌──────▼──────┐
-              │  PDF Buffer  │
-              │  → res.end() │
-              └─────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     Next.js 14 (Pages Router)                   │
+│              Vercel · bom1 region · MongoDB Atlas               │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+          ┌────────────────┼────────────────────┐
+          ▼                ▼                    ▼
+   /book-tickets   /retrieve-tickets    /booking-success
+          │                │                    │
+          ▼                ▼                    │
+  POST /api/bookings/  POST /api/bookings/      │
+  create               retrieve                 │
+          │                │                    │
+          ▼                │                    ▼
+  POST /api/payments/      │         GET /api/generate-ticket
+  create-order             │                    │
+          │                └────────────────────┘
+          ▼                         │
+  POST /api/payments/               ▼
+  verify                    lib/ticket-template.ts
+          │                 lib/secure-qr.ts
+          ▼                 lib/mongodb.ts
+     MongoDB                        │
+  (bookings collection)             ▼
+                              Puppeteer + Chromium
+                                    │
+                                    ▼
+                              PDF Buffer → res.end()
 ```
 
-### Key Files
+### Key Files at a Glance
 
 | File | Role |
 |------|------|
-| `pages/book-tickets.tsx` | Booking form UI + Razorpay initialization |
-| `pages/booking-success.tsx` | Post-payment confirmation + auto-download trigger |
-| `pages/retrieve-tickets.tsx` | Ticket search & list UI |
-| `pages/api/bookings/create.ts` | Creates a `pending` booking in MongoDB |
-| `pages/api/bookings/retrieve.ts` | Queries bookings by email+phone or bookingId |
+| `pages/book-tickets.tsx` | Booking form + Razorpay SDK init |
+| `pages/booking-success.tsx` | Post-payment page + auto-download |
+| `pages/retrieve-tickets.tsx` | Search UI + download button |
+| `pages/api/bookings/create.ts` | Creates `pending` booking in MongoDB |
+| `pages/api/bookings/retrieve.ts` | Looks up bookings by identity proof |
 | `pages/api/payments/create-order.ts` | Creates Razorpay order |
-| `pages/api/payments/verify.ts` | Verifies Razorpay signature → sets booking `approved` |
-| `pages/api/generate-ticket.ts` | The PDF generation endpoint (Puppeteer) |
-| `lib/ticket-template.ts` | HTML template for the ticket |
+| `pages/api/payments/verify.ts` | Verifies Razorpay signature → `approved` |
+| `pages/api/generate-ticket.ts` | **The PDF endpoint — Puppeteer** |
+| `lib/ticket-template.ts` | HTML string for the ticket card |
 | `lib/secure-qr.ts` | HMAC-signed QR code generator |
-| `lib/bookingId.ts` | Sequential human-friendly ID generator |
+| `lib/bookingId.ts` | Atomic sequential ID generator |
 | `lib/mongodb.ts` | MongoDB connection with global caching |
 
 ---
 
 ## 2. Complete Booking Flow
 
-### Step-by-Step Walkthrough
-
 ```
-USER opens /book-tickets
-         │
-         ▼
-[1] Fills form: fullName, email, phone, numberOfTickets (1–10)
-         │
-         ▼
-[2] Clicks "Pay & Book Tickets"
-  handleSubmit() fires
-         │
-         ▼
-[3] Client-side validation:
-    • fullName, email, phone all required
-    • If Razorpay SDK not loaded → load it dynamically from CDN
-         │
-         ▼
-[4] POST /api/bookings/create
-    Body: { fullName, email, phone, numberOfTickets }
-    
-    Server:
-    ├── Validates fields
-    ├── Checks venue capacity (≤150 seats), warns if exceeded (doesn't block)
-    ├── generateBookingId() → atomic MongoDB counter → "HH-2026-000XXX"
-    └── Inserts booking with status: "pending"
-    
-    Returns: { bookingId, _id, capacityWarning }
-         │
-         ▼
-[5] POST /api/payments/create-order
-    Body: { numberOfTickets, bookingId }
-    
-    Server:
-    ├── Initializes Razorpay with env credentials
-    ├── Calculates amount = numberOfTickets × 14900 paise (₹149 each)
-    └── Creates Razorpay order
-    
-    Returns: { keyId, amount, currency, orderId }
-         │
-         ▼
-[6] Razorpay checkout modal opens in browser
-    User pays via UPI / Card / NetBanking
-         │
-    ┌────▼────────────────────┐
-    │  Payment Success        │
-    │  → handler() callback   │
-    └────┬────────────────────┘
-         │
-         ▼
-[7] POST /api/payments/verify
-    Body: { razorpay_payment_id, razorpay_order_id, razorpay_signature, bookingId }
-    
-    Server:
-    ├── Recreates HMAC SHA-256 signature
-    ├── Compares with Razorpay signature
-    ├── Checks for duplicate payment (idempotency)
-    ├── Inserts payment record into "payments" collection
-    └── Updates booking status: "pending" → "approved"
-    
-    Returns: { message: 'Payment verified successfully', bookingId }
-         │
-         ▼
-[8] Client redirects:
-    router.push(`/booking-success?id=${bookingId}`)
-         │
-         ▼
-[9] /booking-success page:
-    ├── Displays booking confirmation + bookingId
-    ├── Copy-to-clipboard for bookingId
-    └── Auto-triggers handleDownloadTicket() after 1500ms
-         │
-         ▼
-[10] PDF Download triggered (see Section 4)
+USER visits /book-tickets
+       │
+       ▼
+[1]  Fills: fullName, email, phone, numberOfTickets (1–10, ₹149 each)
+       │
+       ▼
+[2]  "Pay & Book Tickets" → handleSubmit()
+       │
+       ▼
+[3]  Client validation (name/email/phone required)
+     + Razorpay SDK loaded dynamically from CDN if not present
+       │
+       ▼
+[4]  POST /api/bookings/create
+     ├── Validates all fields
+     ├── Capacity check (warns at >150 seats, does NOT block)
+     ├── generateBookingId() → atomic MongoDB counter
+     │   Format: HH-{YEAR}-{000001..999999}
+     └── Inserts with status: "pending"
+     Returns: { bookingId, capacityWarning }
+       │
+       ▼
+[5]  POST /api/payments/create-order
+     ├── amount = numberOfTickets × 14900 paise (₹149 each)
+     └── Creates Razorpay order
+     Returns: { keyId, amount, currency, orderId }
+       │
+       ▼
+[6]  Razorpay modal opens → user pays (UPI / Card / NetBanking)
+       │
+       ▼  (payment success callback)
+[7]  POST /api/payments/verify
+     ├── Recompute HMAC-SHA256(orderId|paymentId) vs razorpay_signature
+     ├── Idempotency check (reject duplicate orderId)
+     ├── Insert payment record into "payments" collection
+     └── Update booking: "pending" → "approved"
+     Returns: { bookingId }
+       │
+       ▼
+[8]  router.push(`/booking-success?id=${bookingId}`)
+       │
+       ▼
+[9]  booking-success page:
+     ├── Shows bookingId with copy button
+     └── Auto-triggers PDF download after 1500ms
 ```
 
-### MongoDB Document after Payment
+### MongoDB Booking Document (post-payment)
 
 ```json
-// bookings collection
 {
-  "_id": ObjectId("..."),
-  "bookingId": "HH-2026-000013",
-  "fullName": "John Doe",
-  "email": "john@example.com",
-  "phone": "9876543210",
+  "_id": "ObjectId(...)",
+  "bookingId":       "HH-2026-000013",
+  "fullName":        "Jane Doe",
+  "email":           "jane@example.com",
+  "phone":           "9876543210",
   "numberOfTickets": 2,
-  "bookingType": "paid",
-  "status": "approved",
-  "attended": false,
-  "attendedAt": null,
-  "paymentId": "pay_XXXXXX",
-  "paymentStatus": "completed",
-  "createdAt": ISODate("2026-06-24T00:00:00Z"),
-  "updatedAt": ISODate("2026-06-24T00:00:01Z")
+  "bookingType":     "paid",
+  "status":          "approved",
+  "attended":        false,
+  "attendedAt":      null,
+  "paymentId":       "pay_XXXXXX",
+  "paymentStatus":   "completed",
+  "createdAt":       "2026-06-24T00:00:00.000Z",
+  "updatedAt":       "2026-06-24T00:00:01.000Z"
 }
 ```
 
 ---
 
-## 3. Retrieve My Ticket Flow
+## 3. Retrieve My Ticket — How It Works
 
-### Page UI
+This is the **identity verification layer** — no login required.
 
-The `/retrieve-tickets` page has two search modes selectable via a sliding pill tab:
+### Two Search Modes
 
-| Mode | Required Fields |
-|------|----------------|
-| **Email & Phone** | Both email AND phone |
-| **Booking ID** | Booking ID + at least one of email/phone |
+| Mode | Required Fields | What MongoDB Checks |
+|------|----------------|---------------------|
+| **Email & Phone** | email + phone | `email` AND `phone` both match |
+| **Booking ID** | bookingId + (email OR phone) | `bookingId` AND at least one contact matches |
 
-### Search API Flow
+### Retrieve API Flow
 
 ```
-User submits form
-       │
-       ▼
 POST /api/bookings/retrieve
 Body: { email?, phone?, bookingId? }
-
-Server:
-├── Validates: email+phone (mode 1) OR bookingId+one-of-email/phone (mode 2)
-├── Normalizes phone: strips +91, takes last 10 digits, uses $regex for suffix match
-├── Builds MongoDB query accordingly
-├── db.collection('bookings').find(query).sort({ createdAt: -1 })
-└── Splits results into:
-    • activeBookings  (status === 'approved')
-    • cancelledBookings (status === 'cancelled')
-    
+       │
+       ▼
+Server normalizes phone:
+  strips "+91", takes last 10 digits, uses $regex suffix match
+  (handles 91XXXXXXXXXX and XXXXXXXXXX formats interchangeably)
+       │
+       ▼
+Builds MongoDB query:
+  Mode 1: { email: ..., phone: {$regex: ...} }
+  Mode 2: { bookingId: ..., $or: [{email:...}, {phone:...}] }
+       │
+       ▼
+db.collection('bookings').find(query).sort({ createdAt: -1 })
+       │
+       ▼
+Splits results:
+  activeBookings    → status === 'approved'
+  cancelledBookings → status === 'cancelled'
+       │
+       ▼
 Returns: { activeBookings[], cancelledBookings[], total }
-       │
-       ▼
-UI renders:
-├── "ACTIVE BOOKINGS" section with ticket cards
-│   └── Each card has [Download] button
-└── "PAST & CANCELLED" section (greyed out, no download)
-       │
-       ▼
-User clicks [Download] on a booking card
-       │
-       ▼
-handleDownload(bookingId, e) fires → PDF download (see Section 4)
 ```
 
-### Download Button Behavior
+### What the UI Shows
 
-The `handleDownload` function in `retrieve-tickets.tsx`:
+```
+[ACTIVE BOOKINGS]
+┌──────────────────────────────────────┐
+│ ● CONFIRMED  ID: HH-2026-000013      │
+│ Jane Doe                             │ ║  [⬇ Download]
+│ 📅 24 Jun 2026   2x General  PAID   │ ║
+└──────────────────────────────────────┘
 
-1. Shows a spinner in the button and disables it
-2. Creates a hidden `<a>` element pointing to `/api/generate-ticket?bookingId=X`
-3. Programmatically clicks it and removes it
-4. After 2 seconds: shows a green ✅ "DONE" state
-5. After another 3 seconds: resets button to original state
+[PAST & CANCELLED — greyed out, no download button]
+```
 
-> ⚠️ **Critical note:** Because it's an anchor tag download (not a fetch), the button state resets on a timer — **it does NOT know if the PDF actually succeeded or failed.** The user may see "DONE" even if the server returned an error.
+### Current Download Button Behavior (the problem)
+
+```typescript
+// retrieve-tickets.tsx — handleDownload (CURRENT — BROKEN)
+const handleDownload = (bId: string, e) => {
+  btn.innerHTML = `<loader>`;
+  btn.disabled = true;
+
+  const a = document.createElement('a');
+  a.href = `/api/generate-ticket?bookingId=${bId}`; // ← bare bookingId, no proof
+  a.download = `HH-TICKET-${bId}.pdf`;
+  document.body.appendChild(a);
+  a.click();   // browser fires the request, JS has no idea what comes back
+  a.remove();
+
+  setTimeout(() => {
+    btn.innerHTML = `✅ DONE`;  // ← shows DONE even if server returned a 500 error
+  }, 2000);
+};
+```
+
+**The fundamental problem:** An anchor-click download is fire-and-forget. If the server returns `500 { "message": "Failed to generate ticket" }`, the browser saves that JSON as a `.pdf` file and the button still says "DONE."
 
 ---
 
-## 4. PDF Generation Pipeline
-
-This is the most complex and fragile part of the system.
-
-### Full Pipeline
+## 4. PDF Generation Pipeline — Full Breakdown
 
 ```
 GET /api/generate-ticket?bookingId=HH-2026-000013
-                │
-                ▼
-[1] Validate bookingId query param
-                │
-                ▼
-[2] MongoDB lookup:
-    db.collection('bookings').findOne({ bookingId })
-                │
-                ▼
-[3] MongoDB lookup (CMS):
-    db.collection('homepage_content').findOne({ type: 'next_show' })
-    → Extracts: eventTitle, eventDate, eventDay, eventTime, eventLocation
-    → Falls back to hardcoded defaults if CMS doc is missing
-                │
-                ▼
-[4] Build QRBookingData object with all booking details
-                │
-                ▼
-[5] generateSecureQRCode(qrData):
-    lib/secure-qr.ts
-    ├── JSON.stringify(qrData)
-    ├── HMAC SHA-256 sign with NEXTAUTH_SECRET
-    ├── QRCode.toDataURL(signedPayload, { width: 400, errorCorrection: 'M' })
-    └── Returns: base64 PNG data URI
-                │
-                ▼
-[6] Build TicketTemplateData object
-                │
-                ▼
-[7] generateTicketHtml(templateData):
-    lib/ticket-template.ts
-    ├── Returns full HTML string with:
-    │   ├── Google Fonts CDN links (Hind, DM Sans, Material Symbols)
-    │   ├── Tailwind CDN (tailwindcss.com)
-    │   ├── Custom Tailwind config (inline)
-    │   └── Ticket card HTML with embedded QR as <img src="data:...">
-    └── Returns: HTML string
-                │
-                ▼
-[8] Puppeteer Browser Launch:
-    DEV: puppeteer (full, cached browser instance via cachedBrowser module var)
-    PROD: puppeteer-core + @sparticuz/chromium (new browser per request)
-                │
-                ▼
-[9] page.setViewport({ width: 600, height: 1000 })
-                │
-                ▼
-[10] page.setContent(htmlContent, {
-      waitUntil: ['domcontentloaded', 'networkidle2'],
-      timeout: 15000
-    })
-    → Puppeteer waits for all network requests to finish
-    → This includes: Google Fonts + Tailwind CDN requests
-                │
-                ▼
+       │
+       ▼
+[1]  Validate bookingId param exists
+       │
+       ▼
+[2]  MongoDB: bookings.findOne({ bookingId })
+     → 404 if not found
+       │
+       ▼
+[3]  MongoDB: homepage_content.findOne({ type: 'next_show' })
+     → Extracts: eventTitle, eventDate, eventDay, eventTime, eventLocation
+     → Falls back to hardcoded strings if CMS doc missing
+       │
+       ▼
+[4]  Build QRBookingData object (all booking details)
+       │
+       ▼
+[5]  generateSecureQRCode(qrData) — lib/secure-qr.ts
+     ├── JSON.stringify(payload, null, 2)  ← PROBLEM: pretty-print adds ~200 extra bytes
+     ├── HMAC-SHA256(payloadString, NEXTAUTH_SECRET)
+     ├── QRCode.toDataURL(signedPayload, { width: 400, errorCorrectionLevel: 'M' })
+     └── Returns base64 PNG data URI (~35KB)
+       │
+       ▼
+[6]  Build TicketTemplateData object
+       │
+       ▼
+[7]  generateTicketHtml(data) — lib/ticket-template.ts
+     Returns full HTML string containing:
+     ├── <link> Google Fonts CDN (Hind, DM Sans)    ← PROBLEM: external network call
+     ├── <link> Material Symbols CDN                 ← PROBLEM: external network call
+     ├── <script> Tailwind Play CDN                  ← PROBLEM: ~342KB JS, not prod-ready
+     ├── <script> Tailwind config (inline)
+     └── Ticket card HTML with QR as <img src="data:...">
+       │
+       ▼
+[8]  Browser launch:
+     DEV:  puppeteer (full — cached module-level var)
+     PROD: puppeteer-core + @sparticuz/chromium (new instance EVERY request)
+       │
+       ▼
+[9]  page.setViewport({ width: 600, height: 1000 })
+       │
+       ▼
+[10] page.setContent(html, {
+       waitUntil: ['domcontentloaded', 'networkidle2'],  ← PROBLEM: waits for ALL CDN requests
+       timeout: 15000
+     })
+     → Puppeteer sits and waits for Google Fonts + Tailwind CDN to finish
+     → If CDN is slow or blocked → TIMEOUT → broken/empty PDF
+       │
+       ▼
 [11] page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '0', bottom: '0', left: '0', right: '0' }
-    })
-    → Returns: Uint8Array
-                │
-                ▼
+       format: 'A4',
+       printBackground: true,
+       margin: { top: '0', bottom: '0', left: '0', right: '0' }
+     })
+     Returns: Uint8Array
+       │
+       ▼
 [12] page.close()
-     if PROD: browser.close()
-     if DEV: browser stays open (cached)
-                │
-                ▼
-[13] Buffer.from(pdfBuffer) → proper Node.js Buffer
-                │
-                ▼
+     PROD: browser.close()  ← closes immediately, cold launch again next request
+     DEV:  browser stays cached
+       │
+       ▼
+[13] Buffer.from(pdfBuffer)  ← converts Uint8Array → Node.js Buffer
+       │
+       ▼
 [14] res.setHeader('Content-Type', 'application/pdf')
      res.setHeader('Content-Disposition', 'attachment; filename=HH-TICKET-...')
      res.setHeader('Content-Length', nodeBuffer.length)
      res.end(nodeBuffer)
 ```
 
-### What's Inside the Ticket HTML Template
+### What the Ticket HTML Contains
 
-The template (`lib/ticket-template.ts`) generates a self-contained HTML page with:
-
-- **Top stub section:** Ticket number (e.g., `#HH-2026-000013`) with perforation notch effect
-- **Main body:** Event name, admittee name, date, time, venue
-- **QR Code:** Embedded as a base64 PNG data URI (HMAC-signed JSON payload)
-- **Fonts:** Google Fonts (Hind, DM Sans) loaded from CDN
-- **Styling:** Tailwind CSS loaded from CDN + inline custom config
+```
+┌─────────────────────────────┐
+│     Digital Ticket          │  ← top stub
+│    #HH-2026-000013          │
+├──────────────────── ╌╌╌╌╌╌ ┤  ← perforation notch (CSS mask)
+│                             │
+│  The Humours Hub            │
+│  Open Mic Night             │
+│                             │
+│  Admitting: JANE DOE        │
+│                             │
+│  DATE         VENUE         │
+│  24 Jun, Tue  The Studio    │
+│  8:00 PM      SG Highway    │
+│                             │
+│        ┌─────────┐          │
+│        │  [QR]   │          │  ← base64 PNG data URI (~35KB)
+│        └─────────┘          │
+│    Scan at the entrance      │
+└─────────────────────────────┘
+```
 
 ---
 
 ## 5. QR Code Generation
 
-### What's Encoded
-
-The QR code contains a **JSON payload** with an HMAC SHA-256 signature:
+### What's Currently Encoded (~600–800 bytes, pretty-printed)
 
 ```json
 {
   "data": {
-    "bookingId": "HH-2026-000013",
-    "ticketNumber": "HH-2026-000013",
-    "fullName": "John Doe",
-    "email": "john@example.com",
-    "phone": "9876543210",
+    "bookingId":       "HH-2026-000013",
+    "ticketNumber":    "HH-2026-000013",
+    "fullName":        "Jane Doe",
+    "email":           "jane@example.com",
+    "phone":           "9876543210",
     "numberOfTickets": 2,
-    "bookingType": "paid",
-    "paymentId": "pay_XXXX",
-    "paymentStatus": "approved",
-    "eventName": "The Humours Hub: Open Mic Night",
-    "eventDate": "24 Jun, Tue",
-    "venue": "The Studio, SG Highway",
-    "createdAt": "2026-06-24T00:00:00.000Z"
+    "bookingType":     "paid",
+    "paymentId":       "pay_XXXX",
+    "paymentStatus":   "approved",
+    "eventName":       "The Humours Hub: Open Mic Night",
+    "eventDate":       "24 Jun, Tue",
+    "venue":           "The Studio, SG Highway",
+    "createdAt":       "2026-06-24T00:00:00.000Z"
   },
-  "signature": "a3f9b2c1d4e5..."
+  "signature": "a3f9b2c1d4e567..."
 }
 ```
 
-### Security Model
+**Problem:** Pretty-printing (`JSON.stringify(payload, null, 2)`) adds ~200 wasted bytes of whitespace. `ticketNumber` duplicates `bookingId`. Full PII (email + phone) is readable by any QR scanner app at the venue. The result is a very dense QR code that's hard to scan.
 
-| Aspect | Current Implementation |
-|--------|----------------------|
-| Algorithm | HMAC SHA-256 |
-| Secret | `NEXTAUTH_SECRET` (falls back to `JWT_SECRET`, then hardcoded string) |
-| Verification | Not yet implemented on-server — QR is for event staff scanning |
-| Tampering | Any modification breaks the signature |
+### What Should Be Encoded (~80–100 bytes, compact)
 
----
-
-## 6. Current Issues & Pain Points
-
-### 🔴 Critical Issues
-
-#### Issue 1: No Auth on PDF Endpoint — Anyone Can Download Any Ticket
-**File:** `pages/api/generate-ticket.ts`  
-**Problem:** The endpoint is completely public. Anyone who knows/guesses a booking ID (e.g., `HH-2026-000001`) can download someone else's ticket.  
-**Impact:** Privacy violation. Zero-effort scraping of all attendee names, emails, phones embedded in QR codes.
-
----
-
-#### Issue 2: External CDN Requests Break `networkidle2` → Timeout
-**File:** `pages/api/generate-ticket.ts` (line 105), `lib/ticket-template.ts` (lines 22–27)  
-**Problem:** The HTML template loads:
-- Google Fonts (2 separate CDN requests)
-- Tailwind CDN + plugins
-- Google Material Symbols font
-
-`waitUntil: ['domcontentloaded', 'networkidle2']` means Puppeteer waits for ALL of these. On Vercel's cold start, outbound requests from Puppeteer/Chromium to Google CDN can fail, be slow, or be blocked. This is the **#1 cause of invalid/empty PDFs and timeouts**.
-
-**Impact:** Users get errors like "Failed to generate ticket" or a blank/broken PDF.
-
----
-
-#### Issue 3: QR Code Payload Size is Excessive
-**File:** `lib/secure-qr.ts` (line 46)  
-**Problem:** `JSON.stringify(payload, null, 2)` uses **pretty-print with 2-space indentation**. The full signed JSON payload is approximately 600–800 bytes. At QR error correction level 'M' and `width: 400`, this creates a very dense QR code. More data = harder to scan.
-
----
-
-#### Issue 4: Production Browser is Recreated Every Request
-**File:** `pages/api/generate-ticket.ts` (lines 85–97)  
-**Problem:** In production, a new `puppeteer-core` browser is launched **every single time** a ticket is downloaded. This is:
-- Slow (~3–8 seconds cold launch on Vercel)
-- Memory-intensive (Chromium is ~200MB+)
-- A Vercel function timeout risk (default 10s, extended in vercel.json not configured)
-- A likely cause of Lambda memory limit crashes
-
----
-
-#### Issue 5: Download Button Shows "DONE" Even on Server Error
-**File:** `pages/retrieve-tickets.tsx` (lines 88–113)  
-**Problem:** The download is triggered via an anchor click, not `fetch()`. There is **no way to detect** if the server returned a 404/500 instead of a PDF. The button shows "DONE" 2 seconds later regardless.
-
-**Impact:** Users think their ticket downloaded successfully but actually received an error response (often saved as a corrupted `.pdf` file containing JSON error text).
-
----
-
-#### Issue 6: `booking-success.tsx` Auto-Downloads Before Page Data Loads
-**File:** `pages/booking-success.tsx` (lines 35–42)  
-**Problem:** The auto-download fires 1500ms after mount. On Vercel's cold start, the payment was *just* verified milliseconds before redirect. The `generate-ticket` endpoint immediately queries MongoDB — but the `approved` status write might not be fully propagated yet (eventual consistency window), causing a potential race condition where the ticket is requested before status is fully written.
-
----
-
-#### Issue 7: `cachedBrowser` is Module-Level — Not Safe in Serverless
-**File:** `pages/api/generate-ticket.ts` (lines 6, 77–84)  
-**Problem:** `let cachedBrowser: any = null;` at module level works fine in dev but in serverless environments (Vercel), each function invocation may or may not get a warm instance. If the cached browser crashes silently, all subsequent requests in that instance will fail without any re-initialization attempt.
-
----
-
-#### Issue 8: No Vercel `maxDuration` Set for `generate-ticket`
-**File:** `vercel.json`  
-**Problem:** The `generate-ticket` API route uses Puppeteer + Chromium and can easily take 10–20 seconds on a cold start. Vercel's default function timeout is **10 seconds** for Hobby plans and **60 seconds** for Pro. Without explicit `maxDuration`, cold starts will silently timeout and users get errors.
-
----
-
-### 🟡 Medium Issues
-
-#### Issue 9: QR Payload Contains PII (email, phone) in Plain Sight
-**File:** `lib/secure-qr.ts`  
-**Problem:** The QR code contains full email and phone number in plaintext JSON. Anyone with a QR scanner app at the venue can read all attendee PII. The signature prevents tampering but not reading.
-
----
-
-#### Issue 10: `numberOfTickets` in booking-success is not displayed
-**File:** `pages/booking-success.tsx`  
-**Problem:** The success page shows the booking ID but not how many tickets were booked. Users need to re-retrieve their tickets to see this.
-
----
-
-#### Issue 11: No Rate Limiting on Retrieve or Generate Endpoints
-**Files:** `pages/api/bookings/retrieve.ts`, `pages/api/generate-ticket.ts`  
-**Problem:** No rate limiting, no IP throttling. The retrieve endpoint could be brute-forced (try all 10-digit phone numbers against a known email). The generate-ticket endpoint could be hammered to exhaust Chromium memory.
-
----
-
-#### Issue 12: `pending` bookings are invisible in Retrieve
-**File:** `pages/api/bookings/retrieve.ts` (line 54)  
-**Problem:** Only `approved` bookings show in "Active". If payment failed mid-flow or Razorpay webhook wasn't delivered, the booking stays `pending` forever and the user sees "No active bookings found" — confusing.
-
----
-
-### 🟢 Minor Issues
-
-#### Issue 13: Tailwind CDN in ticket template is for prototyping only
-**File:** `lib/ticket-template.ts` (line 27)  
-**Problem:** `<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries">` — Tailwind's CDN version is not production-ready. It loads the entire Tailwind runtime in-browser and dynamically generates CSS. In Puppeteer, this adds significant rendering time and is fragile.
-
----
-
-#### Issue 14: Font loading race condition in Puppeteer
-**File:** `lib/ticket-template.ts` (lines 22–25)  
-**Problem:** Google Fonts are loaded via `<link>` tags. Even with `networkidle2`, there's no guarantee that fonts are fully parsed and applied before PDF generation. If fonts fail to load, the PDF will use system fallback fonts, looking broken.
-
----
-
-#### Issue 15: `res.send()` vs `res.end()` — already fixed but fragile
-**File:** `pages/api/generate-ticket.ts` (line 128)  
-**Note:** This was previously a bug (using `res.send()` which serializes Buffer as JSON). Now uses `res.end()` correctly. But the comment in the code warns of this — it should be a test case to prevent regression.
-
----
-
-## 7. Optimization Roadmap
-
-### Priority 1 — Immediate (Fix Errors / Security)
-
-#### OPT-1: Inline All CSS — Eliminate External CDN Dependency ⭐⭐⭐⭐⭐
-
-**Problem solved:** Issues #2, #13, #14 (timeouts, blank PDFs, font failures)
-
-Replace the CDN-loaded Tailwind + Google Fonts in `lib/ticket-template.ts` with **fully inlined CSS**. This is the single most impactful fix. The template should be 100% self-contained.
-
-```typescript
-// lib/ticket-template.ts — NEW APPROACH
-
-// Embed fonts as base64 data URIs OR use system fonts
-// Replace Tailwind CDN with hand-written CSS that covers only what the ticket uses
-
-// In generateTicketHtml(), instead of CDN links:
-const INLINED_CSS = `
-  @font-face {
-    font-family: 'Hind';
-    font-weight: 400;
-    src: url('data:font/woff2;base64,...') format('woff2');
-  }
-  /* ... only the ~50 CSS rules actually used in the ticket */
-`;
+```json
+{"bid":"HH-2026-000013","n":2,"ts":1750000000,"sig":"a3f9b2..."}
 ```
 
-**In `page.setContent()`, change `waitUntil` to:**
+Venue staff scan → server looks up full booking details by `bookingId` + verifies `sig`. No PII in the QR at all.
+
+---
+
+## 6. Security Model — How Identity Works Without Auth
+
+> **You do NOT need a login system.** The "Retrieve My Ticket" page is the identity check. Here's exactly how it works and where the gap is.
+
+### What You Have (Correct Design ✅)
+
+```
+User goes to /retrieve-tickets
+       │
+       ▼
+Proves identity: bookingId + email/phone
+       │
+       ▼
+/api/bookings/retrieve validates against MongoDB
+       │
+       ▼
+Returns list of their bookings
+       │
+       ▼
+User clicks [Download] → hits /api/generate-ticket?bookingId=X
+```
+
+The retrieve step **is** your identity check. This is completely valid and low-cost. The design is correct.
+
+### The Real Gap (The Actual Security Issue ⚠️)
+
+```
+/api/generate-ticket?bookingId=HH-2026-000001
+```
+
+This endpoint **has no memory of the retrieve step.** Anyone who:
+1. Guesses a sequential booking ID (HH-2026-000001, HH-2026-000002...)
+2. Or sees someone else's booking ID printed on a ticket
+
+...can directly hit `/api/generate-ticket?bookingId=HH-2026-000001` and download that person's ticket **without going through the retrieve/identity step at all.**
+
+The ticket contains the full name of the attendee in the QR code payload.
+
+### The Fix — Short-Lived Signed Download Token (Zero Cost)
+
+The retrieve API (which already verified identity) generates a signed 30-minute token per booking. The generate-ticket endpoint requires this token. No database, no sessions, no external service.
+
+```
+[Retrieve API] validates identity → issues token
+       │
+       ▼
+[Frontend] stores token in React state (memory only)
+       │
+       ▼
+[Download click] sends: bookingId + token
+       │
+       ▼
+[generate-ticket API] verifies: token is valid, not expired, matches bookingId
+       │
+       ▼
+PDF served ✅
+```
+
+Full implementation in Section 8.
+
+---
+
+## 7. All Current Issues & Root Causes
+
+### 🔴 Critical — Causes Broken PDFs / Errors
+
+---
+
+#### ISSUE-1: External CDN in Puppeteer → Timeouts & Blank PDFs
+**Files:** `lib/ticket-template.ts` lines 22–27, `pages/api/generate-ticket.ts` line 105
+
+The ticket HTML template loads 3 external resources that Puppeteer must fetch before rendering:
+- Google Fonts (Hind + DM Sans) — 2 CDN requests
+- Tailwind Play CDN (`cdn.tailwindcss.com`) — ~342KB JS that runs in-browser
+
+With `waitUntil: 'networkidle2'`, Puppeteer waits for **all** of these. On Vercel:
+- Outbound requests from Chromium to Google CDN add 1–4 seconds
+- If any CDN request times out or is blocked → Puppeteer timeout → `500 Failed to generate ticket`
+- Tailwind CDN is explicitly marked "not for production" by the Tailwind team
+
+**This is the #1 cause of all blank/invalid PDFs.**
+
+**Fix:** Replace every CDN reference with inlined CSS. The template becomes 100% self-contained. See OPT-1.
+
+---
+
+#### ISSUE-2: New Chromium Instance Per Request in Production
+**File:** `pages/api/generate-ticket.ts` lines 85–97
+
 ```typescript
+// CURRENT — launches a fresh browser on every single download in prod
+browser = await puppeteerCore.launch({
+  args: chromium.args,
+  executablePath: await chromium.executablePath(),
+  headless: true,
+});
+// ... generate PDF ...
+await browser.close(); // ← kills it immediately after
+```
+
+`@sparticuz/chromium` takes **3–8 seconds** to launch on a cold Vercel function. Memory: ~200MB. With the default Vercel 10s timeout, this alone can consume most of the budget before a single line of PDF is rendered.
+
+**Fix:** TTL-based browser caching — reuse the same browser instance across warm invocations. See OPT-2.
+
+---
+
+#### ISSUE-3: No `maxDuration` Set for generate-ticket
+**File:** `vercel.json`
+
+Vercel's default function timeout is **10 seconds** (Hobby) / **60 seconds** (Pro). The generate-ticket route can take 8–15 seconds on a cold start. Without explicit configuration, Vercel silently kills the function and the user gets a network error — not even a proper 500 response.
+
+**Fix:** Add `maxDuration` to `vercel.json`. See OPT-3.
+
+---
+
+#### ISSUE-4: Download Button Shows "DONE" Even When PDF Failed
+**File:** `pages/retrieve-tickets.tsx` lines 88–113, `pages/booking-success.tsx` lines 21–31
+
+Both download implementations use an anchor-click:
+```typescript
+const a = document.createElement('a');
+a.href = `/api/generate-ticket?bookingId=${bId}`;
+a.click(); // fires and forgets — JS never sees the response
+```
+
+If the server returns `{ "message": "Failed to generate ticket" }`, the browser:
+1. Saves a file called `HH-TICKET-HH-2026-000013.pdf`
+2. The file actually contains JSON text (not a PDF)
+3. The button shows "✅ DONE" 2 seconds later
+
+Users open the file, it's corrupted, they think something is wrong with their booking.
+
+**Fix:** Use `fetch()` → `blob()` → validate MIME type → create object URL. See OPT-4.
+
+---
+
+#### ISSUE-5: Auto-Download Race Condition on Booking Success
+**File:** `pages/booking-success.tsx` lines 35–42
+
+```typescript
+useEffect(() => {
+  if (bookingId) {
+    const timer = setTimeout(() => {
+      handleDownloadTicket(); // fires 1.5s after page mount
+    }, 1500);
+  }
+}, [bookingId, handleDownloadTicket]);
+```
+
+Timeline of what actually happens:
+```
+T+0ms:   /api/payments/verify runs, sets status "approved"
+T+50ms:  router.push('/booking-success?id=...')
+T+1500ms: auto-download fires → hits /api/generate-ticket
+T+1500ms: MongoDB read in generate-ticket — approved write just happened
+```
+
+MongoDB Atlas write propagation is typically <100ms so this usually works. But on a busy cluster or cross-region read, the `approved` status may not be visible yet — generate-ticket then either finds status `pending` (or could 404 if it added status filtering) and fails silently.
+
+Additionally, Puppeteer cold start on Vercel means this auto-download will timeout on the first user of a cold function instance.
+
+**Fix:** Pre-fetch with loading state + retry. See OPT-5.
+
+---
+
+### 🟡 Medium — Security / UX
+
+---
+
+#### ISSUE-6: generate-ticket Has No Proof-of-Identity Check
+**File:** `pages/api/generate-ticket.ts`
+
+As explained in Section 6, anyone who knows a `bookingId` can bypass the retrieve page entirely and call `/api/generate-ticket?bookingId=HH-2026-000001` directly.
+
+**Fix:** Signed download token issued by the retrieve API. See OPT-6.
+
+---
+
+#### ISSUE-7: QR Code is Unnecessarily Dense + Contains Full PII
+**File:** `lib/secure-qr.ts` line 46
+
+`JSON.stringify(payload, null, 2)` — pretty-printed JSON with full email, phone, paymentId inside the QR. Anyone at the venue with a phone can scan the QR and read all attendee personal data.
+
+**Fix:** Compact payload with only `bookingId + n + ts + sig`. See OPT-7.
+
+---
+
+#### ISSUE-8: `pending` Bookings Are Invisible to Users
+**File:** `pages/api/bookings/retrieve.ts` line 54
+
+If payment failed mid-flow (Razorpay closed before verify) the booking stays `pending` permanently. The user searches their email/phone, gets "No active bookings found" and has no idea what happened.
+
+**Fix:** Return `pending` bookings with a "Payment Incomplete" badge. See OPT-8.
+
+---
+
+#### ISSUE-9: `cachedBrowser` Can Silently Crash Without Recovery
+**File:** `pages/api/generate-ticket.ts` lines 6, 77–84
+
+In dev, the `cachedBrowser` module-level variable is reused across requests. If Chromium crashes (OOM, render error), the variable still holds a reference to the dead browser. The next request tries to open a page on it, throws, and the browser is never reset — all subsequent requests fail until the dev server restarts.
+
+**Fix:** Wrap in try/catch with browser reset logic. See OPT-9.
+
+---
+
+### 🟢 Minor — Polish
+
+---
+
+#### ISSUE-10: `numberOfTickets` Not Shown on Booking Success Page
+**File:** `pages/booking-success.tsx`
+
+The success page only shows the bookingId. Users don't know how many tickets they just bought without re-retrieving their booking.
+
+---
+
+#### ISSUE-11: No Rate Limiting on Retrieve or Generate Endpoints
+Both `/api/bookings/retrieve` and `/api/generate-ticket` are completely open with no IP-level throttling. The retrieve endpoint could be brute-forced. The generate endpoint could be hammered to exhaust Chromium memory.
+
+---
+
+## 8. Optimization Roadmap — Copy-Paste Ready
+
+---
+
+### OPT-1: Inline All CSS — Eliminate External CDN From Puppeteer ⭐⭐⭐⭐⭐
+**Fixes:** ISSUE-1 (blank PDFs, timeouts, Tailwind CDN)  
+**Impact:** PDF generation time: 8–15s → 2–4s cold, 0.5–1.5s warm
+
+Replace `lib/ticket-template.ts` entirely. Remove all CDN `<link>` and `<script>` tags. Write the ~50 CSS rules the ticket actually uses, inline in a `<style>` block. Use system/web-safe fonts as fallback (or embed font as base64 — optional).
+
+Change `waitUntil` in `generate-ticket.ts` from `networkidle2` → `domcontentloaded`.
+
+**lib/ticket-template.ts — full replacement:**
+
+```typescript
+export interface TicketTemplateData {
+  ticketNumber: string;
+  fullName: string;
+  eventName: string;
+  eventDate: string;
+  eventTime: string;
+  venueName: string;
+  venueLocation: string;
+  seatType: string;
+  bookingType: string;
+  numberOfTickets?: number;
+  qrCodeDataUri: string;
+}
+
+export function generateTicketHtml(data: TicketTemplateData): string {
+  const isComplimentary = data.bookingType?.toLowerCase() === 'complimentary';
+  const badgeText = isComplimentary ? 'COMPLIMENTARY' : 'CONFIRMED';
+  const badgeColor = isComplimentary ? '#F59E0B' : '#FF6B1A';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Humours Hub Ticket</title>
+<style>
+  /* === Reset & Base === */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0A0A0A;
+    color: #E5E2E1;
+    font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  /* === Ticket Wrapper === */
+  .ticket-wrap {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  /* === Ticket Card === */
+  .ticket {
+    background: #141414;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,107,26,0.15);
+  }
+
+  /* === Top Stub === */
+  .stub {
+    background: #1A1A1A;
+    padding: 24px;
+    text-align: center;
+    position: relative;
+    border-bottom: 2px dashed rgba(255,255,255,0.12);
+  }
+  .stub::before,
+  .stub::after {
+    content: '';
+    position: absolute;
+    bottom: -14px;
+    width: 28px;
+    height: 28px;
+    background: #0A0A0A;
+    border-radius: 50%;
+  }
+  .stub::before { left: -14px; }
+  .stub::after  { right: -14px; }
+
+  .stub-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #7A7A7A;
+    margin-bottom: 8px;
+  }
+  .stub-id {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: #FF6B1A;
+  }
+  .stub-badge {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 3px 12px;
+    border-radius: 100px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: rgba(255,107,26,0.12);
+    color: ${badgeColor};
+    border: 1px solid ${badgeColor}33;
+  }
+
+  /* === Main Body === */
+  .body {
+    padding: 32px 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .event-name {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.2;
+    color: #FFFFFF;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+  .admitting {
+    font-size: 14px;
+    color: #7A7A7A;
+    margin-bottom: 28px;
+  }
+  .admitting strong {
+    color: #E5E2E1;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* === Info Grid === */
+  .info-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin-bottom: 28px;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .info-cell {
+    padding: 14px 16px;
+    text-align: left;
+  }
+  .info-cell:first-child {
+    border-right: 1px solid rgba(255,255,255,0.07);
+  }
+  .info-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #5A5A5A;
+    margin-bottom: 4px;
+  }
+  .info-value {
+    font-size: 16px;
+    font-weight: 800;
+    color: #FFFFFF;
+    line-height: 1.2;
+  }
+  .info-sub {
+    font-size: 12px;
+    color: #7A7A7A;
+    margin-top: 2px;
+  }
+
+  /* === Ticket Count === */
+  .ticket-count {
+    width: 100%;
+    background: rgba(255,107,26,0.06);
+    border: 1px solid rgba(255,107,26,0.15);
+    border-radius: 10px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .ticket-count-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #7A7A7A;
+  }
+  .ticket-count-value {
+    font-size: 18px;
+    font-weight: 800;
+    color: #FF6B1A;
+  }
+
+  /* === QR Section === */
+  .qr-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+  .qr-halo {
+    position: absolute;
+    width: 160px;
+    height: 160px;
+    background: radial-gradient(circle, rgba(255,107,26,0.25) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .qr-box {
+    position: relative;
+    z-index: 1;
+    background: #FFFFFF;
+    padding: 10px;
+    border-radius: 14px;
+    box-shadow: 0 0 40px rgba(255,107,26,0.12);
+  }
+  .qr-box img {
+    display: block;
+    width: 130px;
+    height: 130px;
+  }
+  .qr-hint {
+    font-size: 11px;
+    color: #5A5A5A;
+    letter-spacing: 0.05em;
+  }
+
+  /* === Footer === */
+  .ticket-footer {
+    background: #0F0F0F;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .footer-brand {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #FF6B1A;
+  }
+  .footer-type {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #3A3A3A;
+  }
+</style>
+</head>
+<body>
+<div class="ticket-wrap">
+  <div class="ticket">
+
+    <!-- Top Stub -->
+    <div class="stub">
+      <p class="stub-label">Digital Ticket</p>
+      <p class="stub-id">${data.ticketNumber}</p>
+      <span class="stub-badge">${badgeText}</span>
+    </div>
+
+    <!-- Body -->
+    <div class="body">
+      <h1 class="event-name">${data.eventName}</h1>
+      <p class="admitting">Admitting <strong>${data.fullName}</strong></p>
+
+      <div class="info-grid">
+        <div class="info-cell">
+          <p class="info-label">Date</p>
+          <p class="info-value">${data.eventDate}</p>
+          <p class="info-sub">${data.eventTime}</p>
+        </div>
+        <div class="info-cell">
+          <p class="info-label">Venue</p>
+          <p class="info-value">${data.venueName}</p>
+          <p class="info-sub">${data.venueLocation}</p>
+        </div>
+      </div>
+
+      ${data.numberOfTickets ? `
+      <div class="ticket-count">
+        <span class="ticket-count-label">Tickets Booked</span>
+        <span class="ticket-count-value">${data.numberOfTickets}× ${data.seatType}</span>
+      </div>` : ''}
+
+      <div class="qr-wrap">
+        <div class="qr-halo"></div>
+        <div class="qr-box">
+          <img src="${data.qrCodeDataUri}" alt="QR Code"/>
+        </div>
+      </div>
+      <p class="qr-hint">Scan at the entrance</p>
+    </div>
+
+    <!-- Footer -->
+    <div class="ticket-footer">
+      <span class="footer-brand">Humours Hub</span>
+      <span class="footer-type">${data.seatType} Admission</span>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>`;
+}
+```
+
+**In `pages/api/generate-ticket.ts` — change line 105:**
+
+```typescript
+// BEFORE:
 await page.setContent(htmlContent, {
-  waitUntil: 'domcontentloaded', // No more networkidle2 wait
+  waitUntil: ['domcontentloaded', 'networkidle2'] as any,
+  timeout: 15000,
+});
+
+// AFTER:
+await page.setContent(htmlContent, {
+  waitUntil: 'domcontentloaded', // no CDN = no network to wait for
   timeout: 10000,
 });
 ```
 
-**Result:** PDF generation drops from ~8–15s to ~2–4s. Zero external network calls. No CDN failure risk.
-
 ---
 
-#### OPT-2: Add Token-Based Auth to `/api/generate-ticket` ⭐⭐⭐⭐⭐
+### OPT-2: Fix Puppeteer Browser Lifecycle ⭐⭐⭐⭐⭐
+**Fixes:** ISSUE-2 (new browser per request), ISSUE-9 (silent crash)  
+**Impact:** Warm instance PDF generation: 8s → ~1s
 
-**Problem solved:** Issue #1 (anyone can download any ticket)
-
-Generate a short-lived signed token when the user retrieves their bookings, and require it for download:
-
-```typescript
-// In /api/bookings/retrieve.ts — add downloadToken to each booking
-import crypto from 'crypto';
-
-function generateDownloadToken(bookingId: string, email: string): string {
-  const expires = Date.now() + 30 * 60 * 1000; // 30 min
-  const payload = `${bookingId}:${email}:${expires}`;
-  const sig = crypto.createHmac('sha256', process.env.NEXTAUTH_SECRET!).update(payload).digest('hex');
-  return Buffer.from(`${payload}:${sig}`).toString('base64url');
-}
-
-// Add to each booking in the response:
-downloadToken: generateDownloadToken(b.bookingId, email)
-```
+Replace the current browser launch block in `pages/api/generate-ticket.ts` with a TTL-cached factory that auto-recovers from crashes:
 
 ```typescript
-// In /api/generate-ticket.ts — verify token
-const { bookingId, token } = req.query;
-// decode, verify sig, check expiry, ensure bookingId matches
-```
+// pages/api/generate-ticket.ts — replace the cachedBrowser + launch block
 
-```typescript
-// In retrieve-tickets.tsx — pass token in download URL
-a.href = `/api/generate-ticket?bookingId=${bId}&token=${downloadToken}`;
-```
+import type { Browser } from 'puppeteer-core';
 
----
+let _browser: Browser | null = null;
+let _browserUsedAt = 0;
+const BROWSER_TTL_MS = 45_000; // close after 45s idle
 
-#### OPT-3: Use `fetch()` for Downloads to Detect Errors ⭐⭐⭐⭐⭐
+async function getBrowser(): Promise<Browser> {
+  const now = Date.now();
 
-**Problem solved:** Issue #5 (button shows DONE on error)
-
-Replace the anchor-click download with a proper `fetch()` → `blob()` approach:
-
-```typescript
-const handleDownload = async (bId: string, downloadToken: string, e: React.MouseEvent<HTMLButtonElement>) => {
-  const btn = e.currentTarget;
-  const originalHTML = btn.innerHTML;
-  btn.innerHTML = `<div class="loader ..."></div>`;
-  btn.disabled = true;
-
-  try {
-    const res = await fetch(`/api/generate-ticket?bookingId=${bId}&token=${downloadToken}`);
-    
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({ message: 'Download failed' }));
-      throw new Error(errData.message || `Server error ${res.status}`);
-    }
-
-    const blob = await res.blob();
-    
-    // Validate it's actually a PDF
-    if (blob.type !== 'application/pdf') {
-      throw new Error('Invalid file received');
-    }
-    
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `HH-TICKET-${bId}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url); // Clean up memory
-
-    btn.innerHTML = `<span class="material-symbols-outlined">check</span> DONE`;
-    btn.classList.add('bg-[#FF6B1A]', 'text-black', 'border-[#FF6B1A]');
-    setTimeout(() => {
-      btn.innerHTML = originalHTML;
-      btn.classList.remove('bg-[#FF6B1A]', 'text-black', 'border-[#FF6B1A]');
-      btn.disabled = false;
-    }, 3000);
-
-  } catch (err) {
-    btn.innerHTML = `<span class="material-symbols-outlined">error</span> FAILED`;
-    btn.classList.add('bg-red-900', 'text-red-200', 'border-red-700');
-    setTimeout(() => {
-      btn.innerHTML = originalHTML;
-      btn.classList.remove('bg-red-900', 'text-red-200', 'border-red-700');
-      btn.disabled = false;
-    }, 4000);
-    console.error('Download error:', err);
+  // Evict stale browser
+  if (_browser && now - _browserUsedAt > BROWSER_TTL_MS) {
+    try { await _browser.close(); } catch {}
+    _browser = null;
   }
-};
+
+  if (!_browser) {
+    if (process.env.NODE_ENV === 'development') {
+      const puppeteer = (await import('puppeteer')).default;
+      _browser = await puppeteer.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      }) as unknown as Browser;
+    } else {
+      const puppeteerCore = (await import('puppeteer-core')).default;
+      const chromium = (await import('@sparticuz/chromium')).default;
+      _browser = await puppeteerCore.launch({
+        args: [...chromium.args, '--disable-dev-shm-usage', '--no-zygote'],
+        defaultViewport: { width: 600, height: 1000 },
+        executablePath: await chromium.executablePath(),
+        headless: true,
+      });
+    }
+  }
+
+  _browserUsedAt = Date.now();
+  return _browser;
+}
+```
+
+**Then wrap the entire Puppeteer block in crash recovery:**
+
+```typescript
+let page;
+try {
+  const browser = await getBrowser();
+  page = await browser.newPage();
+} catch (err) {
+  // Browser is dead — reset and retry once
+  if (_browser) { try { await _browser.close(); } catch {} _browser = null; }
+  const browser = await getBrowser();
+  page = await browser.newPage();
+}
 ```
 
 ---
 
-#### OPT-4: Set Explicit Vercel Function Timeout ⭐⭐⭐⭐
+### OPT-3: Set maxDuration in vercel.json ⭐⭐⭐⭐⭐
+**Fixes:** ISSUE-3 (silent Vercel timeout)
 
-**Problem solved:** Issue #8 (silent 10s timeout on Vercel)
-
-Add to `vercel.json`:
+Add to `vercel.json` (inside the root object):
 
 ```json
 {
@@ -638,328 +1006,467 @@ Add to `vercel.json`:
 }
 ```
 
-> Note: `maxDuration: 60` requires Vercel Pro. On Hobby, max is 10s — and without OPT-1 (inline CSS), you *will* hit this limit on cold starts.
+> ⚠️ `maxDuration: 60` requires **Vercel Pro**. On Hobby the max is 10s. After applying OPT-1 (inline CSS) the cold-start time drops to ~4s which should fit within 10s on Hobby most of the time. OPT-1 is more important than OPT-3.
 
 ---
 
-#### OPT-5: Fix Production Browser Caching ⭐⭐⭐⭐
+### OPT-4: Fix Download Button — Use fetch() Not Anchor Click ⭐⭐⭐⭐⭐
+**Fixes:** ISSUE-4 (DONE shown on error)
 
-**Problem solved:** Issue #4 (new browser every request in prod)
-
-In production serverless, the module-level variable approach can work *if* the function instance is warm. Refactor to be safer:
+Replace `handleDownload` in **`pages/retrieve-tickets.tsx`**:
 
 ```typescript
-// pages/api/generate-ticket.ts
+const handleDownload = async (bId: string, e: React.MouseEvent<HTMLButtonElement>) => {
+  const btn = e.currentTarget;
+  const originalHTML = btn.innerHTML;
 
-let _browser: any = null;
-let _browserLastUsed = 0;
-const BROWSER_TTL_MS = 60_000; // Reuse for up to 60s
+  btn.innerHTML = `<div class="loader !border-black !border-t-transparent w-5 h-5"></div> Generating...`;
+  btn.disabled = true;
 
-async function getBrowser() {
-  const now = Date.now();
-  
-  // Close stale browser
-  if (_browser && now - _browserLastUsed > BROWSER_TTL_MS) {
-    try { await _browser.close(); } catch {}
-    _browser = null;
-  }
-  
-  if (!_browser) {
-    if (process.env.NODE_ENV === 'development') {
-      const puppeteer = (await import('puppeteer')).default;
-      _browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      });
-    } else {
-      const puppeteerCore = (await import('puppeteer-core')).default;
-      const chromium = (await import('@sparticuz/chromium')).default;
-      _browser = await puppeteerCore.launch({
-        args: [...chromium.args, '--disable-dev-shm-usage'],
-        defaultViewport: chromium.defaultViewport || { width: 1920, height: 1080 },
-        executablePath: await chromium.executablePath(),
-        headless: true,
-      });
+  try {
+    const res = await fetch(`/api/generate-ticket?bookingId=${bId}`);
+
+    // Server returned an error — parse the JSON message
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({ message: 'Server error' }));
+      throw new Error(errData.message || `Error ${res.status}`);
     }
+
+    const blob = await res.blob();
+
+    // Sanity check: make sure we actually got a PDF
+    if (!blob.type.includes('pdf') && blob.size < 500) {
+      throw new Error('Received an invalid file. Please try again.');
+    }
+
+    // Create temporary object URL and trigger download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `HH-TICKET-${bId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url); // free memory
+
+    // Success state
+    btn.innerHTML = `<span class="material-symbols-outlined">check</span> DONE`;
+    btn.classList.add('bg-[#FF6B1A]', 'text-black', 'border-[#FF6B1A]');
+    setTimeout(() => {
+      btn.innerHTML = originalHTML;
+      btn.classList.remove('bg-[#FF6B1A]', 'text-black', 'border-[#FF6B1A]');
+      btn.disabled = false;
+    }, 3000);
+
+  } catch (err: any) {
+    // Error state — show the actual message
+    btn.innerHTML = `<span class="material-symbols-outlined">error</span> FAILED`;
+    btn.classList.add('!bg-red-900/50', '!text-red-300', '!border-red-700');
+    setTimeout(() => {
+      btn.innerHTML = originalHTML;
+      btn.classList.remove('!bg-red-900/50', '!text-red-300', '!border-red-700');
+      btn.disabled = false;
+    }, 4000);
+    setError(err.message || 'Download failed. Please try again.');
+    console.error('[Download Error]', err);
   }
-  
-  _browserLastUsed = now;
-  return _browser;
-}
-```
-
----
-
-### Priority 2 — Performance & UX
-
-#### OPT-6: Reduce QR Code Payload Size ⭐⭐⭐
-
-**Problem solved:** Issue #3 (dense/unreadable QR code)
-
-1. Remove pretty-print: `JSON.stringify(payload)` instead of `JSON.stringify(payload, null, 2)`
-2. Remove redundant fields from QR (ticketNumber === bookingId)
-3. Use compact field names: `{ bid, n, e, t, ts, sig }` instead of full names
-4. Consider encoding just `bookingId + signature` (8 bytes) and looking up rest server-side
-
-```typescript
-// Compact payload approach
-const compactPayload = {
-  bid: data.bookingId,          // "HH-2026-000013"
-  n: data.numberOfTickets,      // 2
-  ts: Math.floor(Date.now()/1000), // Unix timestamp
 };
-const sig = createSignature(compactPayload);
-const finalPayload = JSON.stringify({ ...compactPayload, sig }); // ~80 bytes vs 600+ bytes
 ```
 
-**Result:** Lower QR density, easier scan, faster generation.
-
----
-
-#### OPT-7: PDF Caching with Short TTL ⭐⭐⭐
-
-**Problem solved:** Issue #4 partially, repeated downloads
-
-Cache the generated PDF buffer in-memory (or use Vercel KV/Redis) for ~10 minutes. If the same `bookingId` is downloaded again within that window, serve from cache.
+Do the same for **`pages/booking-success.tsx`** — replace `handleDownloadTicket`:
 
 ```typescript
-// In-memory cache (works for warm function instances)
-const pdfCache = new Map<string, { buffer: Buffer; generatedAt: number }>();
-const PDF_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const [dlState, setDlState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
 
-// Before generation:
-const cached = pdfCache.get(bookingId);
-if (cached && Date.now() - cached.generatedAt < PDF_CACHE_TTL) {
-  // Serve from cache
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('X-Cache', 'HIT');
-  res.end(cached.buffer);
-  return;
-}
+const handleDownloadTicket = useCallback(async () => {
+  if (!bookingId || dlState === 'loading') return;
+  setDlState('loading');
 
-// After generation:
-pdfCache.set(bookingId, { buffer: nodeBuffer, generatedAt: Date.now() });
-```
+  try {
+    const res = await fetch(`/api/generate-ticket?bookingId=${bookingId}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed' }));
+      throw new Error(err.message);
+    }
+    const blob = await res.blob();
+    if (!blob.type.includes('pdf')) throw new Error('Invalid PDF received');
 
----
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `HH-TICKET-${bookingId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setDlState('done');
+  } catch (err: any) {
+    console.error('[Ticket Download Error]', err);
+    setDlState('error');
+  }
+}, [bookingId, dlState]);
 
-#### OPT-8: Show `pending` Bookings with "Payment Pending" Badge ⭐⭐⭐
-
-**Problem solved:** Issue #12 (pending bookings invisible)
-
-Update `retrieve.ts` to also return `pending` bookings:
-
-```typescript
-const pendingBookings = bookings.filter(b => b.status === 'pending');
-
-// In response:
-pendingBookings: pendingBookings.map(b => ({
-  bookingId: b.bookingId,
-  fullName: b.fullName,
-  numberOfTickets: b.numberOfTickets,
-  status: b.status,
-  createdAt: b.createdAt,
-})),
-```
-
-In the UI, show these with a yellow "PAYMENT PENDING" badge and no download button.
-
----
-
-#### OPT-9: Pre-warm PDF on booking-success with Loading State ⭐⭐⭐
-
-**Problem solved:** Issue #6 (race condition + UX)
-
-Instead of silently auto-downloading after 1500ms, show an explicit loading state and use `fetch()`:
-
-```typescript
-// pages/booking-success.tsx
-const [pdfState, setPdfState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
-
+// Auto-download on mount — wait 2.5s for MongoDB write to propagate
 useEffect(() => {
   if (!bookingId) return;
-  
-  // Start pre-warming after 2s (allow MongoDB write propagation)
-  const timer = setTimeout(async () => {
-    setPdfState('loading');
-    try {
-      const res = await fetch(`/api/generate-ticket?bookingId=${bookingId}`);
-      if (!res.ok) throw new Error('Failed');
-      const blob = await res.blob();
-      setPdfBlob(blob);
-      setPdfState('ready');
-    } catch {
-      setPdfState('error');
-    }
-  }, 2000);
-  
-  return () => clearTimeout(timer);
-}, [bookingId]);
+  const t = setTimeout(() => handleDownloadTicket(), 2500);
+  return () => clearTimeout(t);
+}, [bookingId]); // intentionally excludes handleDownloadTicket
+```
 
-// Button becomes enabled + changes label once 'ready':
+**Update the button in booking-success.tsx:**
+
+```tsx
 <button
-  disabled={pdfState === 'loading'}
-  onClick={() => {
-    if (pdfBlob) {
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `HH-TICKET-${bookingId}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  }}
+  onClick={handleDownloadTicket}
+  disabled={dlState === 'loading'}
+  className="w-full bg-primary-container text-on-primary-fixed py-4 px-6 rounded-lg font-headline-sm hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
 >
-  {pdfState === 'loading' ? '⏳ Preparing your ticket...' : 
-   pdfState === 'ready'   ? '⬇️ Download Ticket PDF' :
-   pdfState === 'error'   ? '❌ Retry Download' : '⬇️ Download Ticket PDF'}
+  {dlState === 'loading' && <><span className="material-symbols-outlined animate-spin">sync</span> Generating ticket...</>}
+  {dlState === 'idle'    && <><span className="material-symbols-outlined">download</span> Download Ticket PDF</>}
+  {dlState === 'done'    && <><span className="material-symbols-outlined">check_circle</span> Downloaded!</>}
+  {dlState === 'error'   && <><span className="material-symbols-outlined">refresh</span> Retry Download</>}
 </button>
 ```
 
 ---
 
-#### OPT-10: Add Rate Limiting to Sensitive Endpoints ⭐⭐
+### OPT-5: Add PDF Validity Check Before Sending ⭐⭐⭐⭐
+**Fixes:** Corrupt PDF edge case (Puppeteer renders empty page)
 
-**Problem solved:** Issue #11
+In `pages/api/generate-ticket.ts`, after `Buffer.from(pdfBuffer)`:
 
-Use a simple in-memory rate limiter or Vercel's Edge Middleware:
+```typescript
+const nodeBuffer = Buffer.from(pdfBuffer);
+
+// Every valid PDF starts with the magic bytes "%PDF"
+const magic = nodeBuffer.slice(0, 4).toString('ascii');
+if (magic !== '%PDF') {
+  console.error(`[generate-ticket] Invalid PDF output. Magic bytes: "${magic}". Size: ${nodeBuffer.length}`);
+  // Don't close browser here so we can investigate
+  return res.status(500).json({ message: 'Ticket generation produced an invalid file. Please try again.' });
+}
+
+res.setHeader('Content-Type', 'application/pdf');
+res.setHeader('Content-Disposition', `attachment; filename=HH-TICKET-${booking.bookingId}.pdf`);
+res.setHeader('Content-Length', nodeBuffer.length);
+res.end(nodeBuffer);
+```
+
+---
+
+### OPT-6: Signed Download Token — Close the Security Gap ⭐⭐⭐⭐
+**Fixes:** ISSUE-6 (bare bookingId in generate-ticket URL)
+
+**No new service. No DB writes. Just HMAC. 30-minute expiry.**
+
+**Step 1 — New file `lib/download-token.ts`:**
+
+```typescript
+import crypto from 'crypto';
+
+const SECRET = process.env.NEXTAUTH_SECRET!;
+
+export function issueDownloadToken(bookingId: string, email: string): string {
+  const exp = Date.now() + 30 * 60 * 1000; // 30 minutes
+  const payload = `${bookingId}|${email.toLowerCase()}|${exp}`;
+  const sig = crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
+  return Buffer.from(`${payload}|${sig}`).toString('base64url');
+}
+
+export function verifyDownloadToken(
+  token: string,
+  bookingId: string
+): { valid: boolean; reason?: string } {
+  try {
+    const decoded = Buffer.from(token, 'base64url').toString('utf8');
+    const parts = decoded.split('|');
+    if (parts.length !== 4) return { valid: false, reason: 'malformed' };
+
+    const [bid, email, expStr, sig] = parts;
+    const exp = parseInt(expStr, 10);
+
+    if (bid !== bookingId) return { valid: false, reason: 'bookingId mismatch' };
+    if (Date.now() > exp) return { valid: false, reason: 'expired' };
+
+    const payload = `${bid}|${email}|${expStr}`;
+    const expected = crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
+    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+      return { valid: false, reason: 'invalid signature' };
+    }
+
+    return { valid: true };
+  } catch {
+    return { valid: false, reason: 'parse error' };
+  }
+}
+```
+
+**Step 2 — `pages/api/bookings/retrieve.ts` — add token to each booking:**
+
+```typescript
+import { issueDownloadToken } from '../../../lib/download-token';
+
+// Inside the handler, after verifying identity, add to each active booking:
+activeBookings: activeBookings.map(b => ({
+  bookingId:     b.bookingId,
+  fullName:      b.fullName,
+  numberOfTickets: b.numberOfTickets,
+  status:        b.status,
+  bookingType:   b.bookingType,
+  createdAt:     b.createdAt,
+  downloadToken: issueDownloadToken(b.bookingId, email || b.email),
+})),
+```
+
+**Step 3 — `pages/api/generate-ticket.ts` — verify token:**
+
+```typescript
+import { verifyDownloadToken } from '../../lib/download-token';
+
+const { bookingId, token } = req.query;
+
+if (!bookingId || typeof bookingId !== 'string') {
+  return res.status(400).json({ message: 'Booking ID is required' });
+}
+
+// Token check — skip in dev for easier testing
+if (process.env.NODE_ENV !== 'development') {
+  if (!token || typeof token !== 'string') {
+    return res.status(401).json({ message: 'Download link is invalid. Please retrieve your tickets again.' });
+  }
+  const check = verifyDownloadToken(token, bookingId);
+  if (!check.valid) {
+    const msg = check.reason === 'expired'
+      ? 'Your download link has expired. Please retrieve your tickets again.'
+      : 'Invalid download link. Please retrieve your tickets again.';
+    return res.status(401).json({ message: msg });
+  }
+}
+```
+
+**Step 4 — `pages/retrieve-tickets.tsx` — update BookingItem interface and pass token:**
+
+```typescript
+interface BookingItem {
+  bookingId: string;
+  fullName: string;
+  numberOfTickets: number;
+  status: string;
+  bookingType: string;
+  createdAt: string;
+  downloadToken: string; // ← add this
+}
+
+// In handleDownload, update the fetch URL:
+const res = await fetch(`/api/generate-ticket?bookingId=${bId}&token=${booking.downloadToken}`);
+
+// Pass the full booking object to handleDownload:
+onClick={(e) => handleDownload(booking.bookingId, booking.downloadToken, e)}
+```
+
+---
+
+### OPT-7: Compact QR Code Payload ⭐⭐⭐
+**Fixes:** ISSUE-7 (dense QR, PII exposure)
+
+In `lib/secure-qr.ts`, replace the payload construction:
+
+```typescript
+// BEFORE — pretty-printed, full PII (~650 bytes)
+const payloadString = JSON.stringify(payload, null, 2);
+
+// AFTER — compact, no PII (~85 bytes)
+const compactData = {
+  bid: data.bookingId,
+  n: data.numberOfTickets,
+  ts: Math.floor(Date.now() / 1000), // Unix timestamp (for expiry checks at venue)
+};
+const compactSig = createSignature(compactData);
+const payloadString = JSON.stringify({ ...compactData, sig: compactSig });
+// Result: {"bid":"HH-2026-000013","n":2,"ts":1750000000,"sig":"a3f9b2..."}
+```
+
+Also change error correction level to `'L'` (lowest) since the payload is now very small — results in a less dense, much easier-to-scan QR:
+
+```typescript
+const qrCodeDataUrl = await QRCode.toDataURL(payloadString, {
+  errorCorrectionLevel: 'L', // was 'M' — L is fine for short payloads
+  margin: 1,
+  width: 300,                // was 400 — smaller is fine at L correction
+  color: { dark: '#000000', light: '#FFFFFF' },
+});
+```
+
+---
+
+### OPT-8: Show Pending Bookings in Retrieve UI ⭐⭐⭐
+**Fixes:** ISSUE-8 (user confused when payment didn't complete)
+
+In `pages/api/bookings/retrieve.ts`, add pending to the response:
+
+```typescript
+const pendingBookings = bookings.filter(b => b.status === 'pending');
+
+return res.status(200).json({
+  activeBookings:    activeBookings.map(b => ({ ...fields, downloadToken: issueDownloadToken(...) })),
+  cancelledBookings: cancelledBookings.map(b => ({ ...fields })),
+  pendingBookings:   pendingBookings.map(b => ({
+    bookingId:       b.bookingId,
+    fullName:        b.fullName,
+    numberOfTickets: b.numberOfTickets,
+    status:          b.status,
+    createdAt:       b.createdAt,
+  })),
+  total: bookings.length,
+});
+```
+
+In `pages/retrieve-tickets.tsx`, add a pending section above active:
+
+```tsx
+{pendingBookings.length > 0 && (
+  <>
+    <h2 className="...">PAYMENT INCOMPLETE</h2>
+    {pendingBookings.map(b => (
+      <div key={b.bookingId} className="... border-yellow-500/30">
+        <span className="bg-yellow-500/10 text-yellow-400 ...">PAYMENT PENDING</span>
+        <p className="text-sm text-on-surface-variant mt-2">
+          Your payment may still be processing. Wait a few minutes then search again.
+          If the issue persists, contact support with Booking ID: <strong>{b.bookingId}</strong>
+        </p>
+      </div>
+    ))}
+  </>
+)}
+```
+
+---
+
+### OPT-9: In-Memory PDF Cache ⭐⭐
+**Fixes:** Repeated downloads hitting Puppeteer again unnecessarily
+
+```typescript
+// Top of pages/api/generate-ticket.ts
+const _pdfCache = new Map<string, { buf: Buffer; at: number }>();
+const PDF_TTL = 15 * 60 * 1000; // 15 minutes
+
+// Inside handler, before Puppeteer block:
+const cached = _pdfCache.get(bookingId);
+if (cached && Date.now() - cached.at < PDF_TTL) {
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=HH-TICKET-${bookingId}.pdf`);
+  res.setHeader('Content-Length', cached.buf.length);
+  res.setHeader('X-Cache', 'HIT');
+  return res.end(cached.buf);
+}
+
+// After generating nodeBuffer:
+_pdfCache.set(bookingId, { buf: nodeBuffer, at: Date.now() });
+```
+
+---
+
+### OPT-10: Basic Rate Limiting ⭐⭐
+**Fixes:** ISSUE-11 (brute-force / Chromium exhaustion)
 
 ```typescript
 // lib/rate-limit.ts
-const ipMap = new Map<string, { count: number; resetAt: number }>();
+const _map = new Map<string, { n: number; reset: number }>();
 
-export function rateLimit(ip: string, maxRequests = 10, windowMs = 60_000): boolean {
+export function rateLimit(key: string, max: number, windowMs: number): boolean {
   const now = Date.now();
-  const entry = ipMap.get(ip);
-  
-  if (!entry || now > entry.resetAt) {
-    ipMap.set(ip, { count: 1, resetAt: now + windowMs });
-    return true; // allowed
+  const entry = _map.get(key);
+  if (!entry || now > entry.reset) {
+    _map.set(key, { n: 1, reset: now + windowMs });
+    return true;
   }
-  
-  if (entry.count >= maxRequests) return false; // blocked
-  
-  entry.count++;
-  return true; // allowed
+  if (entry.n >= max) return false;
+  entry.n++;
+  return true;
 }
 ```
 
 ```typescript
-// In generate-ticket.ts:
-const ip = req.headers['x-forwarded-for']?.toString() || req.socket.remoteAddress || 'unknown';
-if (!rateLimit(ip, 5, 60_000)) { // 5 downloads per minute
-  return res.status(429).json({ message: 'Too many requests. Please wait.' });
-}
-```
+// In generate-ticket.ts and retrieve.ts:
+import { rateLimit } from '../../lib/rate-limit';
 
----
+const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
+           || req.socket.remoteAddress
+           || 'unknown';
 
-#### OPT-11: Reduce QR PII — Store Minimal Data ⭐⭐
-
-**Problem solved:** Issue #9
-
-Only encode the `bookingId` + timestamp + HMAC signature. At scan time, the venue app queries the API to get booking details. This way the QR code doesn't expose user PII.
-
----
-
-### Priority 3 — Polish & Reliability
-
-#### OPT-12: Add PDF Integrity Check Before Sending ⭐⭐
-
-Add a quick sanity check that the generated buffer is actually a valid PDF:
-
-```typescript
-// After generating pdfBuffer:
-const nodeBuffer = Buffer.from(pdfBuffer);
-
-// PDF magic bytes: %PDF
-if (!nodeBuffer.slice(0, 4).equals(Buffer.from('%PDF'))) {
-  console.error('Generated buffer is not a valid PDF!');
-  return res.status(500).json({ message: 'PDF generation produced invalid output' });
+if (!rateLimit(ip, 6, 60_000)) { // 6 per minute per IP
+  return res.status(429).json({ message: 'Too many requests. Please wait a moment.' });
 }
 ```
 
 ---
 
-#### OPT-13: Add Graceful Browser Recovery ⭐⭐
-
-```typescript
-// Wrap the whole Puppeteer block in try/catch with browser reset:
-try {
-  browser = await getBrowser();
-  page = await browser.newPage();
-  // ... rest of generation
-} catch (err) {
-  // If browser is crashed, reset it
-  if (_browser) {
-    try { await _browser.close(); } catch {}
-    _browser = null;
-  }
-  throw err; // re-throw for outer catch
-}
-```
-
----
-
-#### OPT-14: Add `Content-Security-Policy` for ticket iframe ⭐
-
-If you ever want to preview the ticket in-browser (not just download), the current CSP in `next.config.js` blocks `data:` URIs for fonts — fix this to allow `font-src data:` which is already set, but ensure `frame-src 'self'` is also correct.
-
----
-
-#### OPT-15: Add proper TypeScript types to `generate-ticket.ts` ⭐
-
-The `cachedBrowser: any` type should be `Browser | null` from `puppeteer-core`:
-
-```typescript
-import type { Browser } from 'puppeteer-core';
-let cachedBrowser: Browser | null = null;
-```
-
----
-
-## 8. Recommended File Changes
+## 9. File Change Summary
 
 ### Files to Modify
 
-| File | Change | Priority |
-|------|--------|----------|
-| `lib/ticket-template.ts` | Inline all CSS + embed fonts as base64 | 🔴 Critical |
-| `pages/api/generate-ticket.ts` | Add auth token, browser caching, PDF validation, rate limit | 🔴 Critical |
-| `pages/retrieve-tickets.tsx` | Use fetch() for download, show real errors | 🔴 Critical |
-| `pages/booking-success.tsx` | Pre-warm with loading state, use fetch+blob | 🔴 Critical |
-| `vercel.json` | Add `maxDuration: 60` for generate-ticket | 🔴 Critical |
-| `pages/api/bookings/retrieve.ts` | Return downloadTokens, include pending bookings | 🟡 High |
-| `lib/secure-qr.ts` | Compact payload, remove pretty-print | 🟡 High |
-| `pages/api/generate-ticket.ts` | Add in-memory PDF cache | 🟡 High |
-| `lib/rate-limit.ts` | New file: in-memory rate limiter | 🟡 High |
-| `pages/api/generate-ticket.ts` | Apply rate limit | 🟡 High |
+| File | What Changes | Priority |
+|------|-------------|----------|
+| `lib/ticket-template.ts` | Full rewrite — inline CSS, remove all CDN refs | 🔴 Must Do |
+| `pages/api/generate-ticket.ts` | TTL browser cache, magic-byte check, token verify, PDF cache, rate limit, `domcontentloaded` | 🔴 Must Do |
+| `pages/retrieve-tickets.tsx` | `fetch()` download, error state, pass downloadToken | 🔴 Must Do |
+| `pages/booking-success.tsx` | `fetch()` download, loading state, 2.5s delay | 🔴 Must Do |
+| `vercel.json` | Add `functions.maxDuration` + `memory` | 🔴 Must Do |
+| `pages/api/bookings/retrieve.ts` | Add `downloadToken` per booking, return `pendingBookings` | 🟡 High |
+| `lib/secure-qr.ts` | Compact payload, `JSON.stringify()` (no pretty print), `errorCorrectionLevel: 'L'` | 🟡 High |
 
 ### New Files to Create
 
 | File | Purpose |
 |------|---------|
-| `lib/rate-limit.ts` | Sliding window rate limiter for API endpoints |
-| `lib/download-token.ts` | Token generation + verification for secure downloads |
-| `lib/pdf-cache.ts` | In-memory PDF buffer cache with TTL |
+| `lib/download-token.ts` | Issue + verify signed 30-minute download tokens |
+| `lib/rate-limit.ts` | In-memory IP rate limiter |
 
 ---
 
-## Quick Reference: End-to-End Timing (Current vs Optimized)
+## 10. Timing: Before vs After
 
-| Step | Current (Cold) | Optimized (Cold) | Optimized (Warm) |
-|------|---------------|-----------------|-----------------|
-| Page load (`/retrieve-tickets`) | ~300ms | ~300ms | ~300ms |
-| Search API (`/api/bookings/retrieve`) | ~100–300ms | ~100–300ms | ~50ms |
-| PDF API — DB fetch | ~100ms | ~100ms | ~50ms |
-| PDF API — QR generation | ~50ms | ~30ms | ~20ms |
-| PDF API — HTML template | ~5ms | ~3ms | ~3ms |
-| PDF API — Browser launch | ~4000–8000ms | ~3000ms (cached) | ~0ms (warm) |
-| PDF API — CDN font/CSS load | ~1000–3000ms | **0ms (inlined)** | **0ms** |
-| PDF API — PDF render | ~1000ms | ~800ms | ~500ms |
-| **Total (PDF generation)** | **6–14s** | **4–5s** | **0.5–1.5s** |
+| Step | Current Cold Start | After All Fixes (Cold) | After All Fixes (Warm) |
+|------|-------------------|------------------------|------------------------|
+| `/api/bookings/retrieve` | ~200ms | ~200ms | ~60ms |
+| Browser launch | 4,000–8,000ms | 3,000ms | **~0ms (cached)** |
+| CDN font + Tailwind load | 1,000–4,000ms | **0ms (inlined)** | **0ms** |
+| QR generation | ~50ms | ~25ms | ~20ms |
+| PDF render | ~1,000ms | ~700ms | ~500ms |
+| PDF validity check | — | ~1ms | ~1ms |
+| **Total (PDF endpoint)** | **6–15s** | **4–5s** | **~600ms** |
+| User sees real error on failure | ❌ Never | ✅ Always | ✅ Always |
+| Corrupt `.pdf` saves as JSON | ✅ Happens | ❌ Never | ❌ Never |
+| DONE shown on server error | ✅ Happens | ❌ Never | ❌ Never |
 
 ---
 
-*Generated by: Code analysis of `hh-149-amvd` codebase · June 2026*  
-*Author of analysis: Antigravity AI Assistant*
+## Quick Implementation Order
+
+If you can only do a few things, do them in this order:
+
+```
+1. OPT-1  → Replace lib/ticket-template.ts (inline CSS)
+              Change waitUntil to 'domcontentloaded'
+              → Fixes blank PDFs. Biggest win.
+
+2. OPT-4  → Replace handleDownload with fetch() + blob()
+              → Fixes the fake "DONE" button forever.
+
+3. OPT-5  → Add PDF magic-byte check in generate-ticket.ts
+              → Catches bad renders before they reach the user.
+
+4. OPT-3  → Add maxDuration to vercel.json
+              → Stops silent Vercel timeouts.
+
+5. OPT-2  → TTL browser caching
+              → Warm requests drop to <1s.
+
+6. OPT-6  → Download token (lib/download-token.ts)
+              → Closes the bookingId enumeration gap.
+```
+
+---
+
+*Last updated: June 2026 · Analysis of `hh-149-amvd` codebase · Antigravity*

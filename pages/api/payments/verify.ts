@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import clientPromise from '../../../lib/mongodb';
+import { issueDownloadToken } from '../../../lib/download-token';
 
 export default async function handler(
   req: NextApiRequest,
@@ -60,7 +61,9 @@ export default async function handler(
 
     if (existingPayment) {
       console.log('Payment already processed:', razorpay_order_id);
-      return res.status(200).json({ message: 'Payment already verified', bookingId });
+      // Re-issue token so the user can still download even if they refresh the success page
+      const downloadToken = issueDownloadToken(bookingId, booking.email);
+      return res.status(200).json({ message: 'Payment already verified', bookingId, downloadToken });
     }
 
     // Create payment record (no userId, guest-only)
@@ -99,7 +102,11 @@ export default async function handler(
     );
     console.log('Booking updated:', bookingId);
 
-    res.status(200).json({ message: 'Payment verified successfully', bookingId });
+    // Issue a signed 30-minute download token so booking-success can fetch the PDF
+    // without requiring the user to go through the retrieve page first.
+    const downloadToken = issueDownloadToken(bookingId, booking.email);
+
+    res.status(200).json({ message: 'Payment verified successfully', bookingId, downloadToken });
   } catch (error: any) {
     console.error('Payment verification error:', {
       message: error.message,
