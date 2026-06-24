@@ -10,17 +10,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const client = await clientPromise;
     const db = client.db();
 
-    const footerConfigArray = await db.collection('homepage_content')
-      .find({ type: 'footer_settings' })
-      .sort({ createdAt: -1 })
-      .limit(1)
+    const faqs = await db.collection('homepage_content')
+      .find({ type: 'support_faq', isVisible: true, isDeleted: { $ne: true } })
+      .sort({ displayOrder: 1 })
       .toArray();
-      
-    const footerConfig = footerConfigArray[0] || null;
 
-    return res.status(200).json({ content: footerConfig });
+    return res.status(200).json({ content: faqs });
   } catch (error) {
-    console.error('Footer API error:', error);
+    console.error('FAQ API error:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 }

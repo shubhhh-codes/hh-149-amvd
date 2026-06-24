@@ -520,13 +520,13 @@ export default function AdminPanel() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 flex justify-end">
+                <div className="mt-4 flex justify-center md:justify-end">
                   <button
                     onClick={() => setShowCompModal(true)}
                     className="bg-primary-container text-[#0A0A0A] px-4 py-2 font-headline-sm text-sm font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 uppercase tracking-wider"
                   >
                     <span className="material-symbols-outlined text-lg">add</span>
-                    Create Comp Booking
+                    Create Complimentary Booking
                   </button>
                 </div>
               </section>
@@ -812,7 +812,7 @@ export default function AdminPanel() {
       {showCompModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-sm px-4">
           <div className="bg-[#131313] brutalist-border rounded-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-headline-md font-bold text-[#e5e2e1] mb-2 uppercase tracking-wide">Comp Booking</h2>
+            <h2 className="text-xl font-headline-md font-bold text-[#e5e2e1] mb-2 uppercase tracking-wide">Complimentary Booking</h2>
             <p className="text-xs text-[#e5e2e1]/70 mb-6">Create a free booking for a guest.</p>
             <div className="space-y-4 mb-6">
               <div>

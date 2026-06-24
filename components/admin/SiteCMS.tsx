@@ -35,7 +35,7 @@ interface CMSItem {
 }
 
 export default function SiteCMS() {
-  const [cmsTab, setCmsTab] = useState<'homepage' | 'gallery' | 'shows' | 'perform' | 'policies' | 'page404' | 'profile' | 'footer'>('homepage');
+  const [cmsTab, setCmsTab] = useState<'homepage' | 'gallery' | 'shows' | 'perform' | 'policies' | 'page404' | 'profile' | 'footer' | 'faq'>('homepage');
   
   const [performers, setPerformers] = useState<Comedian[]>([]);
   const [gallery, setGallery] = useState<CMSItem[]>([]);
@@ -53,6 +53,10 @@ export default function SiteCMS() {
   const [page404, setPage404] = useState<CMSItem | null>(null);
   const [profilePage, setProfilePage] = useState<CMSItem | null>(null);
   const [footerSettings, setFooterSettings] = useState<CMSItem | null>(null);
+  
+  const [faqs, setFaqs] = useState<CMSItem[]>([]);
+  const [showFaqModal, setShowFaqModal] = useState(false);
+  const [selectedFaq, setSelectedFaq] = useState<CMSItem | null>(null);
   
   const [loading, setLoading] = useState(true);
   
@@ -121,6 +125,10 @@ export default function SiteCMS() {
         const data = await res.json();
         if (data.content && data.content.length > 0) setFooterSettings(data.content[0]);
         else setFooterSettings(null);
+      } else if (cmsTab === 'faq') {
+        const res = await fetch('/api/admin/cms/content?type=support_faq');
+        const data = await res.json();
+        if (data.content) setFaqs(data.content.sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0)));
       }
     } catch (error) {
       console.error(error);
@@ -136,7 +144,14 @@ export default function SiteCMS() {
 
   const revalidatePaths = async (paths: string[]) => {
     try {
-      await Promise.all(paths.map(path => 
+      // Only revalidate paths that use getStaticProps (ISR).
+      // Other paths (like /policies, /about, /404, /support) are SSR or static and will throw errors.
+      const isrPaths = ['/', '/shows', '/gallery', '/perform-with-us'];
+      const validPaths = paths.filter(p => isrPaths.includes(p));
+
+      if (validPaths.length === 0) return;
+
+      await Promise.all(validPaths.map(path => 
         fetch('/api/admin/cms/revalidate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -588,8 +603,10 @@ export default function SiteCMS() {
         metadata: {
           instagramUrl: form.get('instagramUrl'),
           whatsappUrl: form.get('whatsappUrl'),
+          emailAddress: form.get('emailAddress'),
           showInstagram: form.get('showInstagram') === 'true',
           showWhatsapp: form.get('showWhatsapp') === 'true',
+          showEmail: form.get('showEmail') === 'true',
         },
         isVisible: true
       };
@@ -608,6 +625,41 @@ export default function SiteCMS() {
       fetchData();
       // Wait to revalidate
       revalidatePaths(['/', '/shows', '/gallery', '/perform-with-us', '/policies', '/about', '/auth/login', '/404', '/profile']);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleSaveFaq = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSavingStatus(true);
+    try {
+      const form = new FormData(e.currentTarget);
+      
+      const payload = {
+        type: 'support_faq',
+        title: form.get('title'),
+        content: form.get('content'),
+        displayOrder: Number(form.get('displayOrder')),
+        isVisible: form.get('isVisible') === 'true'
+      };
+
+      const url = selectedFaq ? `/api/admin/cms/content/${selectedFaq._id}` : `/api/admin/cms/content`;
+      const method = selectedFaq ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error('Failed to save FAQ');
+      toast.success('FAQ saved');
+      setShowFaqModal(false);
+      fetchData();
+      // no need to revalidate /support as it fetches client-side
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -666,6 +718,12 @@ export default function SiteCMS() {
           className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'footer' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         >
           Footer Settings
+        </button>
+        <button 
+          onClick={() => setCmsTab('faq')}
+          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'faq' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+        >
+          Support FAQs
         </button>
       </div>
 
@@ -1117,6 +1175,118 @@ export default function SiteCMS() {
                </form>
             </div>
           )}
+
+          {/* FOOTER TAB */}
+          {cmsTab === 'footer' && (
+            <div className="bg-[#141414] brutalist-card p-6 rounded-lg max-w-4xl">
+               <h2 className="text-xl font-headline-md font-bold mb-6 border-b border-white/5 pb-2">Footer Settings</h2>
+               <p className="text-sm text-on-surface-variant mb-6">Manage social link integrations and visibility in the website footer.</p>
+               <form onSubmit={handleSaveFooter} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Instagram URL</label>
+                      <input name="instagramUrl" defaultValue={footerSettings?.metadata?.instagramUrl || ''} placeholder="https://instagram.com/..." className="w-full bg-[#080808] border border-white/10 p-2 rounded text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">WhatsApp URL</label>
+                      <input name="whatsappUrl" defaultValue={footerSettings?.metadata?.whatsappUrl || ''} placeholder="https://wa.me/..." className="w-full bg-[#080808] border border-white/10 p-2 rounded text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Email Address</label>
+                      <input name="emailAddress" defaultValue={footerSettings?.metadata?.emailAddress || ''} placeholder="contact@humourshub.com" className="w-full bg-[#080808] border border-white/10 p-2 rounded text-white" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Show Instagram</label>
+                      <select name="showInstagram" defaultValue={footerSettings?.metadata?.showInstagram !== false ? 'true' : 'false'} className="w-full bg-[#080808] border border-white/10 p-2 rounded text-white">
+                        <option value="true">Visible</option>
+                        <option value="false">Hidden</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Show WhatsApp</label>
+                      <select name="showWhatsapp" defaultValue={footerSettings?.metadata?.showWhatsapp !== false ? 'true' : 'false'} className="w-full bg-[#080808] border border-white/10 p-2 rounded text-white">
+                        <option value="true">Visible</option>
+                        <option value="false">Hidden</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Show Email</label>
+                      <select name="showEmail" defaultValue={footerSettings?.metadata?.showEmail !== false ? 'true' : 'false'} className="w-full bg-[#080808] border border-white/10 p-2 rounded text-white">
+                        <option value="true">Visible</option>
+                        <option value="false">Hidden</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-4">
+                     <button type="submit" disabled={savingStatus} className="px-6 py-2 bg-primary-container text-[#0A0A0A] font-bold rounded hover:opacity-90 disabled:opacity-50">
+                       {savingStatus ? 'Saving...' : 'Save Footer Settings'}
+                     </button>
+                  </div>
+               </form>
+            </div>
+          )}
+
+          {/* FAQ TAB */}
+          {cmsTab === 'faq' && (
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <button 
+                  onClick={() => { setSelectedFaq(null); setShowFaqModal(true); }}
+                  className="bg-primary-container text-[#0A0A0A] px-4 py-2 font-headline-md font-bold rounded hover:opacity-90 transition-opacity"
+                >
+                  + Add FAQ
+                </button>
+              </div>
+              <div className="bg-surface-container-low brutalist-card overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#0A0A0A] border-b border-white/5">
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant w-1/2">Question</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant">Order & Status</th>
+                      <th className="px-6 py-4 text-label-caps text-on-surface-variant text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {faqs.map(f => (
+                      <tr key={f._id} className={`hover:bg-white/[0.02] ${f.isDeleted ? 'opacity-50' : ''}`}>
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-sm">{f.title || 'Untitled'}</p>
+                          <p className="text-xs text-on-surface-variant mt-1 line-clamp-2">{f.content}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm">Order: {f.displayOrder}</p>
+                          <div className="flex gap-2 mt-1">
+                            {f.isVisible ? (
+                              <span className="text-xs text-green-400 bg-green-400/10 px-2 py-0.5 rounded">Visible</span>
+                            ) : (
+                              <span className="text-xs text-on-surface-variant bg-surface-variant px-2 py-0.5 rounded">Hidden</span>
+                            )}
+                            {f.isDeleted && <span className="text-xs text-red-400 bg-red-400/10 px-2 py-0.5 rounded">Archived</span>}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right space-x-3">
+                          <button onClick={() => { setSelectedFaq(f); setShowFaqModal(true); }} className="text-sm text-primary-container hover:underline">Edit</button>
+                          {f.isDeleted ? (
+                            <button onClick={() => handleAction(f._id, 'restore')} className="text-sm text-green-400 hover:underline">Restore</button>
+                          ) : (
+                            <button onClick={() => handleAction(f._id, 'delete')} className="text-sm text-red-400 hover:underline">Archive</button>
+                          )}
+                          <button onClick={() => handleAction(f._id, 'permanent_delete')} className="text-sm text-red-600 hover:underline font-bold">Delete</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {faqs.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="text-center py-8 text-on-surface-variant">No FAQs found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -1263,6 +1433,44 @@ export default function SiteCMS() {
                 <button type="button" onClick={() => setShowPolicyModal(false)} className="px-6 py-2 border border-white/10 text-on-surface-variant rounded font-bold text-sm hover:bg-white/5 transition-colors">Cancel</button>
                 <button type="submit" disabled={savingStatus} className="px-6 py-2 bg-primary-container text-[#0A0A0A] font-bold text-sm rounded hover:opacity-90 disabled:opacity-50">
                   {savingStatus ? 'Saving...' : 'Save Policy'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* FAQ Modal */}
+      {showFaqModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
+          <div className="bg-[#141414] brutalist-card rounded-lg p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto hide-scrollbar">
+            <h2 className="text-xl font-headline-md font-bold mb-6">{selectedFaq ? 'Edit FAQ' : 'Add FAQ'}</h2>
+            <form onSubmit={handleSaveFaq} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-label-caps text-on-surface-variant mb-1 uppercase">Question (Title)</label>
+                <input name="title" defaultValue={selectedFaq?.title} required className="w-full bg-[#080808] border border-white/10 p-3 rounded-lg text-white outline-none focus:border-primary-container" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-on-surface-variant mb-1 uppercase">Answer (Content, supports [Text](/link) Markdown-style links)</label>
+                <textarea name="content" defaultValue={selectedFaq?.content} required rows={5} className="w-full bg-[#080808] border border-white/10 p-3 rounded-lg text-white outline-none focus:border-primary-container font-mono text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-label-caps text-on-surface-variant mb-1 uppercase">Display Order</label>
+                  <input name="displayOrder" type="number" defaultValue={selectedFaq?.displayOrder || 0} className="w-full bg-[#080808] border border-white/10 p-3 rounded-lg text-white outline-none focus:border-primary-container" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-label-caps text-on-surface-variant mb-1 uppercase">Visibility</label>
+                  <select name="isVisible" defaultValue={selectedFaq?.isVisible !== false ? 'true' : 'false'} className="w-full bg-[#080808] border border-white/10 p-3 rounded-lg text-white outline-none focus:border-primary-container">
+                    <option value="true">Visible</option>
+                    <option value="false">Hidden</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-8">
+                <button type="button" onClick={() => setShowFaqModal(false)} className="px-6 py-2 border border-white/10 text-on-surface-variant rounded font-bold text-sm hover:bg-white/5 transition-colors">Cancel</button>
+                <button type="submit" disabled={savingStatus} className="px-6 py-2 bg-primary-container text-[#0A0A0A] font-bold text-sm rounded hover:opacity-90 disabled:opacity-50">
+                  {savingStatus ? 'Saving...' : 'Save FAQ'}
                 </button>
               </div>
             </form>

@@ -30,6 +30,8 @@ export default function Navbar() {
     { href: "/gallery", label: "Gallery" },
     { href: "/about", label: "About" },
     { href: "/perform-with-us", label: "Perform With Us" },
+    { href: "/contact", label: "Contact" },
+    { href: "/support", label: "Support" },
   ];
 
   return (
@@ -43,19 +45,24 @@ export default function Navbar() {
               <span className="group-hover:text-primary-container transition-colors">The Humours Hub</span>
           </Link>
           
-          <div className="hidden md:flex items-center gap-8 font-label-caps text-label-caps tracking-widest text-xs uppercase font-bold">
-            {navLinks.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className="text-on-surface-variant dark:text-on-surface-variant hover:text-primary-container transition-colors transition-all duration-300"
-              >
-                {link.label}
-              </Link>
-            ))}
+          <div className="hidden md:flex items-center gap-6 lg:gap-8 font-label-caps text-label-caps tracking-widest text-[10px] lg:text-xs uppercase font-bold">
+            <Link href="/shows" className="text-on-surface-variant dark:text-on-surface-variant hover:text-primary-container transition-colors duration-300">Shows</Link>
+            <Link href="/gallery" className="text-on-surface-variant dark:text-on-surface-variant hover:text-primary-container transition-colors duration-300">Gallery</Link>
+            <Link href="/perform-with-us" className="text-on-surface-variant dark:text-on-surface-variant hover:text-primary-container transition-colors duration-300">Perform</Link>
+            
+            <div className="relative group py-2">
+              <span className="text-on-surface-variant dark:text-on-surface-variant hover:text-primary-container transition-colors duration-300 cursor-pointer flex items-center gap-1">
+                More <span className="material-symbols-outlined text-[14px]">expand_more</span>
+              </span>
+              <div className="absolute top-full left-0 mt-0 w-48 bg-[#141414] border border-white/10 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 flex flex-col py-2">
+                <Link href="/about" className="px-4 py-2 hover:bg-white/5 text-on-surface-variant hover:text-white transition-colors">About</Link>
+                <Link href="/contact" className="px-4 py-2 hover:bg-white/5 text-on-surface-variant hover:text-white transition-colors">Contact</Link>
+                <Link href="/support" className="px-4 py-2 hover:bg-white/5 text-on-surface-variant hover:text-white transition-colors">Support</Link>
+              </div>
+            </div>
   
-            <div className="flex items-center gap-6 border-l border-white/10 pl-6 ml-2">
-              <Link href="/retrieve-tickets" className="text-on-surface-variant hover:text-primary-container transition-colors">My Tickets</Link>
+            <div className="flex items-center gap-6 border-l border-white/10 pl-6 ml-2 lg:ml-4">
+              <Link href="/retrieve-tickets" className="text-on-surface-variant hover:text-primary-container transition-colors duration-300">My Tickets</Link>
             </div>
           </div>
           

@@ -6,7 +6,6 @@ import clientPromise from '../../../../lib/mongodb';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const session = await getServerSession(req, res, authOptions);
-    console.log('Session in content.ts:', session);
     if (session?.user?.role !== 'admin') {
       console.log('Failed auth check in content.ts. Email:', session?.user?.email, 'Role:', session?.user?.role);
       return res.status(403).json({ message: 'Not authorized' });
@@ -15,10 +14,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const client = await clientPromise;
     const db = client.db();
     
-    const user = await db.collection('users').findOne({ email: session.user.email });
+    let user = await db.collection('users').findOne({ email: session.user.email });
     if (!user) {
-      console.log('User not found in DB:', session.user.email);
-      return res.status(403).json({ message: 'Admin user not found in DB' });
+      console.log('User not found in DB, auto-creating admin user document:', session.user.email);
+      try {
+        const result = await db.collection('users').insertOne({
+          username: 'Admin',
+          email: session.user.email,
+          role: 'admin',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        user = { _id: result.insertedId, email: session.user.email };
+      } catch (err) {
+        user = await db.collection('users').findOne({ email: session.user.email });
+        if (!user) {
+          return res.status(403).json({ message: 'Admin user not found or failed to create in DB' });
+        }
+      }
     }
     const adminId = user._id;
 

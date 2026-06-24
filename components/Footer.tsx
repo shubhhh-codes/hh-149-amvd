@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { FaInstagram, FaEnvelope, FaWhatsapp } from 'react-icons/fa';
 
 export default function Footer() {
   const [footerConfig, setFooterConfig] = useState<any>(null);
@@ -15,10 +16,12 @@ export default function Footer() {
       .catch(err => console.error('Failed to load footer settings:', err));
   }, []);
 
-  const showInstagram = footerConfig?.showInstagram !== false;
-  const showWhatsapp = footerConfig?.showWhatsapp !== false;
-  const instagramUrl = footerConfig?.instagramUrl || 'https://www.instagram.com/the.humourshub';
-  const whatsappUrl = footerConfig?.whatsappUrl || 'https://whatsapp.com';
+  const showInstagram = footerConfig ? footerConfig.showInstagram : true;
+  const showWhatsapp = footerConfig ? footerConfig.showWhatsapp : true;
+  const showEmail = footerConfig ? footerConfig.showEmail : true;
+  const instagramUrl = footerConfig?.instagramUrl || '';
+  const whatsappUrl = footerConfig?.whatsappUrl || '';
+  const emailAddress = footerConfig?.emailAddress || '';
 
   return (
     <footer className="bg-[#0A0A0A] border-t border-white/[0.07] font-body mt-24">
@@ -34,17 +37,19 @@ export default function Footer() {
               </p>
             </div>
             <div className="flex items-center space-x-5 pt-2">
-              {showInstagram && (
+              {showInstagram && instagramUrl && (
                 <a aria-label="Instagram" className="text-white/45 hover:text-primary-container transition-all duration-300 transform hover:-translate-y-1" href={instagramUrl} target="_blank" rel="noopener noreferrer">
-                  <i className="fab fa-instagram text-xl"></i>
+                  <FaInstagram className="text-xl" />
                 </a>
               )}
-              <a aria-label="Twitter X" className="text-white/45 hover:text-primary-container transition-all duration-300 transform hover:-translate-y-1" href="https://twitter.com" target="_blank" rel="noopener noreferrer">
-                <i className="fab fa-x-twitter text-xl"></i>
-              </a>
-              {showWhatsapp && (
+              {showWhatsapp && whatsappUrl && (
                 <a aria-label="WhatsApp" className="text-white/45 hover:text-primary-container transition-all duration-300 transform hover:-translate-y-1" href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-                  <i className="fab fa-whatsapp text-xl"></i>
+                  <FaWhatsapp className="text-xl" />
+                </a>
+              )}
+              {showEmail && emailAddress && (
+                <a aria-label="Email" className="text-white/45 hover:text-primary-container transition-all duration-300 transform hover:-translate-y-1" href={`mailto:${emailAddress}`}>
+                  <FaEnvelope className="text-xl" />
                 </a>
               )}
             </div>
@@ -64,8 +69,8 @@ export default function Footer() {
             <h4 className="font-display font-bold text-sm uppercase tracking-[0.2em] text-primary-container">Community</h4>
             <ul className="space-y-4 text-sm lg:text-base">
               <li><Link className="text-white/45 hover:text-white transition-colors" href="/perform-with-us">Perform With Us</Link></li>
-              <li><Link className="text-white/45 hover:text-white transition-colors" href="/">Contact</Link></li>
-              <li><Link className="text-white/45 hover:text-white transition-colors" href="/">Support</Link></li>
+              <li><Link className="text-white/45 hover:text-white transition-colors" href="/contact">Contact</Link></li>
+              <li><Link className="text-white/45 hover:text-white transition-colors" href="/support">Support</Link></li>
             </ul>
           </div>
           {/* Column 4: Newsletter & Legal */}
@@ -73,8 +78,10 @@ export default function Footer() {
             <div className="space-y-6">
               <h4 className="font-display font-bold text-sm uppercase tracking-[0.2em] text-primary-container">Legal</h4>
               <ul className="space-y-4 text-sm lg:text-base">
-                <li><Link className="text-white/45 hover:text-white transition-colors" href="/policies">Privacy Policy</Link></li>
-                <li><Link className="text-white/45 hover:text-white transition-colors" href="/policies">Terms of Service</Link></li>
+                {/* <li><Link className="text-white/45 hover:text-white transition-colors" href="/policies">Privacy Policy</Link></li> */}
+                {/* <li><Link className="text-white/45 hover:text-white transition-colors" href="/policies">Terms of Service</Link></li> */}
+                <li><Link className="text-white/45 hover:text-white transition-colors" href="/policies">Policies & Terms
+                </Link></li>
               </ul>
             </div>
           </div>
