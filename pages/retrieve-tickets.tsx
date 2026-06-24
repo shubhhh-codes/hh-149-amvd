@@ -399,26 +399,7 @@ export default function RetrieveTickets() {
         {searched && (
           <div className="w-full max-w-4xl flex flex-col gap-8" id="results-section">
 
-            {/* Pending Bookings */}
-            {pendingBookings.length > 0 && (
-              <>
-                <h2 className="font-headline-md text-[28px] font-bold text-yellow-400 border-b border-yellow-500/20 pb-4 uppercase reveal-item delay-1">
-                  ⏳ PAYMENT PROCESSING
-                </h2>
-                {pendingBookings.map(booking => (
-                  <div key={booking.bookingId} className="w-full border border-yellow-500/20 rounded-xl p-6 bg-yellow-500/5 reveal-item delay-2">
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="bg-yellow-500/10 text-yellow-400 font-label-caps tracking-widest text-[12px] font-bold px-3 py-1 rounded-full">PAYMENT PENDING</span>
-                      <span className="text-on-surface-variant font-label-caps tracking-widest text-xs">ID: {booking.bookingId}</span>
-                    </div>
-                    <p className="text-on-surface-variant text-sm font-body-md">
-                      Your payment may still be processing. Wait a few minutes and search again.
-                      If this persists, contact us with Booking ID: <strong className="text-white">{booking.bookingId}</strong>
-                    </p>
-                  </div>
-                ))}
-              </>
-            )}
+
 
             {/* Active Bookings */}
             {activeBookings.length > 0 ? (

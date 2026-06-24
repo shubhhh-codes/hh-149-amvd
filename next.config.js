@@ -10,7 +10,9 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
   compress: true,
 
-
+  experimental: {
+    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
+  },
 
   images: {
     dangerouslyAllowSVG: true,

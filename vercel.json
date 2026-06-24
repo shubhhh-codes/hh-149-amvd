@@ -1,10 +1,5 @@
 {
   "buildCommand": "npm run build",
-  "functions": {
-    "pages/api/generate-ticket.ts": {
-      "memory": 3008
-    }
-  },
   "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["bom1"],

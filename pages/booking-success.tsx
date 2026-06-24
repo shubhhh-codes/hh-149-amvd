@@ -66,7 +66,7 @@ export default function BookingSuccess() {
       setDlState('error');
       setDlError(err.message || 'Download failed. Please try again.');
     }
-  }, [bookingId, dlState]);
+  }, [bookingId, dlState, downloadToken]);
 
   // Auto-download once after 2.5s — longer delay than before (was 1500ms)
   // to allow MongoDB write propagation after payment verification
@@ -79,6 +79,7 @@ export default function BookingSuccess() {
     }, 2500);
 
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingId]); // intentionally excludes handleDownloadTicket to prevent re-triggers
 
   const dlButtonLabel = () => {
