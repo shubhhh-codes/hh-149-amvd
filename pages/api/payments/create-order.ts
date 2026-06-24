@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Razorpay from 'razorpay';
 
+import { getTicketPrice } from '../../../lib/getTicketPrice';
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -31,7 +33,9 @@ export default async function handler(
       return res.status(400).json({ message: 'Invalid number of tickets' });
     }
 
-    const amount = numberOfTickets * 14900; // ₹149 per ticket in paise
+    // Fetch dynamic ticket price from CMS
+    const ticketPrice = await getTicketPrice();
+    const amount = numberOfTickets * ticketPrice * 100; // ticket price in paise
     const currency = 'INR';
 
     const options = {

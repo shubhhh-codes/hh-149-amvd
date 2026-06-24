@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import clientPromise from '../../../lib/mongodb';
 import { issueDownloadToken } from '../../../lib/download-token';
+import { getTicketPrice } from '../../../lib/getTicketPrice';
 
 export default async function handler(
   req: NextApiRequest,
@@ -66,13 +67,16 @@ export default async function handler(
       return res.status(200).json({ message: 'Payment already verified', bookingId, downloadToken });
     }
 
+    // Fetch dynamic ticket price from CMS
+    const ticketPrice = await getTicketPrice();
+
     // Create payment record (no userId, guest-only)
     const payment = {
       orderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
       signature: razorpay_signature,
       bookingId: bookingId,
-      amount: booking.numberOfTickets * 14900, // ₹149 per ticket in paise
+      amount: booking.numberOfTickets * ticketPrice * 100, // ticket price in paise
       status: 'completed',
       type: 'ticket_booking',
       createdAt: new Date(),

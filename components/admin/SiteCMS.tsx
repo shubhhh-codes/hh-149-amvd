@@ -1043,7 +1043,7 @@ export default function SiteCMS({ onNavigateToApps }: SiteCMSProps = {}) {
                         </div>
                         <div>
                           <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Ticket Price</label>
-                          <input name="ticketPrice" defaultValue={nextShow?.metadata?.ticketPrice} placeholder="e.g. ₹149" required className="w-full bg-[#080808] border border-white/10 p-2 rounded text-white" />
+                          <input type="number" min="0" name="ticketPrice" defaultValue={nextShow?.metadata?.ticketPrice?.toString().replace(/\D/g, '')} placeholder="e.g. 149" required className="w-full bg-[#080808] border border-white/10 p-2 rounded text-white" />
                         </div>
                         <div>
                           <label className="block text-sm font-label-caps text-on-surface-variant mb-1">Location</label>

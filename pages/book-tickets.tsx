@@ -10,8 +10,14 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { GetServerSideProps } from 'next';
+import { getTicketPrice } from '@/lib/getTicketPrice';
 
-export default function BookTickets() {
+interface BookTicketsProps {
+  ticketPrice: number;
+}
+
+export default function BookTickets({ ticketPrice }: BookTicketsProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -63,7 +69,7 @@ export default function BookTickets() {
         amount: data.amount,
         currency: data.currency,
         name: 'Humors Hub',
-        description: `${numberOfTickets} Show Ticket${numberOfTickets > 1 ? 's' : ''} @ ₹149 each`,
+        description: `${numberOfTickets} Show Ticket${numberOfTickets > 1 ? 's' : ''} @ ₹${ticketPrice} each`,
         order_id: data.orderId,
         handler: async (response: any) => {
           try {
@@ -273,8 +279,8 @@ export default function BookTickets() {
                   </div>
                   <div className="text-right">
                     <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Total Amount</label>
-                    <div className="font-headline-md text-headline-md text-primary-container">₹{149 * numberOfTickets}</div>
-                    <p className="font-body-md text-sm text-on-surface-variant/60">₹149 per ticket</p>
+                    <div className="font-headline-md text-headline-md text-primary-container">₹{ticketPrice * numberOfTickets}</div>
+                    <p className="font-body-md text-sm text-on-surface-variant/60">₹{ticketPrice} per ticket</p>
                   </div>
                 </div>
 
@@ -314,3 +320,12 @@ export default function BookTickets() {
     </div>
   );
 }
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  const ticketPrice = await getTicketPrice();
+  return {
+    props: {
+      ticketPrice,
+    },
+  };
+};

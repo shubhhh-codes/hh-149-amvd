@@ -117,7 +117,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
               </div>
               <div className="flex items-center gap-2 bg-brand-surface border border-white/10 px-4 py-2 rounded-full">
                 <span className="material-symbols-outlined text-primary-container text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>payments</span>
-                ₹149 Ticket
+                ₹{nextShow?.metadata?.ticketPrice?.toString().replace(/\D/g, '') || '149'} Ticket
               </div>
               <div className="flex items-center gap-2 bg-brand-surface border border-white/10 px-4 py-2 rounded-full">
                 <span className="material-symbols-outlined text-primary-container text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>groups</span>
@@ -149,7 +149,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
           <div className="animate-marquee inline-block font-label-caps text-label-caps text-primary-container tracking-widest uppercase">
             <span className="mx-8">12+ shows performed</span> ·
             <span className="mx-8">Ahmedabad</span> ·
-            <span className="mx-8">₹149 only</span> ·
+            <span className="mx-8">₹{nextShow?.metadata?.ticketPrice?.toString().replace(/\D/g, '') || '149'} only</span> ·
             <span className="mx-8">Comedy</span> ·
             <span className="mx-8">Poetry</span> ·
             <span className="mx-8">Music</span> ·
@@ -157,7 +157,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
             <span className="mx-8 text-on-surface">Performers wanted →</span> ·
             <span className="mx-8">3+ shows performed</span> ·
             <span className="mx-8">Ahmedabad</span> ·
-            <span className="mx-8">₹149 only</span> ·
+            <span className="mx-8">₹{nextShow?.metadata?.ticketPrice?.toString().replace(/\D/g, '') || '149'} only</span> ·
             <span className="mx-8">Comedy</span> ·
             <span className="mx-8">Poetry</span> ·
             <span className="mx-8">Music</span> ·
@@ -244,7 +244,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
                 <div className="flex flex-wrap items-center gap-6 mb-8 pt-6 border-t border-white/10">
                   <div className="flex flex-col">
                     <span className="font-label-caps text-label-caps text-on-surface-variant mb-1">Ticket Price</span>
-                    <span className="font-headline-sm text-headline-sm text-on-surface">{nextShow.metadata?.ticketPrice || '₹149'}</span>
+                    <span className="font-headline-sm text-headline-sm text-on-surface">₹{nextShow?.metadata?.ticketPrice?.toString().replace(/\D/g, '') || '149'}</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="font-label-caps text-label-caps text-on-surface-variant mb-1">Status</span>
