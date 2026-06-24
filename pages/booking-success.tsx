@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useCallback, useRef } from 'react';
+import Head from 'next/head';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -93,6 +94,9 @@ export default function BookingSuccess() {
 
   return (
     <div className="bg-background min-h-screen flex flex-col overflow-x-hidden text-on-surface">
+      <Head>
+        <title>The Humours Hub</title>
+      </Head>
       <Navbar />
 
       <main className="flex-grow flex items-center justify-center py-16 px-margin-mobile">

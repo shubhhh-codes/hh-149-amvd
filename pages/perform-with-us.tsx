@@ -80,7 +80,7 @@ export default function PerformWithUsPage({ performHero }: { performHero: any })
   return (
     <>
       <Head>
-        <title>Perform With Us | The Humours Hub</title>
+        <title>The Humours Hub</title>
         <meta name="description" content="Give your art an audience. Perform at The Humours Hub." />
       </Head>
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import Head from 'next/head';
 import Image from 'next/image';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -94,6 +95,10 @@ export default function Home({ performers, gallery, nextShow }: Props) {
 
   return (
     <>
+      <Head>
+        <title>The Humours Hub</title>
+        <meta name="description" content="Stand-up, poetry, singing, and guitar jams in Ahmedabad. Join us for an unforgettable night of entertainment!" />
+      </Head>
       <Navbar />
 
       <main>

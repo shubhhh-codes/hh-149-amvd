@@ -1,6 +1,7 @@
 import React from 'react';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { motion } from 'framer-motion';
@@ -22,6 +23,9 @@ export default function Policies({ policies }: PoliciesProps) {
 
   return (
     <div className="font-body-md text-on-surface antialiased bg-[#0A0A0A] flex flex-col min-h-screen">
+      <Head>
+        <title>The Humours Hub</title>
+      </Head>
       <Navbar />
       <main className="flex-grow flex justify-center w-full pt-16 pb-32 px-margin-mobile md:px-margin-desktop relative">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[500px] bg-primary-container/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>

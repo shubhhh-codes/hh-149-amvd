@@ -31,7 +31,7 @@ export default function AboutPage() {
   return (
     <>
       <Head>
-        <title>About | The Humours Hub</title>
+        <title>The Humours Hub</title>
         <meta name="description" content="Our Story. Ahmedabad always had funny people. It just needed a room." />
       </Head>
 

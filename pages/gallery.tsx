@@ -20,7 +20,7 @@ export default function GalleryPage({ galleryItems }: { galleryItems: any[] }) {
   return (
     <>
       <Head>
-        <title>Gallery | The Humours Hub</title>
+        <title>The Humours Hub</title>
         <meta name="description" content="Gallery of real nights and real crowds at The Humours Hub." />
       </Head>
 

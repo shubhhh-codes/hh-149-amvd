@@ -93,7 +93,7 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>Login — The Humours Hub</title>
+        <title>The Humours Hub</title>
         <meta name="description" content="Sign in to The Humours Hub and continue your comedy journey." />
       </Head>
 

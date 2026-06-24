@@ -1,5 +1,6 @@
 import React from 'react';
 import { GetStaticProps } from 'next';
+import Head from 'next/head';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Home, Smile, Search } from 'lucide-react';
@@ -26,6 +27,9 @@ export default function Custom404({ cmsData }: Custom404Props) {
 
   return (
     <div className="antialiased min-h-screen flex flex-col relative overflow-x-hidden bg-[#0A0A0A] text-[#e5e2e1]">
+      <Head>
+        <title>The Humours Hub</title>
+      </Head>
       <main className="flex-grow flex items-center justify-center relative px-margin-mobile md:px-margin-desktop py-[80px]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,107,26,0.1)_0%,rgba(10,10,10,0)_70%)] pointer-events-none z-0"></div>
         <div className="max-w-[800px] w-full text-center relative z-10 space-y-8">

@@ -29,7 +29,7 @@ export default function ShowsPage({ showsData }: { showsData: any }) {
   return (
     <>
       <Head>
-        <title>Shows | The Humours Hub</title>
+        <title>The Humours Hub</title>
         <meta name="description" content="Upcoming and past shows at The Humours Hub." />
       </Head>
 

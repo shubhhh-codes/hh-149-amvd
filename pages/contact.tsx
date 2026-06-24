@@ -82,7 +82,7 @@ export default function ContactPage() {
   return (
     <>
       <Head>
-        <title>Contact Us | The Humours Hub</title>
+        <title>The Humours Hub</title>
         <meta name="description" content="Get in touch with The Humours Hub. Questions about shows, tickets, or performing? We're always around." />
       </Head>
 

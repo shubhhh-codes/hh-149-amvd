@@ -7,6 +7,7 @@ import React from 'react';
 
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
@@ -159,7 +160,10 @@ export default function BookTickets() {
   };
 
   return (
-    <div className="bg-background min-h-screen flex flex-col overflow-x-hidden text-on-surface">
+    <div className="min-h-screen bg-[#0e0e0e] text-[#e5e2e1] font-body-md antialiased overflow-hidden flex flex-col">
+      <Head>
+        <title>The Humours Hub</title>
+      </Head>
       <Navbar />
 
       <main className="flex-grow flex items-center justify-center py-16 px-margin-mobile md:py-16 relative overflow-hidden">

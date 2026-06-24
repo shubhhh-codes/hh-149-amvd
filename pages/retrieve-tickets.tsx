@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Head from 'next/head';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
@@ -190,6 +191,9 @@ export default function RetrieveTickets() {
 
   return (
     <div className="bg-[#0A0A0A] min-h-screen flex flex-col font-body-md text-on-surface antialiased overflow-x-hidden relative">
+      <Head>
+        <title>The Humours Hub</title>
+      </Head>
       <style dangerouslySetInnerHTML={{
         __html: `
         #cursor-spotlight {

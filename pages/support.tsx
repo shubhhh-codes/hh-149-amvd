@@ -66,7 +66,7 @@ export default function SupportPage() {
   return (
     <>
       <Head>
-        <title>Support | The Humours Hub</title>
+        <title>The Humours Hub</title>
         <meta name="description" content="Find answers to common questions about The Humours Hub shows, tickets, and venue." />
       </Head>
 
