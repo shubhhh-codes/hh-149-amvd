@@ -402,7 +402,6 @@ export default function Home({ performers, gallery, nextShow }: Props) {
           </div>
         </section>
       </main>
-
       <Footer />
     </>
   );

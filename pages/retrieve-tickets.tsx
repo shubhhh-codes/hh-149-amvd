@@ -264,14 +264,18 @@ export default function RetrieveTickets() {
                     </div>
                     <div className="space-y-2">
                         <label className="font-label-caps text-label-caps tracking-widest text-[14px] font-bold text-on-surface-variant uppercase">Phone Number</label>
-                        <div className="relative">
-                            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">phone</span>
+                        <div className="flex items-stretch bg-[#080808] border border-white/10 rounded-DEFAULT focus-within:border-[#FF6B1A] focus-within:shadow-[0_0_0_1px_#FF6B1A] transition-all duration-300 overflow-hidden">
+                            <div className="flex items-center gap-2 pl-4 pr-3 border-r border-white/5 bg-white/[0.02] text-on-surface-variant select-none">
+                                <span className="material-symbols-outlined text-[20px]">phone</span>
+                                <span className="font-body-md font-bold text-white/40 pt-[1px]">+91</span>
+                            </div>
                             <input 
-                                className="premium-input w-full rounded-DEFAULT py-3 pl-12 pr-4 font-body-md text-body-md" 
-                                placeholder="+91" 
+                                className="w-full bg-transparent border-none py-3 pl-3 pr-4 font-body-md text-white placeholder-white/20 focus:outline-none focus:ring-0" 
+                                placeholder="XXXXXXXXXX" 
                                 type="tel"
                                 value={phone}
-                                onChange={e => setPhone(e.target.value.replace(/[^0-9+\s-]/g, ''))}
+                                onChange={e => setPhone(e.target.value.replace(/^\+91/, '').replace(/[^0-9]/g, '').slice(0, 10))}
+                                maxLength={10}
                                 required
                             />
                         </div>
@@ -302,14 +306,17 @@ export default function RetrieveTickets() {
                 <form onSubmit={handleSearch} className="space-y-6" id="form-booking">
                     <div className="space-y-2">
                         <label className="font-label-caps text-label-caps tracking-widest text-[14px] font-bold text-on-surface-variant uppercase">Booking ID</label>
-                        <div className="relative">
-                            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">confirmation_number</span>
+                        <div className="flex items-stretch bg-[#080808] border border-white/10 rounded-DEFAULT focus-within:border-[#FF6B1A] focus-within:shadow-[0_0_0_1px_#FF6B1A] transition-all duration-300 overflow-hidden">
+                            <div className="flex items-center gap-2 pl-4 pr-3 border-r border-white/5 bg-white/[0.02] text-on-surface-variant select-none">
+                                <span className="material-symbols-outlined text-[20px]">confirmation_number</span>
+                                <span className="font-body-md font-bold text-white/40 pt-[1px]">#</span>
+                            </div>
                             <input 
-                                className="premium-input w-full rounded-DEFAULT py-3 pl-12 pr-4 font-body-md text-body-md uppercase" 
-                                placeholder="e.g. THH-1234-5678" 
+                                className="w-full bg-transparent border-none py-3 pl-3 pr-4 font-body-md text-white placeholder-white/20 focus:outline-none uppercase focus:ring-0" 
+                                placeholder="E.G. THH-1234-5678" 
                                 type="text"
                                 value={bookingId}
-                                onChange={e => setBookingId(e.target.value.toUpperCase())}
+                                onChange={e => setBookingId(e.target.value.replace(/#/g, '').toUpperCase())}
                                 required
                             />
                         </div>
@@ -337,14 +344,18 @@ export default function RetrieveTickets() {
                     </div>
                     <div className="space-y-2">
                         <label className="font-label-caps text-label-caps tracking-widest text-[14px] font-bold text-on-surface-variant uppercase">Phone Number <span className="text-on-surface-variant/50 lowercase normal-case ml-1">(Optional)</span></label>
-                        <div className="relative">
-                            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">phone</span>
+                        <div className="flex items-stretch bg-[#080808] border border-white/10 rounded-DEFAULT focus-within:border-[#FF6B1A] focus-within:shadow-[0_0_0_1px_#FF6B1A] transition-all duration-300 overflow-hidden">
+                            <div className="flex items-center gap-2 pl-4 pr-3 border-r border-white/5 bg-white/[0.02] text-on-surface-variant select-none">
+                                <span className="material-symbols-outlined text-[20px]">phone</span>
+                                <span className="font-body-md font-bold text-white/40 pt-[1px]">+91</span>
+                            </div>
                             <input 
-                                className="premium-input w-full rounded-DEFAULT py-3 pl-12 pr-4 font-body-md text-body-md" 
-                                placeholder="+91" 
+                                className="w-full bg-transparent border-none py-3 pl-3 pr-4 font-body-md text-white placeholder-white/20 focus:outline-none focus:ring-0" 
+                                placeholder="XXXXXXXXXX" 
                                 type="tel"
                                 value={phone}
-                                onChange={e => setPhone(e.target.value.replace(/[^0-9+\s-]/g, ''))}
+                                onChange={e => setPhone(e.target.value.replace(/^\+91/, '').replace(/[^0-9]/g, '').slice(0, 10))}
+                                maxLength={10}
                                 required={!email}
                             />
                         </div>

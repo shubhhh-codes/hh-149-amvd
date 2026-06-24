@@ -201,7 +201,20 @@ export default function ContactPage() {
                     </div>
                     <div className="space-y-2">
                       <label htmlFor="phone" className="font-headline text-label-caps text-secondary-opacity block tracking-[0.1em]">PHONE</label>
-                      <input type="tel" id="phone" placeholder="Your phone number" className="w-full px-4 py-3 font-body focus:ring-0" />
+                      <div className="flex items-stretch bg-[#080808] border border-[rgba(255,255,255,0.07)] rounded focus-within:border-[#ff6b1a] transition-colors overflow-hidden">
+                        <div className="flex items-center gap-2 pl-4 pr-3 border-r border-[rgba(255,255,255,0.07)] bg-white/[0.02] text-secondary-opacity select-none">
+                          <span className="material-symbols-outlined text-[20px]">phone</span>
+                          <span className="font-body font-bold text-white/40 pt-[1px]">+91</span>
+                        </div>
+                        <input 
+                          type="tel" 
+                          id="phone" 
+                          placeholder="XXXXXXXXXX" 
+                          maxLength={10}
+                          className="w-full !bg-transparent !border-none px-3 py-3 font-body focus:outline-none focus:ring-0"
+                          onChange={(e) => { e.target.value = e.target.value.replace(/^\+91/, '').replace(/[^0-9]/g, '').slice(0, 10) }}
+                        />
+                      </div>
                     </div>
                   </div>
 

@@ -196,7 +196,22 @@ export default function PerformWithUsPage({ performHero }: { performHero: any })
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="font-bold text-[14px] tracking-[0.05em] text-[rgba(255,255,255,0.7)] uppercase font-headline-md" htmlFor="phone">Phone Number *</label>
-                    <input required value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/[^0-9+\s-]/g, '')})} className="bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg px-4 py-3 text-[#e5e2e1] focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none" id="phone" placeholder="+91 XXXXX XXXXX" type="tel" />
+                    <div className="flex items-stretch bg-[#1c1b1b] border border-[rgba(255,255,255,0.07)] rounded-lg focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-colors overflow-hidden">
+                      <div className="flex items-center gap-2 pl-4 pr-3 border-r border-white/5 bg-white/[0.02] text-[rgba(255,255,255,0.7)] select-none">
+                        <span className="material-symbols-outlined text-[20px]">phone</span>
+                        <span className="font-body-md font-bold text-[rgba(255,255,255,0.4)] pt-[1px]">+91</span>
+                      </div>
+                      <input 
+                        type="tel"
+                        id="phone"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/^\+91/, '').replace(/[^0-9]/g, '').slice(0, 10)})}
+                        placeholder="XXXXXXXXXX" 
+                        maxLength={10}
+                        required 
+                        className="w-full bg-transparent border-none text-[#e5e2e1] px-3 py-3 placeholder-[rgba(255,255,255,0.3)] font-body-md focus:outline-none focus:ring-0"
+                      />
+                    </div>
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="font-bold text-[14px] tracking-[0.05em] text-[rgba(255,255,255,0.7)] uppercase font-headline-md" htmlFor="experience">Experience (Stages)</label>

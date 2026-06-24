@@ -25,7 +25,7 @@ export default function BookTickets() {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'phone' ? value.replace(/[^0-9+\s-]/g, '') : value
+      [name]: name === 'phone' ? value.replace(/^\+91/, '').replace(/[^0-9]/g, '').slice(0, 10) : value
     }));
   };
 
@@ -209,16 +209,23 @@ export default function BookTickets() {
                   </div>
                   <div className="space-y-2">
                     <label className="block font-label-caps text-label-caps text-on-surface-variant" htmlFor="phone">Phone Number</label>
-                    <input 
-                      type="tel"
-                      id="phone"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      placeholder="+91 XXXXX XXXXX" 
-                      required 
-                      className="w-full bg-[#080808] border border-white/10 text-on-surface px-4 py-3 rounded-lg focus:border-primary-container transition-colors font-body-md focus:outline-none focus:ring-1 focus:ring-primary-container"
-                    />
+                    <div className="flex items-stretch bg-[#080808] border border-white/10 rounded-lg focus-within:border-primary-container focus-within:ring-1 focus-within:ring-primary-container transition-all duration-300 overflow-hidden">
+                      <div className="flex items-center gap-2 pl-4 pr-3 border-r border-white/5 bg-white/[0.02] text-on-surface-variant select-none">
+                        <span className="material-symbols-outlined text-[20px]">phone</span>
+                        <span className="font-body-md font-bold text-white/40 pt-[1px]">+91</span>
+                      </div>
+                      <input 
+                        type="tel"
+                        id="phone"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        placeholder="XXXXXXXXXX" 
+                        maxLength={10}
+                        required 
+                        className="w-full bg-transparent border-none text-on-surface px-3 py-3 placeholder-white/20 font-body-md focus:outline-none focus:ring-0"
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-2">

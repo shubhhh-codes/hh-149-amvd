@@ -24,7 +24,7 @@ export default function Footer() {
   const emailAddress = footerConfig?.emailAddress || '';
 
   return (
-    <footer className="bg-[#0A0A0A] border-t border-white/[0.07] font-body mt-24">
+    <footer className="bg-[#0A0A0A] border-t border-white/[0.07] font-body">
       <div className="max-w-[1280px] mx-auto px-margin-mobile lg:px-margin-desktop py-16 md:py-24">
         {/* Top Section: 4-Column Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-gutter gap-y-12 mb-20">

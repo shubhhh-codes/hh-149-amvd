@@ -839,14 +839,21 @@ export default function AdminPanel() {
               </div>
               <div>
                 <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Phone</label>
-                <input
-                  type="tel"
-                  value={compForm.phone}
-                  onChange={e => setCompForm(p => ({ ...p, phone: e.target.value.replace(/[^0-9+\s-]/g, '') }))}
-                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
-                  placeholder="+91 XXXXX XXXXX"
-                  required
-                />
+                <div className="flex items-stretch bg-[#0e0e0e] brutalist-border rounded-lg focus-within:border-primary-container transition-colors overflow-hidden">
+                  <div className="flex items-center gap-2 pl-3 pr-2 border-r border-[rgba(255,255,255,0.05)] bg-white/[0.02] text-white/50 select-none">
+                    <span className="material-symbols-outlined text-[16px]">phone</span>
+                    <span className="font-label-caps text-xs pt-[1px]">+91</span>
+                  </div>
+                  <input
+                    type="tel"
+                    value={compForm.phone}
+                    onChange={e => setCompForm(p => ({ ...p, phone: e.target.value.replace(/^\+91/, '').replace(/[^0-9]/g, '').slice(0, 10) }))}
+                    className="w-full bg-transparent px-3 py-3 focus:outline-none text-sm border-none placeholder-white/20 focus:ring-0"
+                    placeholder="XXXXXXXXXX"
+                    maxLength={10}
+                    required
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Tickets</label>
@@ -909,13 +916,20 @@ export default function AdminPanel() {
               </div>
               <div>
                 <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Phone</label>
-                <input
-                  type="tel"
-                  value={comedianForm.phone}
-                  onChange={e => setComedianForm(p => ({ ...p, phone: e.target.value.replace(/[^0-9+\s-]/g, '') }))}
-                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
-                  placeholder="+91 XXXXX XXXXX"
-                />
+                <div className="flex items-stretch bg-[#0e0e0e] brutalist-border rounded-lg focus-within:border-primary-container transition-colors overflow-hidden">
+                  <div className="flex items-center gap-2 pl-3 pr-2 border-r border-[rgba(255,255,255,0.05)] bg-white/[0.02] text-white/50 select-none">
+                    <span className="material-symbols-outlined text-[16px]">phone</span>
+                    <span className="font-label-caps text-xs pt-[1px]">+91</span>
+                  </div>
+                  <input
+                    type="tel"
+                    value={comedianForm.phone}
+                    onChange={e => setComedianForm(p => ({ ...p, phone: e.target.value.replace(/^\+91/, '').replace(/[^0-9]/g, '').slice(0, 10) }))}
+                    className="w-full bg-transparent px-3 py-3 focus:outline-none text-sm border-none placeholder-white/20 focus:ring-0"
+                    placeholder="XXXXXXXXXX"
+                    maxLength={10}
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Speciality / Art Form *</label>
