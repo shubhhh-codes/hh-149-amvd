@@ -60,6 +60,16 @@ interface Payment {
   };
 }
 
+interface ContactMessage {
+  _id: string;
+  name: string;
+  phone: string;
+  subject: string;
+  message: string;
+  status: 'unread' | 'read';
+  createdAt: string;
+}
+
 interface PaymentStats {
   totalAmount: number;
   totalPayments: number;
@@ -70,10 +80,11 @@ interface PaymentStats {
 export default function AdminPanel() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'comedians' | 'payments' | 'cms'>('bookings');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'comedians' | 'payments' | 'messages' | 'cms'>('bookings');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [comedians, setComedians] = useState<ComedianProfile[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [paymentStats, setPaymentStats] = useState<PaymentStats>({
     totalAmount: 0,
     totalPayments: 0,
@@ -145,16 +156,29 @@ export default function AdminPanel() {
     }
   }, []);
 
+  const fetchMessages = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/contact-messages');
+      if (!res.ok) throw new Error('Failed to fetch messages');
+      const data = await res.json();
+      setMessages(data.messages);
+    } catch (err) {
+      console.error('Fetch messages error:', err);
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       if (activeTab === 'dashboard') {
-        await Promise.all([fetchBookings(), fetchComedians(), fetchPayments()]);
+        await Promise.all([fetchBookings(), fetchComedians(), fetchPayments(), fetchMessages()]);
       } else if (activeTab === 'bookings') {
         await fetchBookings();
       } else if (activeTab === 'comedians') {
         await fetchComedians();
       } else if (activeTab === 'payments') {
         await fetchPayments();
+      } else if (activeTab === 'messages') {
+        await fetchMessages();
       }
     } catch (err) {
       console.error('Fetch error:', err);
@@ -162,7 +186,7 @@ export default function AdminPanel() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, fetchBookings, fetchComedians, fetchPayments]);
+  }, [activeTab, fetchBookings, fetchComedians, fetchPayments, fetchMessages]);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -172,6 +196,22 @@ export default function AdminPanel() {
     }
     fetchData();
   }, [session, status, router, activeTab, fetchData]);
+
+  // Intercept hardware/browser back button for the Comedians tab
+  useEffect(() => {
+    if (activeTab === 'comedians') {
+      window.history.pushState({ internalTab: true }, '');
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (activeTab === 'comedians') {
+        setActiveTab('cms');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeTab]);
 
   const handleRegisterPasskey = async () => {
     try {
@@ -294,6 +334,34 @@ export default function AdminPanel() {
     }
   };
 
+  const handleMessageStatusUpdate = async (messageId: string, status: 'read' | 'unread') => {
+    try {
+      const res = await fetch('/api/admin/contact-messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId, status })
+      });
+      if (!res.ok) throw new Error('Failed to update message status');
+      fetchMessages();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleMessageDelete = async (messageId: string) => {
+    if (!confirm('Are you sure you want to delete this message?')) return;
+    try {
+      const res = await fetch(`/api/admin/contact-messages?messageId=${messageId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Failed to delete message');
+      toast.success('Message deleted');
+      fetchMessages();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
   const handleSaveComedian = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -364,10 +432,10 @@ export default function AdminPanel() {
   }
 
   const navLinks = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', short: 'DASH' },
+    { id: 'dashboard', label: 'Dashboard', icon: 'qr_code_2', short: 'DASH' },
     { id: 'bookings', label: 'Bookings', icon: 'calendar_today', short: 'BOOK' },
-    { id: 'cms', label: 'CMS', icon: 'settings_applications', isFab: true },
-    { id: 'comedians', label: 'Comedians', icon: 'theater_comedy', short: 'APPS' },
+    { id: 'cms', label: 'CMS', icon: 'widgets', short: 'CMS' },
+    { id: 'messages', label: 'Messages', icon: 'mail', short: 'MSG' },
     { id: 'payments', label: 'Payments', icon: 'payments', short: 'PAY' },
   ];
 
@@ -640,7 +708,20 @@ export default function AdminPanel() {
 
           {/* COMEDIANS TAB */}
           {activeTab === 'comedians' && (
-            <section className="space-y-6 animate-enter">
+            <section className="space-y-6 animate-enter mb-24">
+              <button 
+                type="button"
+                onClick={() => {
+                  setActiveTab('cms');
+                  if (window.history.state?.internalTab) {
+                    window.history.back();
+                  }
+                }}
+                className="flex w-fit items-center gap-2 px-4 py-2 bg-[#201f1f] brutalist-border rounded-lg text-sm font-label-caps tracking-widest text-on-surface/80 hover:text-on-surface hover:bg-[#2a2a2a] transition-colors uppercase mt-2 mb-4"
+              >
+                <span className="material-symbols-outlined text-lg">arrow_back</span>
+                Back to Hub
+              </button>
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-headline-md font-bold uppercase tracking-wide">Comedian Apps</h2>
                 <button
@@ -767,45 +848,90 @@ export default function AdminPanel() {
             </section>
           )}
 
+          {/* MESSAGES TAB */}
+          {activeTab === 'messages' && (
+            <section className="space-y-6 animate-enter">
+              <h2 className="text-2xl font-headline-md font-bold mb-4 uppercase tracking-wide">Messages Inbox</h2>
+              <div className="flex flex-col gap-4">
+                {messages.length === 0 ? (
+                  <div className="bg-[#131313] brutalist-border rounded p-8 text-center text-on-surface/50">
+                    <span className="material-symbols-outlined text-4xl mb-2 opacity-50">inbox</span>
+                    <p>No messages found.</p>
+                  </div>
+                ) : (
+                  messages.map((msg) => (
+                    <article key={msg._id} className={`bg-[#131313] brutalist-border rounded p-4 relative overflow-hidden flex flex-col gap-3 ${msg.status === 'unread' ? 'border-primary-container/30' : 'opacity-70'}`}>
+                      {msg.status === 'unread' && <div className="absolute top-0 left-0 w-1 h-full bg-primary-container"></div>}
+                      <div className="flex justify-between items-start pl-3">
+                        <div>
+                          <h3 className="font-headline-sm text-lg font-bold">{msg.name}</h3>
+                          <div className="text-xs text-on-surface/70 mt-1 flex gap-3">
+                            <span><span className="material-symbols-outlined text-[14px] align-middle mr-1">chat</span>{msg.phone}</span>
+                            <span>{new Date(msg.createdAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <span className={`font-label-caps px-2 py-1 rounded text-[10px] brutalist-border ${msg.status === 'unread' ? 'bg-primary-container/10 text-primary-container border-primary-container/30' : 'bg-white/5 text-white/50 border-white/10'}`}>
+                          {msg.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="pl-3 mt-2">
+                        <div className="text-xs font-label-caps text-on-surface/40 mb-1 tracking-widest uppercase">Subject: {msg.subject}</div>
+                        <p className="text-sm font-body bg-black/20 p-3 rounded">{msg.message}</p>
+                      </div>
+                      <div className="flex gap-2 pl-3 mt-2">
+                        {msg.status === 'unread' ? (
+                          <button onClick={() => handleMessageStatusUpdate(msg._id, 'read')} className="px-4 py-2 bg-primary-container text-black font-headline-sm text-xs rounded-lg active:scale-[0.98] transition-transform uppercase tracking-wider">Mark as Read</button>
+                        ) : (
+                          <button onClick={() => handleMessageStatusUpdate(msg._id, 'unread')} className="px-4 py-2 bg-[#201f1f] brutalist-border text-white font-headline-sm text-xs rounded-lg active:scale-[0.98] transition-transform uppercase tracking-wider">Mark as Unread</button>
+                        )}
+                        <button onClick={() => handleMessageDelete(msg._id)} className="px-4 py-2 bg-transparent brutalist-border text-red-500 font-headline-sm text-xs rounded-lg hover:bg-red-500/10 active:bg-red-500/20 transition-colors uppercase tracking-wider ml-auto">Delete</button>
+                      </div>
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
+          )}
+
           {/* CMS TAB */}
           {activeTab === 'cms' && (
-            <section className="space-y-6 animate-enter">
-              <h2 className="text-2xl font-headline-md font-bold mb-4 uppercase tracking-wide">Content Management</h2>
-              <div className="bg-[#131313] brutalist-border rounded-lg overflow-hidden">
-                <SiteCMS />
-              </div>
+            <section className="animate-enter">
+              <SiteCMS onNavigateToApps={() => setActiveTab('comedians')} />
             </section>
           )}
         </div>
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full h-20 bg-[#1c1b1b] border-t border-white/5 z-50 px-2 flex justify-around items-center pb-safe">
-        {navLinks.map((link) => (
-          link.isFab ? (
-            <div key={link.id} className="relative -top-5">
-              <button 
-                onClick={() => setActiveTab(link.id as any)}
-                className={`w-14 h-14 rounded-xl flex items-center justify-center transition-transform ${
-                  activeTab === link.id ? 'bg-primary-container text-[#0e0e0e] shadow-[0_8px_16px_rgba(255,107,26,0.3)] scale-105' : 'bg-[#353534] text-on-surface/70'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[28px]">{link.icon}</span>
-              </button>
-            </div>
-          ) : (
+      <nav className="md:hidden fixed bottom-0 left-0 w-full h-20 bg-surface-container-low border-t border-[rgba(255,255,255,0.05)] z-50 px-2 flex justify-around items-center pb-safe">
+        {navLinks.map((link) => {
+          if (link.id === 'cms') {
+            return (
+              <div key={link.id} className="relative -top-5">
+                <button 
+                  onClick={() => setActiveTab('cms')}
+                  className={`w-14 h-14 rounded-xl shadow-[0_8px_16px_rgba(255,107,26,0.3)] flex items-center justify-center hover:scale-95 active:scale-90 transition-transform ${
+                    activeTab === 'cms' ? 'bg-primary-container text-on-primary-container' : 'bg-[#2a2a2a] text-on-surface'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[28px]" style={{fontVariationSettings: activeTab === 'cms' ? "'FILL' 1" : "'FILL' 0"}}>{link.icon}</span>
+                </button>
+              </div>
+            );
+          }
+          return (
             <button 
               key={link.id}
               onClick={() => setActiveTab(link.id as any)}
-              className={`flex flex-col items-center justify-center w-16 h-16 gap-1 transition-colors ${
-                activeTab === link.id ? 'text-primary-container' : 'text-on-surface/50 hover:text-on-surface'
+              className={`flex flex-col items-center justify-center min-w-[52px] h-16 gap-1 transition-colors shrink-0 ${
+                activeTab === link.id ? 'text-primary-container' : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
               <span className="material-symbols-outlined text-[24px]" style={{fontVariationSettings: activeTab === link.id ? "'FILL' 1" : "'FILL' 0"}}>{link.icon}</span>
-              <span className="text-[10px] font-label-caps tracking-wider">{link.short}</span>
+              <span className="text-[10px] font-label-caps uppercase tracking-wider">{link.short}</span>
             </button>
-          )
-        ))}
+          );
+        })}
       </nav>
 
       {/* Complimentary Booking Modal */}

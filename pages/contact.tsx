@@ -5,6 +5,31 @@ import Footer from '@/components/Footer';
 
 export default function ContactPage() {
   const [contactConfig, setContactConfig] = useState<any>(null);
+  const [formData, setFormData] = useState({ name: '', phone: '', subject: '', message: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitMessage(null);
+
+    try {
+      const res = await fetch('/api/contact/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Something went wrong');
+      setSubmitMessage({ type: 'success', text: 'Message sent successfully! We will get back to you soon.' });
+      setFormData({ name: '', phone: '', subject: '', message: '' });
+    } catch (err: any) {
+      setSubmitMessage({ type: 'error', text: err.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     fetch('/api/cms/footer')
@@ -163,7 +188,7 @@ export default function ContactPage() {
                 <h3 className="font-headline font-bold text-xl mb-2 text-on-surface">Follow on Instagram</h3>
                 <p className="font-body text-secondary-opacity mb-6">Catch show announcements, behind the scenes, and community moments.</p>
                 <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center border border-white/20 text-on-surface font-headline font-bold px-6 py-3 rounded-xl hover:bg-white/5 transition-colors duration-200 mt-auto w-full sm:w-auto">
-                  Visit @thehumourshub <span className="material-symbols-outlined ml-2 text-xl">arrow_forward</span>
+                  Visit @the.humourshub <span className="material-symbols-outlined ml-2 text-xl">arrow_forward</span>
                 </a>
               </div>
 
@@ -193,11 +218,11 @@ export default function ContactPage() {
                 
                 <h2 className="font-headline font-bold text-3xl mb-8 text-on-surface relative z-10">Send us a message</h2>
                 
-                <form className="space-y-6 relative z-10" onSubmit={(e) => e.preventDefault()}>
+                <form className="space-y-6 relative z-10" onSubmit={handleSubmit}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label htmlFor="name" className="font-headline text-label-caps text-secondary-opacity block tracking-[0.1em]">NAME</label>
-                      <input type="text" id="name" placeholder="Your name" className="w-full px-4 py-3 font-body focus:ring-0" />
+                      <input type="text" id="name" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Your name" className="w-full px-4 py-3 font-body focus:ring-0" />
                     </div>
                     <div className="space-y-2">
                       <label htmlFor="phone" className="font-headline text-label-caps text-secondary-opacity block tracking-[0.1em]">PHONE</label>
@@ -212,7 +237,9 @@ export default function ContactPage() {
                           placeholder="XXXXXXXXXX" 
                           maxLength={10}
                           className="w-full !bg-transparent !border-none px-3 py-3 font-body focus:outline-none focus:ring-0"
-                          onChange={(e) => { e.target.value = e.target.value.replace(/^\+91/, '').replace(/[^0-9]/g, '').slice(0, 10) }}
+                          value={formData.phone}
+                          required
+                          onChange={(e) => { setFormData({...formData, phone: e.target.value.replace(/^\+91/, '').replace(/[^0-9]/g, '').slice(0, 10)}) }}
                         />
                       </div>
                     </div>
@@ -221,7 +248,7 @@ export default function ContactPage() {
                   <div className="space-y-2">
                     <label htmlFor="subject" className="font-headline text-label-caps text-secondary-opacity block tracking-[0.1em]">SUBJECT</label>
                     <div className="relative">
-                      <select id="subject" className="w-full px-4 py-3 font-body appearance-none focus:ring-0 text-on-surface" defaultValue="">
+                      <select id="subject" required value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className="w-full px-4 py-3 font-body appearance-none focus:ring-0 text-on-surface">
                         <option value="" disabled>Select a topic</option>
                         <option value="tickets">Ticket Issue</option>
                         <option value="perform">Want to Perform</option>
@@ -234,11 +261,17 @@ export default function ContactPage() {
 
                   <div className="space-y-2">
                     <label htmlFor="message" className="font-headline text-label-caps text-secondary-opacity block tracking-[0.1em]">MESSAGE</label>
-                    <textarea id="message" rows={4} placeholder="How can we help?" className="w-full px-4 py-3 font-body focus:ring-0 resize-none"></textarea>
+                    <textarea id="message" required value={formData.message} onChange={e => setFormData({...formData, message: e.target.value})} rows={4} placeholder="How can we help?" className="w-full px-4 py-3 font-body focus:ring-0 resize-none"></textarea>
                   </div>
 
-                  <button type="button" className="w-full bg-[#ff6b1a] text-[#0A0A0A] font-headline font-bold px-6 py-4 rounded-xl hover:brightness-110 transition-colors duration-200 flex items-center justify-center text-lg active:scale-[0.98]">
-                    Send Message <span className="material-symbols-outlined ml-2">arrow_forward</span>
+                  {submitMessage && (
+                    <div className={`p-4 rounded-lg ${submitMessage.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                      {submitMessage.text}
+                    </div>
+                  )}
+
+                  <button type="submit" disabled={isSubmitting} className="w-full bg-[#ff6b1a] text-[#0A0A0A] font-headline font-bold px-6 py-4 rounded-xl hover:brightness-110 transition-colors duration-200 flex items-center justify-center text-lg active:scale-[0.98] disabled:opacity-50">
+                    {isSubmitting ? 'Sending...' : 'Send Message'} {!isSubmitting && <span className="material-symbols-outlined ml-2">arrow_forward</span>}
                   </button>
                 </form>
 

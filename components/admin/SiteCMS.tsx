@@ -34,9 +34,29 @@ interface CMSItem {
   createdAt: string;
 }
 
-export default function SiteCMS() {
-  const [cmsTab, setCmsTab] = useState<'homepage' | 'gallery' | 'shows' | 'perform' | 'policies' | 'page404' | 'profile' | 'footer' | 'faq'>('homepage');
+interface SiteCMSProps {
+  onNavigateToApps?: () => void;
+}
+
+export default function SiteCMS({ onNavigateToApps }: SiteCMSProps = {}) {
+  const [cmsTab, setCmsTab] = useState<'hub' | 'homepage' | 'gallery' | 'shows' | 'perform' | 'policies' | 'page404' | 'profile' | 'footer' | 'faq'>('hub');
   
+  // Intercept hardware/browser back button to return to Hub
+  useEffect(() => {
+    if (cmsTab !== 'hub') {
+      window.history.pushState({ internal: true }, '');
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (cmsTab !== 'hub') {
+        setCmsTab('hub');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [cmsTab]);
+
   const [performers, setPerformers] = useState<Comedian[]>([]);
   const [gallery, setGallery] = useState<CMSItem[]>([]);
   
@@ -73,6 +93,10 @@ export default function SiteCMS() {
   const [savingStatus, setSavingStatus] = useState(false);
 
   const fetchData = useCallback(async () => {
+    if (cmsTab === 'hub') {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       if (cmsTab === 'homepage') {
@@ -668,69 +692,190 @@ export default function SiteCMS() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Sub-Tabs */}
-      <div className="flex gap-6 border-b border-surface-variant overflow-x-auto whitespace-nowrap pb-0">
-        <button 
-          onClick={() => setCmsTab('homepage')}
-          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'homepage' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
-        >
-          Homepage Performers
-        </button>
-        <button 
-          onClick={() => setCmsTab('gallery')}
-          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'gallery' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
-        >
-          Gallery Page
-        </button>
-        <button 
-          onClick={() => setCmsTab('shows')}
-          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'shows' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
-        >
-          Shows Page
-        </button>
-        <button 
-          onClick={() => setCmsTab('perform')}
-          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'perform' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
-        >
-          Perform With Us
-        </button>
-        <button 
-          onClick={() => setCmsTab('profile')}
-          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'profile' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
-        >
-          Profile Page
-        </button>
-        <button 
-          onClick={() => setCmsTab('policies')}
-          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'policies' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
-        >
-          Policies
-        </button>
-        <button 
-          onClick={() => setCmsTab('page404')}
-          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'page404' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
-        >
-          404 Page
-        </button>
-        <button 
-          onClick={() => setCmsTab('footer')}
-          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'footer' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
-        >
-          Footer Settings
-        </button>
-        <button 
-          onClick={() => setCmsTab('faq')}
-          className={`px-2 py-3 font-label-caps tracking-widest text-sm transition-colors ${cmsTab === 'faq' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
-        >
-          Support FAQs
-        </button>
-      </div>
+    <div className="space-y-6 animate-enter">
+      {cmsTab === 'hub' ? (
+        <div className="space-y-6 mb-24">
+           <section className="mb-4">
+              <h2 className="text-headline-md font-bold text-primary-container tracking-tight leading-none mb-2 uppercase text-2xl">Management Hub</h2>
+              <p className="text-body-md text-on-surface/60 max-w-[280px]">Configure the digital presence of Ahmedabad's premier comedy scene.</p>
+           </section>
 
-      {loading ? (
-        <div className="flex justify-center p-12"><LoadingSpinner /></div>
+           <div className="grid grid-cols-2 gap-4">
+              {/* Card 1: Homepage */}
+              <div onClick={() => setCmsTab('homepage')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">home</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Homepage</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Hero, Sliders, CTAs</p>
+                 </div>
+                 <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-primary-container/10 rounded-full blur-xl"></div>
+              </div>
+
+              {/* Card 2: Performers */}
+              <div onClick={() => setCmsTab('homepage')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">theater_comedy</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Performers</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Bios, Roster, Tags</p>
+                 </div>
+              </div>
+
+              {/* Card 3: Gallery */}
+              <div onClick={() => setCmsTab('gallery')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">gallery_thumbnail</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Gallery</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Live shots, Venue</p>
+                 </div>
+              </div>
+
+              {/* Card 4: Shows */}
+              <div onClick={() => setCmsTab('shows')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">event</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Shows</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Listings, Ticketing</p>
+                 </div>
+              </div>
+
+              {/* Card 5: Comedian Apps */}
+              <div onClick={() => { if(onNavigateToApps) onNavigateToApps(); }} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">theater_comedy</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Comedian Apps</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Review & Manage</p>
+                 </div>
+              </div>
+
+              {/* Card 6: Perform With Us */}
+              <div onClick={() => setCmsTab('perform')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">person_add</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Perform CMS</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Page Content</p>
+                 </div>
+              </div>
+
+              {/* Card 6: Profile */}
+              <div onClick={() => setCmsTab('profile')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">account_circle</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Profile</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Admin Metadata</p>
+                 </div>
+              </div>
+
+              {/* Card 7: Policies */}
+              <div onClick={() => setCmsTab('policies')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">policy</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Policies</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Legal, Privacy, TOS</p>
+                 </div>
+              </div>
+
+              {/* Card 8: 404 Page */}
+              <div onClick={() => setCmsTab('page404')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">error</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">404 Page</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Custom Error UX</p>
+                 </div>
+              </div>
+
+              {/* Card 9: Footer Settings */}
+              <div onClick={() => setCmsTab('footer')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">settings_applications</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Footer</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Links, Socials, SEO</p>
+                 </div>
+              </div>
+
+              {/* Card 10: FAQ Hub */}
+              <div onClick={() => setCmsTab('faq')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">quiz</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">FAQ Hub</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Help desk, Q&amp;A</p>
+                 </div>
+              </div>
+           </div>
+
+           {/* System Health Section */}
+           <div className="mt-8 bg-[#1c1b1b] rounded-xl border border-white/5 p-6 mb-8">
+              <div className="flex items-center justify-between mb-4">
+                 <h4 className="font-headline font-bold text-white uppercase tracking-wide">Deployment Status</h4>
+                 <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+                    <span className="text-[10px] font-label text-primary-container uppercase tracking-widest font-bold">LIVE</span>
+                 </div>
+              </div>
+              <div className="flex items-center gap-4">
+                 <div className="flex-1 h-1.5 bg-black rounded-full overflow-hidden">
+                    <div className="w-full h-full bg-primary-container"></div>
+                 </div>
+                 <span className="text-[12px] font-bold text-white/70 uppercase">Online</span>
+              </div>
+              <p className="text-body-md text-white/40 mt-4 leading-relaxed italic">
+                  Systems functioning normally.
+              </p>
+           </div>
+        </div>
       ) : (
-        <>
+        <div className="space-y-6 animate-enter mb-24">
+          <button 
+            type="button"
+            onClick={() => {
+              setCmsTab('hub');
+              // If they clicked the button directly, we should also pop the fake state we added
+              if (window.history.state?.internal) {
+                window.history.back();
+              }
+            }}
+            className="flex w-fit items-center gap-2 px-4 py-2 bg-[#201f1f] brutalist-border rounded-lg text-sm font-label-caps tracking-widest text-on-surface/80 hover:text-on-surface hover:bg-[#2a2a2a] transition-colors uppercase mt-2"
+          >
+            <span className="material-symbols-outlined text-lg">arrow_back</span>
+            Back to Hub
+          </button>
+
+          {loading ? (
+            <div className="flex justify-center p-12"><LoadingSpinner /></div>
+          ) : (
+            <>
           {/* HOMEPAGE PERFORMERS TAB */}
           {cmsTab === 'homepage' && (
             <div className="space-y-4">
@@ -1287,7 +1432,10 @@ export default function SiteCMS() {
               </div>
             </div>
           )}
+          {/* END OF ALL TABS */}
         </>
+      )}
+      </div>
       )}
 
       {/* Gallery Modal */}

@@ -1,6 +1,6 @@
 {
   "//": "@copyright (c) 2024 - Present, @author github.com/shubhhh-codes, @license MIT",
-  "name": "humors-hub",
+  "name": "humours-hub",
   "version": "1.0.0",
   "private": true,
   "author": {
@@ -10,7 +10,7 @@
   },
   "description": "A comedy event booking platform for Humors Hub",
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/start-dev.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

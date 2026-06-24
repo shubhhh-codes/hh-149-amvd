@@ -91,12 +91,12 @@ export default function Footer() {
           <p className="text-[11px] uppercase tracking-[0.2em] text-white/30 text-center md:text-left">
             © 2024 The Humours Hub. Cultivating Culture in Ahmedabad.
           </p>
-          <div className="group relative">
-            <Link className="inline-flex items-center gap-x-2 px-4 py-2 rounded-full border border-white/10 bg-white/[0.02] transition-all duration-500 ease-out hover:border-primary-container/50 hover:bg-primary-container/[0.05] hover:drop-shadow-[0_0_15px_rgba(255,107,26,0.2)]" href="https://shubhhh.in" target="_blank" rel="noopener noreferrer">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/45 font-medium">
+          <div className="group relative flex justify-center md:justify-start">
+            <Link className="inline-flex items-center gap-x-1.5 md:gap-x-2 px-3 md:px-4 py-2 rounded-full border border-white/10 bg-white/[0.02] transition-all duration-500 ease-out hover:border-primary-container/50 hover:bg-primary-container/[0.05] hover:drop-shadow-[0_0_15px_rgba(255,107,26,0.2)] whitespace-nowrap" href="https://shubhhh.in" target="_blank" rel="noopener noreferrer">
+              <span className="text-[9px] md:text-[10px] uppercase tracking-wider md:tracking-[0.2em] text-white/45 font-medium">
                 Crafted with passion by
               </span>
-              <span className="text-[11px] uppercase tracking-widest font-bold bg-gradient-to-r from-white via-primary-container to-white bg-[length:200%_auto] bg-clip-text text-transparent group-hover:from-primary-container group-hover:to-white" style={{ animation: 'shimmer 3s linear infinite' }}>
+              <span className="text-[10px] md:text-[11px] uppercase tracking-widest font-bold bg-gradient-to-r from-white via-primary-container to-white bg-[length:200%_auto] bg-clip-text text-transparent group-hover:from-primary-container group-hover:to-white" style={{ animation: 'shimmer 3s linear infinite' }}>
                 Shubham Vaghela
               </span>
             </Link>
