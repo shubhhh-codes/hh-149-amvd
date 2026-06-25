@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '@/components/LoadingSpinner';
-
+import TicketTiersManager from './cms/TicketTiersManager';
 interface Comedian {
   _id: string;
   username: string;
@@ -40,7 +40,7 @@ interface SiteCMSProps {
 }
 
 export default function SiteCMS({ onNavigateToApps, onNavigateToFeedbacks }: SiteCMSProps = {}) {
-  const [cmsTab, setCmsTab] = useState<'hub' | 'homepage' | 'gallery' | 'shows' | 'perform' | 'policies' | 'page404' | 'profile' | 'footer' | 'faq'>('hub');
+  const [cmsTab, setCmsTab] = useState<'hub' | 'homepage' | 'gallery' | 'shows' | 'ticketTiers' | 'perform' | 'policies' | 'page404' | 'profile' | 'footer' | 'faq'>('hub');
   
   // Intercept hardware/browser back button to return to Hub
   useEffect(() => {
@@ -726,6 +726,17 @@ export default function SiteCMS({ onNavigateToApps, onNavigateToFeedbacks }: Sit
                     <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Bios, Roster, Tags</p>
                  </div>
               </div>
+              {/* Card 2.5: Ticket Tiers */}
+              <div onClick={() => setCmsTab('ticketTiers')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">confirmation_number</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Ticket Tiers</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Pricing, Packages, Seats</p>
+                 </div>
+              </div>
 
               {/* Card 3: Gallery */}
               <div onClick={() => setCmsTab('gallery')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
@@ -1384,6 +1395,13 @@ export default function SiteCMS({ onNavigateToApps, onNavigateToFeedbacks }: Sit
                   </div>
                </form>
             </div>
+          )}
+
+          {/* TICKET TIERS TAB */}
+          {cmsTab === 'ticketTiers' && (
+             <section className="animate-enter">
+                <TicketTiersManager />
+             </section>
           )}
 
           {/* FAQ TAB */}

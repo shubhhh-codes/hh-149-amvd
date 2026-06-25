@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Razorpay from 'razorpay';
 
-import { getTicketPrice } from '../../../lib/getTicketPrice';
+import clientPromise from '../../../lib/mongodb';
 
 export default async function handler(
   req: NextApiRequest,
@@ -27,15 +27,38 @@ export default async function handler(
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    const { numberOfTickets, bookingId } = req.body;
+    const { numberOfTickets, bookingId, tierKey, units } = req.body;
 
     if (!numberOfTickets || numberOfTickets < 1) {
       return res.status(400).json({ message: 'Invalid number of tickets' });
     }
 
-    // Fetch dynamic ticket price from CMS
-    const ticketPrice = await getTicketPrice();
-    const amount = numberOfTickets * ticketPrice * 100; // ticket price in paise
+    // Fetch dynamic ticket tier from CMS
+    const client = await clientPromise;
+    const DEFAULT_TIERS = [
+      { key: 'solo', name: 'Solo Pass', label: 'SOLO', price: 499, seats: 1, badge: null, displayOrder: 1 },
+      { key: 'duo', name: 'Duo Pass', label: 'DUO', price: 899, seats: 2, badge: 'MOST POPULAR', displayOrder: 2 },
+      { key: 'squad', name: 'Squad Pass', label: 'SQUAD', price: 1599, seats: 4, badge: null, displayOrder: 3 },
+    ];
+
+    const db = client.db();
+    const settings = await db.collection('settings').findOne({ type: 'ticket-tiers' });
+    let tiers = settings?.tiers || [];
+    
+    if (tiers.length === 0) {
+      tiers = DEFAULT_TIERS;
+    }
+
+    const tier = tiers.find((t: any) => t.key === tierKey);
+    
+    if (!tier) {
+      return res.status(400).json({ message: 'Invalid or missing ticket tier' });
+    }
+    
+    const ticketPrice = tier.price; 
+    const numberOfUnits = units || 1;
+
+    const amount = numberOfUnits * ticketPrice * 100; // total price in paise
     const currency = 'INR';
 
     const options = {

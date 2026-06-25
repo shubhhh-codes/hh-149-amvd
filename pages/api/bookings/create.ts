@@ -24,6 +24,8 @@ export default async function handler(
       email,
       phone,
       numberOfTickets,
+      tierKey,
+      units,
     } = req.body;
 
     // Validate required fields
@@ -41,20 +43,15 @@ export default async function handler(
     const client = await clientPromise;
     const db = client.db();
 
-    // Check capacity (warning only — admin may override)
-    const totalBookings = await db.collection('bookings')
-      .aggregate([
-        {
-          $match: {
-            status: { $in: ['pending', 'approved'] },
-          }
-        },
-        { $group: { _id: null, total: { $sum: '$numberOfTickets' } } }
-      ])
-      .toArray();
+    // Atomically increment booked seats to prevent race conditions
+    const inventoryResult = await db.collection('inventory').findOneAndUpdate(
+      { type: 'venue_capacity' },
+      { $inc: { bookedSeats: numberOfTickets } },
+      { upsert: true, returnDocument: 'after' }
+    );
 
-    const bookedSeats = totalBookings[0]?.total || 0;
-    const capacityWarning = (bookedSeats + numberOfTickets) > VENUE_CAPACITY;
+    const bookedSeats = inventoryResult?.bookedSeats || numberOfTickets;
+    const capacityWarning = bookedSeats > VENUE_CAPACITY;
 
     // Generate human-friendly booking ID
     const bookingId = await generateBookingId();
@@ -66,6 +63,8 @@ export default async function handler(
       email: email.toLowerCase().trim(),
       phone: phone.trim(),
       numberOfTickets: Number(numberOfTickets),
+      tierKey: tierKey || 'solo',
+      units: Number(units || 1),
       bookingType: 'paid',
       status: 'pending',
       attended: false,

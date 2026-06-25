@@ -15,7 +15,6 @@ export default function BookingSuccess() {
   const [copied, setCopied]     = useState(false);
   const [dlState, setDlState]   = useState<DlState>('idle');
   const [dlError, setDlError]   = useState('');
-  const autoTriggered           = useRef(false); // prevent double-trigger in StrictMode
 
   const handleCopy = () => {
     if (bookingId) {
@@ -69,19 +68,17 @@ export default function BookingSuccess() {
     }
   }, [bookingId, dlState, downloadToken]);
 
-  // Auto-download once after 2.5s — longer delay than before (was 1500ms)
-  // to allow MongoDB write propagation after payment verification
+  // Auto-download once after 1.5s
+  // Relies on dlState === 'idle' so it doesn't re-trigger if already downloaded or downloading
   useEffect(() => {
-    if (!bookingId || autoTriggered.current) return;
-    autoTriggered.current = true;
+    if (!bookingId || dlState !== 'idle') return;
 
     const t = setTimeout(() => {
       handleDownloadTicket();
-    }, 2500);
+    }, 1500);
 
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId]); // intentionally excludes handleDownloadTicket to prevent re-triggers
+  }, [bookingId, dlState, handleDownloadTicket]);
 
   const dlButtonLabel = () => {
     switch (dlState) {

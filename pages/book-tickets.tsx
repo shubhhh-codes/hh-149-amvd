@@ -1,331 +1,464 @@
-import React from 'react';
-/**
- * @copyright (c) 2024 - Present
- * @author github.com/shubhhh-codes
- * @license MIT
- */
-
-import { useState } from 'react';
-import { useRouter } from 'next/router';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
+import Script from 'next/script';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { GetServerSideProps } from 'next';
-import { getTicketPrice } from '@/lib/getTicketPrice';
-
-interface BookTicketsProps {
-  ticketPrice: number;
+// Define the Razorpay interface extending Window
+declare global {
+  interface Window {
+    Razorpay: new (options: Record<string, unknown>) => { open(): void; };
+  }
 }
 
-export default function BookTickets({ ticketPrice }: BookTicketsProps) {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [numberOfTickets, setNumberOfTickets] = useState(1);
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-  });
+interface TicketTier {
+  key: string;
+  name: string;
+  label: string;
+  price: number;
+  seats: number;
+  badge: string | null;
+}
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'phone' ? value.replace(/^\+91/, '').replace(/[^0-9]/g, '').slice(0, 10) : value
-    }));
-  };
+import clientPromise from '@/lib/mongodb';
 
-  const initializeRazorpay = () => {
-    return new Promise<boolean>((resolve) => {
-      if ((window as any).Razorpay) {
-        resolve(true);
-      } else {
-        const script = document.createElement('script');
-        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-        script.onload = () => resolve(true);
-        script.onerror = () => resolve(false);
-        document.body.appendChild(script);
+const DEFAULT_TIERS = [
+  { key: 'solo', name: 'Solo Pass', label: 'SOLO', price: 499, seats: 1, badge: null, displayOrder: 1 },
+  { key: 'duo', name: 'Duo Pass', label: 'DUO', price: 899, seats: 2, badge: 'MOST POPULAR', displayOrder: 2 },
+  { key: 'squad', name: 'Squad Pass', label: 'SQUAD', price: 1599, seats: 4, badge: null, displayOrder: 3 },
+];
+
+export async function getServerSideProps() {
+  try {
+    const client = await clientPromise;
+    const db = client.db();
+    const settings = await db.collection('settings').findOne({ type: 'ticket-tiers' });
+    
+    // We must stringify and parse the object to safely pass it as JSON props (removes ObjectIds etc)
+    let tiersData = settings ? JSON.parse(JSON.stringify(settings)) : { tiers: [] };
+
+    // Fallback if DB is empty
+    if (!tiersData.tiers || tiersData.tiers.length === 0) {
+      tiersData.tiers = DEFAULT_TIERS;
+    }
+
+    return {
+      props: {
+        tiersData,
       }
-    });
-  };
+    };
+  } catch (error) {
+    console.error('Failed to fetch tiers data for booking page', error);
+    return {
+      props: {
+        tiersData: { tiers: DEFAULT_TIERS },
+      }
+    };
+  }
+}
 
-  const handlePayment = async (bookingId: string) => {
+export default function BookTickets({ tiersData }: { tiersData: any }) {
+  const router = useRouter();
+
+  const [selectedTier, setSelectedTier] = useState<TicketTier | null>(null);
+  const [units, setUnits] = useState(1);
+  const [customerName, setName] = useState('');
+  const [customerEmail, setEmail] = useState('');
+  const [customerPhone, setPhone] = useState('');
+  const [isLoading, setLoading] = useState(false);
+  const [mode, setMode] = useState<'loading' | 'active' | 'error'>('loading');
+  const [error, setError] = useState<string | null>(null);
+  const [showSummaryDetails, setShowSummaryDetails] = useState(false);
+
+  useEffect(() => {
+    if (tiersData?.tiers && tiersData.tiers.length > 0) {
+      const defaultTier = tiersData.tiers.find((t: any) => t.badge === 'MOST POPULAR') || tiersData.tiers[0];
+      setSelectedTier(defaultTier);
+    }
+    setMode('active');
+  }, [tiersData]);
+
+  const totalAmount = selectedTier ? selectedTier.price * units : 0;
+  const totalSeats = selectedTier ? selectedTier.seats * units : 1;
+  const venueDisplay = tiersData?.venue || 'The Humours Hub, Ahmedabad';
+  const dateDisplay = tiersData?.date || 'Saturday, 8:30 PM';
+
+  const handleAction = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!selectedTier || units < 1) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!customerName.trim() || !emailRegex.test(customerEmail.trim()) || customerPhone.trim().length !== 10) {
+      setError('Please provide a valid name, email, and 10-digit phone number.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
     try {
-      const res = await fetch('/api/payments/create-order', {
+      // 1. Create local booking via our API (using tierKey and units)
+      const bookRes = await fetch('/api/bookings/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          numberOfTickets,
-          bookingId,
+          fullName: customerName.trim(),
+          email: customerEmail.trim(),
+          phone: customerPhone.trim(),
+          numberOfTickets: totalSeats,
+          tierKey: selectedTier.key,
+          units: units,
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+      const bookData = await bookRes.json();
+      if (!bookRes.ok) throw new Error(bookData.message ?? 'Booking failed');
+      const { bookingId } = bookData;
 
-      const options = {
-        key: data.keyId,
-        amount: data.amount,
-        currency: data.currency,
-        name: 'Humors Hub',
-        description: `${numberOfTickets} Show Ticket${numberOfTickets > 1 ? 's' : ''} @ ₹${ticketPrice} each`,
-        order_id: data.orderId,
-        handler: async (response: any) => {
+      // 2. Create Razorpay order
+      const orderRes = await fetch('/api/payments/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numberOfTickets: totalSeats, bookingId, tierKey: selectedTier.key, units }),
+      });
+
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) throw new Error(orderData.message ?? 'Failed to initiate payment');
+
+      // 3. Open Razorpay checkout
+      if (!window.Razorpay) throw new Error('Razorpay SDK not loaded');
+
+      const rzp = new window.Razorpay({
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: 'The Humours Hub',
+        description: 'Comedy Show Tickets',
+        order_id: orderData.orderId,
+        prefill: {
+          name: customerName,
+          email: customerEmail,
+          contact: `91${customerPhone}`,
+        },
+        theme: { color: '#FF6B1A' },
+        handler: async (response: Record<string, string>) => {
           try {
             const verifyRes = await fetch('/api/payments/verify', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
                 bookingId,
               }),
             });
 
             const verifyData = await verifyRes.json();
-            if (!verifyRes.ok) throw new Error(verifyData.message);
+            if (!verifyRes.ok) throw new Error(verifyData.message ?? 'Verification failed');
 
-            // Pass the signed download token through the URL so booking-success
-            // can call generate-ticket in production without needing retrieve auth
             const dlToken = verifyData.downloadToken ? `&token=${encodeURIComponent(verifyData.downloadToken)}` : '';
             router.push(`/booking-success?id=${bookingId}${dlToken}`);
           } catch (err) {
-            console.error('Payment verification error:', err);
-            setError('Payment verification failed. Please contact support.');
+            setError(err instanceof Error ? err.message : 'Payment verification failed');
+            setLoading(false);
           }
         },
-        prefill: {
-          name: formData.fullName,
-          email: formData.email,
-          contact: formData.phone,
-        },
-        theme: {
-          color: '#7C3AED',
-        },
-      };
-
-      const rzp = new (window as any).Razorpay(options);
-      rzp.open();
-    } catch (err) {
-      console.error('Payment error:', err);
-      setError('Failed to initiate payment. Please try again.');
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    // Validate fields
-    if (!formData.fullName || !formData.email || !formData.phone) {
-      setError('Please fill in all required fields.');
-      setIsLoading(false);
-      return;
-    }
-
-    // Initialize Razorpay
-    const isRazorpayReady = await initializeRazorpay();
-    if (!isRazorpayReady) {
-      setError('Payment gateway is not ready. Please refresh the page and try again.');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      // Create guest booking
-      const res = await fetch('/api/bookings/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-          numberOfTickets,
-        }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-
-      if (data.capacityWarning) {
-        // Show warning but allow booking to proceed
-        console.warn('Capacity warning: venue may be near/at capacity');
-      }
-
-      // Proceed to payment with the generated bookingId
-      await handlePayment(data.bookingId);
+      rzp.open();
     } catch (err) {
-      console.error('Submission error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to submit');
-    } finally {
-      setIsLoading(false);
+      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setLoading(false);
     }
   };
 
+  if (mode === 'loading') {
+    return (
+      <div className="bg-[#0A0A0A] min-h-screen flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-[#FF6B1A] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (mode === 'error') {
+    return (
+      <div className="bg-[#0A0A0A] min-h-screen flex items-center justify-center px-4">
+        <div className="text-center">
+          <span className="material-symbols-outlined text-[#FF6B1A] text-5xl block mb-4">error</span>
+          <h1 className="text-white text-2xl font-bold mb-2">Something went wrong</h1>
+          <p className="text-white/50 mb-6">Could not load booking details. Please try again.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-[#FF6B1A] text-[#0A0A0A] font-bold px-6 py-3 rounded-full text-sm"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const tiers = tiersData?.tiers ?? [];
+
   return (
-    <div className="min-h-screen bg-[#0e0e0e] text-[#e5e2e1] font-body-md antialiased overflow-hidden flex flex-col">
+    <div className="antialiased min-h-screen flex flex-col bg-[#0A0A0A] font-['DM_Sans',sans-serif] text-white">
       <Head>
-        <title>The Humours Hub</title>
+        <title>Book Tickets - Conversion Optimized - The Humours Hub</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Hind:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
       </Head>
+
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+
+      <style>{`
+        body {
+            background-color: #0A0A0A;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+        }
+      `}</style>
+
+      {/* TopNavBar */}
       <Navbar />
 
-      <main className="flex-grow flex items-center justify-center py-16 px-margin-mobile md:py-16 relative overflow-hidden">
-        {/* Spotlight Glow Effect */}
-        <div className="absolute inset-0 spotlight-glow pointer-events-none"></div>
-        <div className="w-full max-w-2xl z-10">
-          
-          {error && (
-            <div className="mb-4 bg-error-container text-on-error-container p-4 rounded-md border border-error">
-              {error}
-            </div>
-          )}
-
-          {/* Main Booking Card */}
-          <div className="bg-[#141414] border border-white/10 rounded-xl overflow-hidden shadow-2xl transition-all duration-500">
-            <div className="p-8 md:p-12">
-              {/* Header Section */}
-              <div className="flex items-center space-x-4 mb-10">
-                <div className="bg-primary-container/10 border border-primary-container/20 rounded-full p-4 flex items-center justify-center transition-transform duration-300">
-                  <span className="material-symbols-outlined text-primary-container text-3xl">
-                    confirmation_number
-                  </span>
-                </div>
-                <div>
-                  <h1 className="font-headline-md text-headline-md text-on-surface leading-none">
-                    Book Show Tickets
-                  </h1>
-                  <p className="font-body-md text-body-md text-on-surface-variant mt-2">
-                    Secure your spot for an unforgettable night! 🎭
-                  </p>
-                </div>
+      <main className="flex-1 pb-24 md:pb-12">
+        <div className="md:max-w-5xl lg:max-w-6xl md:mx-auto md:px-6 md:py-10 md:grid md:grid-cols-12 md:gap-8 lg:gap-12 md:items-start">
+          <div className="max-w-md mx-auto px-4 pt-4 md:max-w-none md:p-0 md:col-span-7 lg:col-span-8">
+            
+            {/* Header & Info */}
+            <header className="text-center md:text-left mb-6">
+              <h1 className="font-['Hind',sans-serif] text-2xl md:text-4xl font-bold text-white mb-2 md:mb-8 leading-tight">Secure Your Spot</h1>
+              
+              <div className="grid grid-cols-3 gap-3 md:gap-6 items-end mb-8 mt-6 md:mt-0 px-1 md:px-0">
+                {tiers.map((tier: TicketTier) => {
+                  const isActive = selectedTier?.key === tier.key;
+                  return (
+                    <div
+                      key={tier.key}
+                      onClick={() => {
+                        setSelectedTier(tier);
+                        setUnits(1);
+                      }}
+                      className={`cursor-pointer bg-[#141414] rounded-lg p-3 md:p-5 text-center transition-all flex flex-col justify-center relative 
+                        ${isActive ? 'border-[#FF6B1A] border-2 shadow-[0_0_15px_rgba(255,107,26,0.4)] bg-[rgba(255,107,26,0.05)] scale-[1.05] z-10' : 'border-white/10 border scale-100'} 
+                        ${isActive ? 'h-28 md:h-36' : 'h-24 md:h-32'}`}
+                    >
+                      {tier.badge && (
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#FF6B1A] px-2 py-0.5 rounded text-[8px] md:text-[10px] font-bold text-white whitespace-nowrap shadow-md uppercase">
+                          {tier.badge}
+                        </div>
+                      )}
+                      <span className={`font-['Hind',sans-serif] text-[9px] md:text-[11px] font-bold tracking-wider uppercase block mb-1 md:mb-2 ${isActive ? 'text-[#FF6B1A]' : 'text-[#a3a3a3]'}`}>
+                        {tier.label}
+                      </span>
+                      <h3 className="font-['Hind',sans-serif] text-lg md:text-3xl font-bold text-white">
+                        ₹{tier.price}
+                      </h3>
+                    </div>
+                  );
+                })}
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-8">
-                {/* Guest Details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="block font-label-caps text-label-caps text-on-surface-variant" htmlFor="fullName">Full Name</label>
+              <div className="flex flex-col gap-2 mt-4 text-sm font-['DM_Sans',sans-serif] md:hidden">
+                <div className="flex items-center justify-center gap-2 bg-[#141414] rounded-md py-2 border border-white/5">
+                  <span className="material-symbols-outlined text-[#FF6B1A] text-sm">location_on</span>
+                  <span className="font-bold text-[#a3a3a3]">{venueDisplay}</span>
+                </div>
+                <div className="flex items-center justify-center gap-2 bg-[#141414] rounded-md py-2 border border-white/5">
+                  <span className="material-symbols-outlined text-[#FF6B1A] text-sm">calendar_today</span>
+                  <span className="font-bold text-[#a3a3a3]">{dateDisplay}</span>
+                </div>
+              </div>
+            </header>
+
+            {/* View 2: Form & Summary */}
+            <div className="block">
+              {/* Accordion Summary */}
+              <div className="mb-4 bg-[#141414] border border-white/10 rounded-lg overflow-hidden md:hidden">
+                <button 
+                  className="w-full px-4 py-3 flex justify-between items-center text-sm font-bold bg-[#111]" 
+                  onClick={() => setShowSummaryDetails(!showSummaryDetails)}
+                >
+                  <span>Total: <span className="text-[#FF6B1A]">₹{totalAmount}</span></span>
+                  <span className="text-xs text-[#a3a3a3] flex items-center gap-1">
+                    View Details <span className="material-symbols-outlined text-[14px]">
+                      {showSummaryDetails ? 'arrow_drop_up' : 'arrow_drop_down'}
+                    </span>
+                  </span>
+                </button>
+                {showSummaryDetails && (
+                  <div className="px-4 py-3 bg-[#141414] border-t border-white/5 text-xs text-[#a3a3a3] flex flex-col gap-2">
+                    <div className="flex justify-between">
+                      <span>Pass Type</span>
+                      <span className="text-white font-bold">{selectedTier?.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Quantity</span>
+                      <span className="text-white font-bold">{units}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Compact Form */}
+              <div className="bg-[#141414] border border-white/10 rounded-xl p-4 md:p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF6B1A]/5 blur-[50px] rounded-full pointer-events-none"></div>
+                
+                <h3 className="font-['Hind',sans-serif] text-base md:text-xl font-bold mb-4 md:mb-6 text-white uppercase tracking-wide">Guest Details</h3>
+                
+                {error && (
+                  <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-3 rounded-lg mb-4 text-sm font-bold">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3 md:gap-5 relative z-10">
+                  <input 
+                    aria-label="Full Name"
+                    className="w-full bg-[#080808] border border-white/10 rounded-md md:rounded-lg py-2 md:py-3 px-3 md:px-4 text-white focus:border-[#FF6B1A] outline-none text-sm md:text-base font-['DM_Sans',sans-serif] transition-colors" 
+                    placeholder="Full Name" 
+                    type="text" 
+                    value={customerName}
+                    onChange={e => setName(e.target.value)}
+                  />
+                  <input 
+                    aria-label="Email Address"
+                    className="w-full bg-[#080808] border border-white/10 rounded-md md:rounded-lg py-2 md:py-3 px-3 md:px-4 text-white focus:border-[#FF6B1A] outline-none text-sm md:text-base font-['DM_Sans',sans-serif] transition-colors" 
+                    placeholder="Email Address" 
+                    type="email" 
+                    value={customerEmail}
+                    onChange={e => setEmail(e.target.value)}
+                  />
+                  <div className="flex gap-2 md:gap-4">
+                    <div className="bg-[#080808] border border-white/10 rounded-md md:rounded-lg py-2 md:py-3 px-2 md:px-4 text-[#a3a3a3] text-sm md:text-base shrink-0 flex items-center select-none">+91</div>
                     <input 
-                      type="text"
-                      id="fullName"
-                      name="fullName"
-                      value={formData.fullName}
-                      onChange={handleChange}
-                      placeholder="Enter your full name" 
-                      required 
-                      className="w-full bg-[#080808] border border-white/10 text-on-surface px-4 py-3 rounded-lg focus:border-primary-container transition-colors font-body-md focus:outline-none focus:ring-1 focus:ring-primary-container"
+                      aria-label="Phone Number"
+                      className="w-full bg-[#080808] border border-white/10 rounded-md md:rounded-lg py-2 md:py-3 px-3 md:px-4 text-white focus:border-[#FF6B1A] outline-none text-sm md:text-base font-['DM_Sans',sans-serif] transition-colors" 
+                      placeholder="Phone Number" 
+                      type="tel"
+                      maxLength={10}
+                      value={customerPhone}
+                      onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="block font-label-caps text-label-caps text-on-surface-variant" htmlFor="phone">Phone Number</label>
-                    <div className="flex items-stretch bg-[#080808] border border-white/10 rounded-lg focus-within:border-primary-container focus-within:ring-1 focus-within:ring-primary-container transition-all duration-300 overflow-hidden">
-                      <div className="flex items-center gap-2 pl-4 pr-3 border-r border-white/5 bg-white/[0.02] text-on-surface-variant select-none">
-                        <span className="material-symbols-outlined text-[20px]">phone</span>
-                        <span className="font-body-md font-bold text-white/40 pt-[1px]">+91</span>
-                      </div>
-                      <input 
-                        type="tel"
-                        id="phone"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        placeholder="XXXXXXXXXX" 
-                        maxLength={10}
-                        required 
-                        className="w-full bg-transparent border-none text-on-surface px-3 py-3 placeholder-white/20 font-body-md focus:outline-none focus:ring-0"
-                      />
-                    </div>
-                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="block font-label-caps text-label-caps text-on-surface-variant" htmlFor="email">Email Address</label>
-                  <input 
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="your@email.com" 
-                    required 
-                    className="w-full bg-[#080808] border border-white/10 text-on-surface px-4 py-3 rounded-lg focus:border-primary-container transition-colors font-body-md focus:outline-none focus:ring-1 focus:ring-primary-container"
-                  />
-                </div>
-
-                {/* Ticket Quantity */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 py-6 border-y border-white/5">
-                  <div className="space-y-4">
-                    <label className="block font-label-caps text-label-caps text-on-surface-variant">Number of Tickets</label>
-                    <div className="flex items-center space-x-6">
-                      <button 
-                        type="button"
-                        onClick={() => setNumberOfTickets(prev => Math.max(1, prev - 1))}
-                        className="w-12 h-12 flex items-center justify-center rounded-lg bg-surface-container-high text-primary hover:bg-primary hover:text-on-primary transition-all active:scale-90"
-                      >
-                        <span className="material-symbols-outlined">remove</span>
-                      </button>
-                      <span className="font-headline-sm text-headline-sm text-on-surface w-8 text-center">{numberOfTickets}</span>
-                      <button 
-                        type="button"
-                        onClick={() => setNumberOfTickets(prev => Math.min(10, prev + 1))}
-                        className="w-12 h-12 flex items-center justify-center rounded-lg bg-surface-container-high text-primary hover:bg-primary hover:text-on-primary transition-all active:scale-90"
-                      >
-                        <span className="material-symbols-outlined">add</span>
-                      </button>
-                    </div>
-                    <p className="font-body-md text-sm text-on-surface-variant/60">Maximum 10 tickets per booking</p>
-                  </div>
-                  <div className="text-right">
-                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Total Amount</label>
-                    <div className="font-headline-md text-headline-md text-primary-container">₹{ticketPrice * numberOfTickets}</div>
-                    <p className="font-body-md text-sm text-on-surface-variant/60">₹{ticketPrice} per ticket</p>
-                  </div>
-                </div>
-
-                {/* Submit Button */}
-                <div className="pt-6">
-                  <button 
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full bg-primary-container text-on-primary-fixed py-5 px-8 rounded-lg font-headline-sm text-headline-sm hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                  >
-                    {isLoading ? (
-                      <>
-                        <span className="material-symbols-outlined animate-spin">sync</span>
-                        <span>Processing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Pay & Book Tickets</span>
-                        <span className="material-symbols-outlined">arrow_forward</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Footer Highlight */}
-            <div className="bg-surface-container-high/30 p-4 border-t border-white/5 flex items-center justify-center gap-2">
-              <span className="material-symbols-outlined text-primary text-sm">verified</span>
-              <span className="text-xs font-label-caps text-on-surface-variant uppercase tracking-widest">Official Humours Hub Booking Portal • No Account Required</span>
+              </div>
             </div>
           </div>
+
+          {/* Desktop Right Sidebar */}
+          <aside className="hidden md:block md:col-span-5 lg:col-span-4 md:sticky md:top-24 bg-[#141414] border border-white/10 rounded-xl p-8 shadow-2xl">
+            {/* Desktop Venue & Date */}
+            <div className="flex flex-col gap-6 mb-8 pb-8 border-b border-white/10">
+              <div className="flex items-start gap-4">
+                <span className="material-symbols-outlined text-[#FF6B1A] text-2xl">location_on</span>
+                <div className="flex flex-col">
+                  <span className="text-xs text-[#a3a3a3] font-bold uppercase tracking-wider mb-1">Venue</span>
+                  <span className="font-bold text-lg text-white font-['Hind',sans-serif]">{venueDisplay}</span>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <span className="material-symbols-outlined text-[#FF6B1A] text-2xl">calendar_today</span>
+                <div className="flex flex-col">
+                  <span className="text-xs text-[#a3a3a3] font-bold uppercase tracking-wider mb-1">Date & Time</span>
+                  <span className="font-bold text-lg text-white font-['Hind',sans-serif]">{dateDisplay}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop Summary */}
+            <h3 className="font-['Hind',sans-serif] text-xl font-bold mb-6 text-white uppercase tracking-wide">Order Summary</h3>
+            <div className="flex justify-between items-center mb-8">
+              <div className="flex flex-col">
+                <span className="font-['Hind',sans-serif] text-xs font-bold tracking-wider text-[#a3a3a3] uppercase mb-1">Pass Type</span>
+                <span className="font-['Hind',sans-serif] text-xl font-bold text-white uppercase">{selectedTier?.name}</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <button onClick={() => setUnits(u => Math.max(1, u - 1))} disabled={units <= 1} className="w-10 h-10 rounded bg-[#080808] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all text-white disabled:opacity-50">
+                  <span className="material-symbols-outlined text-sm">remove</span>
+                </button>
+                <span className="font-['Hind',sans-serif] text-xl font-bold w-6 text-center text-white">{units}</span>
+                <button onClick={() => setUnits(u => Math.min(10, u + 1))} disabled={units >= 10} className="w-10 h-10 rounded bg-[#080808] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all text-white disabled:opacity-50">
+                  <span className="material-symbols-outlined text-sm">add</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-end mb-8 pt-8 border-t border-white/10">
+              <span className="font-['Hind',sans-serif] text-xs font-bold tracking-wider text-[#a3a3a3] uppercase">Total Amount</span>
+              <div className="text-right">
+                <div className="font-['Hind',sans-serif] text-4xl font-bold text-[#FF6B1A] leading-none">₹{totalAmount}</div>
+                <div className="text-xs text-[#a3a3a3] mt-2">₹{selectedTier?.price} per ticket</div>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleAction}
+              disabled={isLoading || !selectedTier}
+              className="w-full bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white font-['Hind',sans-serif] font-bold py-4 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-all text-lg disabled:opacity-50 uppercase tracking-wide"
+            >
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span className="material-symbols-outlined">lock</span> 
+                  <span>PAY ₹{totalAmount} SECURELY</span>
+                </>
+              )}
+            </button>
+          </aside>
         </div>
       </main>
+
+      {/* Sticky Checkout Bar (Mobile) */}
+      <div className="fixed bottom-0 w-full bg-[#111] border-t border-white/10 p-4 pb-safe z-50 md:hidden">
+        <div className="max-w-md mx-auto">
+          <div className="mb-4 px-1">
+            <div className="flex justify-between items-end mb-4">
+              <div className="flex flex-col gap-3">
+                <span className="font-['Hind',sans-serif] text-[10px] font-bold tracking-wider text-[#FF6B1A] uppercase">Number of Tickets</span>
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setUnits(u => Math.max(1, u - 1))} disabled={units <= 1} className="w-10 h-10 rounded bg-[#141414] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all disabled:opacity-50 text-white">
+                    <span className="material-symbols-outlined text-[#a3a3a3]">remove</span>
+                  </button>
+                  <span className="font-['Hind',sans-serif] text-lg font-bold w-4 text-center text-white">{units}</span>
+                  <button onClick={() => setUnits(u => Math.min(10, u + 1))} disabled={units >= 10} className="w-10 h-10 rounded bg-[#141414] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all disabled:opacity-50 text-white">
+                    <span className="material-symbols-outlined text-[#a3a3a3]">add</span>
+                  </button>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="font-['Hind',sans-serif] text-[10px] font-bold tracking-wider text-[#a3a3a3] uppercase block mb-1">Total Amount</span>
+                <div className="font-['Hind',sans-serif] text-2xl font-bold text-[#FF6B1A] leading-none">₹{totalAmount}</div>
+                <div className="text-[10px] text-[#a3a3a3] mt-1">₹{selectedTier?.price} per ticket</div>
+              </div>
+            </div>
+            <div className="text-[10px] text-[#a3a3a3]">Maximum 10 tickets per booking</div>
+            <div className="mt-4 border-t border-white/5"></div>
+          </div>
+          
+          <button 
+            onClick={handleAction}
+            disabled={isLoading || !selectedTier}
+            className="w-full bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white font-['Hind',sans-serif] font-bold py-3.5 rounded-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wide"
+          >
+            {isLoading ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined text-sm">lock</span> PAY ₹{totalAmount} SECURELY
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
 
       <Footer />
     </div>
   );
 }
-
-export const getServerSideProps: GetServerSideProps = async () => {
-  const ticketPrice = await getTicketPrice();
-  return {
-    props: {
-      ticketPrice,
-    },
-  };
-};
