@@ -85,6 +85,7 @@ export default async function handler(
           return res.status(500).json({ message: 'Failed to update user status' });
         }
 
+        try { await res.revalidate('/'); } catch (err) { console.error('Failed to revalidate /:', err); }
         return res.status(200).json({ message: 'User upgraded to performer successfully' });
       } else {
         const userId = generateUserId();
@@ -115,6 +116,7 @@ export default async function handler(
           return res.status(500).json({ message: 'Failed to create performer' });
         }
 
+        try { await res.revalidate('/'); } catch (err) { console.error('Failed to revalidate /:', err); }
         return res.status(201).json({ message: 'Performer created successfully', userId: result.insertedId });
       }
     }
@@ -177,6 +179,7 @@ export default async function handler(
         return res.status(400).json({ message: 'Status update failed' });
       }
 
+      try { await res.revalidate('/'); } catch (err) { console.error('Failed to revalidate /:', err); }
       return res.status(200).json({ message: 'Comedian status updated successfully' });
     }
 

@@ -80,6 +80,7 @@ export default async function handler(
         return res.status(404).json({ message: 'Comedian not found' });
       }
 
+      try { await res.revalidate('/'); } catch (err) { console.error('Failed to revalidate /:', err); }
       return res.status(200).json({ message: 'Comedian updated successfully' });
     }
 
@@ -93,6 +94,7 @@ export default async function handler(
         return res.status(404).json({ message: 'Comedian not found' });
       }
 
+      try { await res.revalidate('/'); } catch (err) { console.error('Failed to revalidate /:', err); }
       return res.status(200).json({ message: 'Comedian deleted successfully' });
     }
 
