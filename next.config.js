@@ -37,7 +37,7 @@ const nextConfig = {
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',
     contentSecurityPolicy:
-      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app *.google.com *.googleapis.com; connect-src 'self' blob: https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app https://api.qrserver.com data: https://fonts.gstatic.com; frame-src 'self' https://*.razorpay.com *.google.com *.youtube.com; img-src 'self' data: blob: https://*.razorpay.com *.googleapis.com https://api.qrserver.com https://fonts.gstatic.com https://images.unsplash.com; style-src 'self' 'unsafe-inline' *.googleapis.com https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com;",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app *.google.com *.googleapis.com; connect-src 'self' blob: https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app https://api.qrserver.com data: https://fonts.gstatic.com; frame-src 'self' https://*.razorpay.com *.google.com *.youtube.com; img-src 'self' data: blob: https://*.razorpay.com *.googleapis.com *.googleusercontent.com https://api.qrserver.com https://fonts.gstatic.com https://images.unsplash.com; style-src 'self' 'unsafe-inline' *.googleapis.com https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com;",
 
     remotePatterns: [
       {
@@ -53,6 +53,11 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'fonts.gstatic.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
         pathname: '/**',
       },
     ],
