@@ -142,6 +142,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return `${item.units}x ${t ? t.name : item.tierKey.replace('-', ' ')}`;
       }).join(', ');
       units = booking.cart.reduce((sum: number, item: any) => sum + item.units, 0);
+      if (!price) {
+        price = booking.cart.reduce((sum: number, item: any) => {
+          const t = tiers.find((t: any) => t.key === item.tierKey);
+          const itemPrice = item.price || (t ? t.price : 0);
+          return sum + (itemPrice * item.units);
+        }, 0);
+      }
     } else {
       const tier = tiers.find((t: any) => t.key === (booking.tierKey || 'solo'));
       tierName = tier ? tier.name : 'Solo Pass';

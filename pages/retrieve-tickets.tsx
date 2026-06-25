@@ -455,7 +455,7 @@ export default function RetrieveTickets() {
                             {booking.cart && booking.cart.length > 0 ? (
                               <div className="flex flex-col gap-1 mt-1 text-base md:text-lg font-body-md normal-case font-bold leading-tight">
                                 {booking.cart.map((item: any, idx: number) => (
-                                  <span key={idx}>{item.units} × <span className="text-[#a3a3a3] capitalize">{item.tierKey.replace('-', ' ')}</span></span>
+                                  <span key={idx}>{item.units} × <span className="text-[#a3a3a3]">{item.name || item.tierKey.replace('-', ' ')}</span></span>
                                 ))}
                               </div>
                             ) : (

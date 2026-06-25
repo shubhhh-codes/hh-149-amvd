@@ -77,6 +77,23 @@ export default async function handler(
       .sort({ createdAt: -1 })
       .toArray();
 
+    // ── Fetch Tiers Configuration ────────────────────────────────────────────
+    const tiersDoc = await db.collection('settings').findOne({ type: 'ticket-tiers' });
+    const tiersConfig = tiersDoc?.tiers || [];
+    const tierNameMap = new Map<string, string>();
+    for (const t of tiersConfig) {
+      // Use the 'label' field (e.g. "Single", "Love Bird Special") for display
+      tierNameMap.set(t.key, t.label || t.name);
+    }
+
+    const enrichCart = (cart: any[]) => {
+      if (!cart || !Array.isArray(cart)) return cart;
+      return cart.map(item => ({
+        ...item,
+        name: tierNameMap.get(item.tierKey) || item.tierKey.replace('-', ' '),
+      }));
+    };
+
     // ── Resolve the verified email for token issuance ────────────────────────
     // Use the email from the request (which has been verified by the MongoDB query).
     // Falls back to the booking's stored email.
@@ -95,6 +112,8 @@ export default async function handler(
         status:          b.status,
         bookingType:     b.bookingType,
         createdAt:       b.createdAt,
+        cart:            enrichCart(b.cart),
+        tierKey:         b.tierKey,
         // Short-lived signed token proving this user proved identity via retrieve
         downloadToken: issueDownloadToken(b.bookingId, verifiedEmail),
       })),
@@ -105,6 +124,8 @@ export default async function handler(
         status:          b.status,
         bookingType:     b.bookingType,
         createdAt:       b.createdAt,
+        cart:            enrichCart(b.cart),
+        tierKey:         b.tierKey,
       })),
       // Show pending so users know their payment is still processing
       pendingBookings: pendingBookings.map(b => ({
@@ -113,6 +134,8 @@ export default async function handler(
         numberOfTickets: b.numberOfTickets,
         status:          b.status,
         createdAt:       b.createdAt,
+        cart:            enrichCart(b.cart),
+        tierKey:         b.tierKey,
       })),
       total: bookings.length,
     });

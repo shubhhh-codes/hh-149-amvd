@@ -103,8 +103,8 @@ export default function TicketTiersManager() {
           <div key={idx} className="bg-[#141414] p-4 rounded-xl border border-white/10 space-y-4 relative">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-white/60">Tier Key (Internal)</label>
-                <input type="text" value={tier.key} onChange={(e) => handleUpdate(idx, 'key', e.target.value)} className="w-full bg-[#080808] p-2 rounded border border-white/10 mt-1" />
+                <label className="text-xs text-white/60">Tier Key (Internal) <span className="text-[#FF6B1A] ml-1">(Read-Only)</span></label>
+                <input type="text" value={tier.key} readOnly className="w-full bg-[#080808] opacity-50 cursor-not-allowed p-2 rounded border border-white/10 mt-1" title="Internal keys cannot be changed to protect historical bookings" />
               </div>
               <div>
                 <label className="text-xs text-white/60">Display Name</label>
