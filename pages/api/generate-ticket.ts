@@ -270,10 +270,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
   } catch (err: any) {
-    console.error('[generate-ticket] PDF generation failed:', err);
+    // Structured Server Logging
+    console.error('[generate-ticket] PDF generation failed:', {
+      message: err.message,
+      stack: err.stack,
+      bookingId: req.query.bookingId,
+      timestamp: new Date().toISOString(),
+    });
+    // Safe client response (No Information Disclosure)
     return res.status(500).json({
-      message: `Error: ${err.message}`,
-      error: err.stack,
+      message: 'Failed to generate ticket. Please try again later.',
     });
   }
 }

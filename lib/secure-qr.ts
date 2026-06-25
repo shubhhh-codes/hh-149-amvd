@@ -23,10 +23,13 @@ export interface SignedQRPayload {
   signature: string;
 }
 
-const SECRET_KEY =
-  process.env.NEXTAUTH_SECRET ||
-  process.env.JWT_SECRET ||
-  'fallback-secret-key-do-not-use-in-prod';
+const SECRET_KEY_ENV = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET;
+
+if (process.env.NODE_ENV === 'production' && !SECRET_KEY_ENV) {
+  throw new Error('NEXTAUTH_SECRET or JWT_SECRET is not set in production');
+}
+
+const SECRET_KEY = SECRET_KEY_ENV || 'fallback-secret-key-do-not-use-in-prod';
 
 function createSignature(data: object): string {
   // Use compact JSON for the signature input to match the payload encoding

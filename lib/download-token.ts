@@ -1,7 +1,13 @@
 // lib/download-token.ts
 import crypto from 'crypto';
 
-const SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-change-in-prod';
+const SECRET = process.env.NEXTAUTH_SECRET;
+
+if (process.env.NODE_ENV === 'production' && !SECRET) {
+  throw new Error('NEXTAUTH_SECRET is not set in production');
+}
+
+const FINAL_SECRET = SECRET || 'fallback-secret-change-in-prod';
 
 /**
  * Issues a short-lived signed download token.
@@ -11,7 +17,7 @@ const SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-change-in-prod';
 export function issueDownloadToken(bookingId: string, email: string): string {
   const exp = Date.now() + 30 * 60 * 1000; // 30 minutes from now
   const payload = `${bookingId}|${email.toLowerCase().trim()}|${exp}`;
-  const sig = crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
+  const sig = crypto.createHmac('sha256', FINAL_SECRET).update(payload).digest('hex');
   return Buffer.from(`${payload}|${sig}`).toString('base64url');
 }
 
@@ -44,7 +50,7 @@ export function verifyDownloadToken(
 
     // Recompute signature and compare using timing-safe comparison
     const payload = `${parts[0]}|${parts[1]}|${parts[2]}`;
-    const expected = crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
+    const expected = crypto.createHmac('sha256', FINAL_SECRET).update(payload).digest('hex');
 
     const sigBuf      = Buffer.from(sig,      'hex');
     const expectedBuf = Buffer.from(expected, 'hex');

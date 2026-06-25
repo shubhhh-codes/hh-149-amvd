@@ -16,11 +16,23 @@ export default function BookingSuccess() {
   const [dlState, setDlState]   = useState<DlState>('idle');
   const [dlError, setDlError]   = useState('');
 
-  const handleCopy = () => {
-    if (bookingId) {
-      navigator.clipboard.writeText(bookingId as string);
+  const handleCopy = async () => {
+    if (!bookingId) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(bookingId as string);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = bookingId as string;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Copy failed', err);
     }
   };
 

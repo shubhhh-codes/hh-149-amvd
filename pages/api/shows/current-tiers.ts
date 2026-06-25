@@ -25,8 +25,18 @@ export default async function handler(
     // Sort by display order
     tiers.sort((a: any, b: any) => a.displayOrder - b.displayOrder);
 
+    const publicTiers = tiers.map((t: any) => ({
+      key: t.key,
+      name: t.name,
+      label: t.label,
+      price: t.price,
+      seats: t.seats,
+      badge: t.badge,
+      displayOrder: t.displayOrder
+    }));
+
     res.status(200).json({
-      tiers,
+      tiers: publicTiers,
       showId: 'default-show',
       showName: 'The Humours Hub - Live Standup',
       seatsRemaining: 150, 

@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
+import Razorpay from 'razorpay';
 import clientPromise from '../../../lib/mongodb';
 import { issueDownloadToken } from '../../../lib/download-token';
-import { getTicketPrice } from '../../../lib/getTicketPrice';
 
 export default async function handler(
   req: NextApiRequest,
@@ -44,6 +44,32 @@ export default async function handler(
       return res.status(400).json({ message: 'Invalid payment signature' });
     }
 
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      return res.status(500).json({ message: 'Missing Razorpay credentials' });
+    }
+
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+
+    let order;
+    try {
+      order = await razorpay.orders.fetch(razorpay_order_id);
+    } catch (err: any) {
+      console.error('Failed to fetch Razorpay order:', err.message);
+      return res.status(500).json({ message: 'Failed to verify order details' });
+    }
+
+    // CRITICAL FIX: Verify the order was actually created for THIS booking
+    if (order.receipt !== bookingId) {
+      console.error('Order/Booking mismatch attack detected:', {
+        orderReceipt: order.receipt,
+        requestedBookingId: bookingId
+      });
+      return res.status(400).json({ message: 'Order does not match booking' });
+    }
+
     const client = await clientPromise;
     const db = client.db();
 
@@ -67,16 +93,13 @@ export default async function handler(
       return res.status(200).json({ message: 'Payment already verified', bookingId, downloadToken });
     }
 
-    // Fetch dynamic ticket price from CMS
-    const ticketPrice = await getTicketPrice();
-
     // Create payment record (no userId, guest-only)
     const payment = {
       orderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
       signature: razorpay_signature,
       bookingId: bookingId,
-      amount: booking.numberOfTickets * ticketPrice * 100, // ticket price in paise
+      amount: Number(order.amount), // Use the exact amount from the verified Razorpay order
       status: 'completed',
       type: 'ticket_booking',
       createdAt: new Date(),
@@ -89,8 +112,13 @@ export default async function handler(
       }
     };
 
-    await db.collection('payments').insertOne(payment);
-    console.log('Payment record created:', payment.paymentId);
+    // Use upsert to prevent duplicate payment records during race conditions
+    await db.collection('payments').updateOne(
+      { orderId: razorpay_order_id },
+      { $setOnInsert: payment },
+      { upsert: true }
+    );
+    console.log('Payment record processed:', payment.paymentId);
 
     // Update booking status to approved
     await db.collection('bookings').updateOne(

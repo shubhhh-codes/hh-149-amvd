@@ -24,6 +24,14 @@ export default async function handler(
   try {
     const { email, phone, bookingId } = req.body;
 
+    if (
+      (email !== undefined && typeof email !== 'string') ||
+      (phone !== undefined && typeof phone !== 'string') ||
+      (bookingId !== undefined && typeof bookingId !== 'string')
+    ) {
+      return res.status(400).json({ message: 'Invalid parameter types' });
+    }
+
     // ── Build phone query ────────────────────────────────────────────────────
     let phoneQuery: any;
     if (phone) {

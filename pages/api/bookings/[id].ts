@@ -24,6 +24,11 @@ export default async function handler(
     }
 
     const bookingId = req.query.id as string;
+    
+    if (!bookingId || !ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ message: 'Invalid booking ID format' });
+    }
+
     const client = await clientPromise;
     const db = client.db();
 

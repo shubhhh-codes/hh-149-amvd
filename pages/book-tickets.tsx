@@ -163,7 +163,19 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
           email: customerEmail,
           contact: `91${customerPhone}`,
         },
-        theme: { color: '#FF6B1A' },
+        theme: { color: '#141414' },
+        modal: {
+          ondismiss: () => {
+            // Fire request to log in Node/Vercel server terminal
+            fetch('/api/payments/log-dismiss', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bookingId })
+            }).catch(() => {});
+            
+            setLoading(false);
+          }
+        },
         handler: async (response: Record<string, string>) => {
           try {
             const verifyRes = await fetch('/api/payments/verify', {
