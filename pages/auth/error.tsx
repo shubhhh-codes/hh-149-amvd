@@ -1,6 +1,7 @@
+import React from 'react';
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 
@@ -19,8 +20,8 @@ export default function ErrorPage() {
             Authentication Error
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            {error === 'AccessDenied' 
-              ? 'You do not have permission to access this page.' 
+            {error === 'AccessDenied'
+              ? 'You do not have permission to access this page.'
               : 'There was an error signing in.'}
           </p>
         </div>

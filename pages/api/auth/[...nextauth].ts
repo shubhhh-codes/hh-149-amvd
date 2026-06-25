@@ -1,13 +1,11 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 import NextAuth from 'next-auth';
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import clientPromise from '../../../lib/mongodb';
-import { compare } from 'bcryptjs';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -22,28 +20,100 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Missing credentials');
         }
 
-        const client = await clientPromise;
-        const db = client.db();
-        const user = await db.collection('users').findOne({ email: credentials.email });
+        // Allow login if email matches environment variable
+        const allowedAdminEmail = process.env.ADMIN_EMAIL;
+        const allowedAdminPassword = process.env.ADMIN_PASSWORD;
 
-        if (!user) {
-          throw new Error('No user found');
+        if (!allowedAdminEmail || !allowedAdminPassword) {
+          throw new Error('Server environment is missing admin credentials configuration');
         }
 
-        const isValid = await compare(credentials.password, user.password);
-        if (!isValid) {
-          throw new Error('Invalid password');
+        if (credentials.email !== allowedAdminEmail || credentials.password !== allowedAdminPassword) {
+          throw new Error('Invalid email or password');
         }
 
         return {
-          id: user._id.toString(),
-          email: user.email,
-          username: user.username,
-          userId: user.userId,
-          name: user.name || null,
-          image: user.image || null,
-          createdAt: user.createdAt?.toISOString() || null,
+          id: 'super-admin-env',
+          email: credentials.email,
+          role: 'admin',
         };
+      }
+    }),
+    CredentialsProvider({
+      id: 'webauthn',
+      name: 'WebAuthn',
+      credentials: {
+        authResponse: { label: "authResponse", type: "text" },
+        challengeId: { label: "challengeId", type: "text" }
+      },
+      async authorize(credentials, req) {
+        if (!credentials?.authResponse || !credentials?.challengeId) {
+          throw new Error('Missing webauthn credentials');
+        }
+
+        const { verifyAuthenticationResponse } = await import('@simplewebauthn/server');
+        const clientPromise = (await import('../../../lib/mongodb')).default;
+        const { ObjectId } = await import('mongodb');
+
+        const client = await clientPromise;
+        const db = client.db();
+
+        const challengeDoc = await db.collection('passkey_challenges').findOne({
+          _id: new ObjectId(credentials.challengeId)
+        });
+
+        if (!challengeDoc) {
+          throw new Error('Challenge expired or not found');
+        }
+
+        const expectedChallenge = challengeDoc.challenge;
+        await db.collection('passkey_challenges').deleteOne({ _id: new ObjectId(credentials.challengeId) });
+
+        const authResponse = JSON.parse(credentials.authResponse);
+        
+        // Find the passkey
+        const passkey = await db.collection('admin_passkeys').findOne({
+          credentialID: authResponse.id
+        });
+
+        if (!passkey) {
+          throw new Error('Passkey not registered');
+        }
+
+        // Host header isn't directly available in NextAuth authorize args without some digging,
+        // but we can use the NEXTAUTH_URL or extract from req
+        const host = req.headers?.host || 'localhost:3000';
+        const rpID = host.split(':')[0];
+        const protocol = host.includes('localhost') ? 'http' : 'https';
+        const expectedOrigin = `${protocol}://${host}`;
+
+        const verification = await verifyAuthenticationResponse({
+          response: authResponse,
+          expectedChallenge,
+          expectedOrigin,
+          expectedRPID: rpID,
+          credential: {
+            id: passkey.credentialID, // already a base64url string
+            publicKey: Buffer.from(passkey.credentialPublicKey, 'base64'),
+            counter: passkey.counter,
+          },
+        });
+
+        if (verification.verified) {
+          // Update the counter
+          await db.collection('admin_passkeys').updateOne(
+            { _id: passkey._id },
+            { $set: { counter: verification.authenticationInfo.newCounter } }
+          );
+
+          return {
+            id: 'super-admin-env',
+            email: process.env.ADMIN_EMAIL || 'admin@humorshub.com',
+            role: 'admin',
+          };
+        }
+
+        throw new Error('WebAuthn verification failed');
       }
     })
   ],
@@ -53,11 +123,7 @@ export const authOptions: NextAuthOptions = {
       if (session?.user) {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
-        session.user.username = token.username as string;
-        session.user.userId = token.userId as string;
-        session.user.name = (token.name as string) || null;
-        session.user.image = (token.image as string) || null;
-        session.user.createdAt = (token.createdAt as string) || null;
+        session.user.role = token.role as string;
       }
       return session;
     },
@@ -65,21 +131,18 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.email = user.email;
-        token.username = user.username;
-        token.userId = user.userId;
-        token.name = user.name;
-        token.image = user.image;
-        token.createdAt = user.createdAt;
+        token.role = user.role;
       }
       return token;
     },
   },
   pages: {
-    signIn: '/auth/signin',
+    signIn: '/auth/login',
   },
   session: {
     strategy: 'jwt',
+    maxAge: 1800, // 30 minutes
   },
 };
 
-export default NextAuth(authOptions); 
+export default NextAuth(authOptions);

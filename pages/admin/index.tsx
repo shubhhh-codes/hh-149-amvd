@@ -1,49 +1,26 @@
-/**
- * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
- * @license MIT
- */
-import { useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import React from 'react';
+import { useSession, signOut } from 'next-auth/react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import { startRegistration } from '@simplewebauthn/browser';
+import SiteCMS from '@/components/admin/SiteCMS';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { formatCurrency } from '@/utils/format';
-import {
-  UserCircleIcon,
-  UsersIcon,
-  TicketIcon,
-  CurrencyDollarIcon,
-  MicrophoneIcon,
-  ChartBarIcon,
-  CalendarIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  ClockIcon,
-  StarIcon,
-  EnvelopeIcon,
-  ShieldCheckIcon,
-} from '@heroicons/react/24/outline';
 import DownloadPaymentsButton from '@/components/UserDownloadPDF';
-
-interface User {
-  _id: string;
-  username: string;
-  email: string;
-  phone?: string;
-  createdAt: string;
-  role: string;
-}
+import Image from 'next/image';
 
 interface Booking {
   _id: string;
+  bookingId: string;
   fullName: string;
   email: string;
   phone: string;
-  status: 'pending' | 'approved' | 'declined';
+  status: 'pending' | 'approved' | 'cancelled';
+  bookingType: 'paid' | 'complimentary';
   numberOfTickets?: number;
+  attended?: boolean;
+  attendedAt?: string;
   createdAt: string;
 }
 
@@ -56,10 +33,13 @@ interface ComedianProfile {
   comedianProfile: {
     comedianType: string;
     speciality: string;
-    experience: string;
+    experience: number;
     bio: string;
     videoUrl: string;
     status: 'pending' | 'approved' | 'declined';
+    isFeatured?: boolean;
+    tagline?: string;
+    instagramUrl?: string;
   };
 }
 
@@ -71,15 +51,23 @@ interface Payment {
   status: string;
   type: string;
   createdAt: string;
+  bookingId?: string;
   bookingDetails?: {
     numberOfTickets: number;
     fullName: string;
     phone: string;
-  };
-  user?: {
     email: string;
-    username: string;
   };
+}
+
+interface ContactMessage {
+  _id: string;
+  name: string;
+  phone: string;
+  subject: string;
+  message: string;
+  status: 'unread' | 'read';
+  createdAt: string;
 }
 
 interface PaymentStats {
@@ -89,14 +77,25 @@ interface PaymentStats {
   failedPayments: number;
 }
 
+interface Feedback {
+  _id: string;
+  fullName: string;
+  email: string;
+  category: string;
+  vibe: string;
+  comment: string;
+  createdAt: string;
+}
+
 export default function AdminPanel() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'bookings' | 'users' | 'comedians' | 'payments'>('bookings');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'comedians' | 'payments' | 'messages' | 'cms' | 'feedbacks'>('bookings');
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [comedians, setComedians] = useState<ComedianProfile[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [paymentStats, setPaymentStats] = useState<PaymentStats>({
     totalAmount: 0,
     totalPayments: 0,
@@ -105,58 +104,46 @@ export default function AdminPanel() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [passwordResetModal, setPasswordResetModal] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
 
-  useEffect(() => {
-    if (status === 'loading') return;
-    if (!session?.user?.email || session.user.email !== 'admin@humorshub.com') {
-      router.push('/');
-      return;
-    }
-    if (activeTab === 'comedians') {
-      fetchComedians();
-    } else {
-      fetchData();
-    }
-  }, [session, status, router, activeTab]);
+  // Complimentary booking modal
+  const [showCompModal, setShowCompModal] = useState(false);
+  const [compForm, setCompForm] = useState({ fullName: '', email: '', phone: '', numberOfTickets: 1 });
 
+  // Add Comedian modal
+  const [showAddComedianModal, setShowAddComedianModal] = useState(false);
+  const [comedianForm, setComedianForm] = useState<{
+    id?: string;
+    username: string;
+    email: string;
+    phone: string;
+    speciality: string;
+    tagline: string;
+    instagramUrl: string;
+    isFeatured: boolean;
+    imageFile?: File | null;
+  }>({
+    username: '',
+    email: '',
+    phone: '',
+    speciality: '',
+    tagline: '',
+    instagramUrl: '',
+    isFeatured: false,
+    imageFile: null,
+  });
 
-  const fetchData = async () => {
-    try {
-      if (activeTab === 'bookings') {
-        await fetchBookings();
-      } else if (activeTab === 'users') {
-        await fetchUsers();
-      } else if (activeTab === 'comedians') {
-        await fetchComedians();
-      } else if (activeTab === 'payments') {
-        await fetchPayments();
-      }
-    } catch (err) {
-      console.error('Fetch error:', err);
-      setError('Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Search & Filter
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'CANCELLED'>('ALL');
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     const res = await fetch('/api/admin/bookings');
     if (!res.ok) throw new Error('Failed to fetch bookings');
     const data = await res.json();
     setBookings(data.bookings);
-  };
+  }, []);
 
-  const fetchUsers = async () => {
-    const res = await fetch('/api/admin/users');
-    if (!res.ok) throw new Error('Failed to fetch users');
-    const data = await res.json();
-    setUsers(data.users);
-  };
-
-  const fetchComedians = async () => {
+  const fetchComedians = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/comedians');
       if (!response.ok) throw new Error('Failed to fetch comedians');
@@ -166,9 +153,9 @@ export default function AdminPanel() {
       console.error('Fetch comedians error:', error);
       setError('Failed to load comedians');
     }
-  };
+  }, []);
 
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/payments');
       if (!res.ok) throw new Error('Failed to fetch payments');
@@ -177,16 +164,110 @@ export default function AdminPanel() {
       setPaymentStats(data.stats);
     } catch (err) {
       console.error('Fetch payments error:', err);
-      setError('Failed to load payments');
+    }
+  }, []);
+
+  const fetchMessages = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/contact-messages');
+      if (!res.ok) throw new Error('Failed to fetch messages');
+      const data = await res.json();
+      setMessages(data.messages);
+    } catch (err) {
+      console.error('Fetch messages error:', err);
+    }
+  }, []);
+
+  const fetchFeedbacks = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/feedbacks');
+      if (!res.ok) throw new Error('Failed to fetch feedbacks');
+      const data = await res.json();
+      setFeedbacks(data.feedbacks);
+    } catch (err) {
+      console.error('Fetch feedbacks error:', err);
+    }
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    try {
+      if (activeTab === 'dashboard') {
+        await Promise.all([fetchBookings(), fetchComedians(), fetchPayments(), fetchMessages(), fetchFeedbacks()]);
+      } else if (activeTab === 'bookings') {
+        await fetchBookings();
+      } else if (activeTab === 'comedians') {
+        await fetchComedians();
+      } else if (activeTab === 'payments') {
+        await fetchPayments();
+      } else if (activeTab === 'messages') {
+        await fetchMessages();
+      } else if (activeTab === 'feedbacks') {
+        await fetchFeedbacks();
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
+      setError('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTab, fetchBookings, fetchComedians, fetchPayments, fetchMessages, fetchFeedbacks]);
+
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (session?.user?.role !== 'admin') {
+      router.push('/auth/login');
+      return;
+    }
+    fetchData();
+  }, [session, status, router, activeTab, fetchData]);
+
+  // Intercept hardware/browser back button for the Comedians tab
+  useEffect(() => {
+    if (activeTab === 'comedians') {
+      window.history.pushState({ internalTab: true }, '');
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (activeTab === 'comedians') {
+        setActiveTab('cms');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeTab]);
+
+  const handleRegisterPasskey = async () => {
+    try {
+      const resp = await fetch('/api/auth/webauthn/register-options', { method: 'POST' });
+      if (!resp.ok) throw new Error('Failed to fetch registration options');
+      const { options, challengeId } = await resp.json();
+      
+      const authResponse = await startRegistration(options);
+      
+      const verifyResp = await fetch('/api/auth/webauthn/register-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ response: authResponse, challengeId }),
+      });
+
+      if (verifyResp.ok) {
+        toast.success('Passkey registered successfully! You can now use it to log in.');
+      } else {
+        throw new Error('Verification failed');
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Passkey registration failed');
     }
   };
 
-  const handleStatusUpdate = async (bookingId: string, status: string) => {
+  const handleStatusUpdate = async (bookingId: string, bookingStatus: string) => {
     try {
       const res = await fetch('/api/admin/bookings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, status }),
+        body: JSON.stringify({ bookingId, status: bookingStatus }),
       });
 
       if (!res.ok) throw new Error('Failed to update status');
@@ -198,53 +279,34 @@ export default function AdminPanel() {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
-
+  const handleAttendanceToggle = async (bookingId: string, currentAttended: boolean) => {
     try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
-        method: 'DELETE',
-      });
-
-      if (!res.ok) throw new Error('Failed to delete user');
-      toast.success('User deleted successfully');
-      fetchUsers();
-    } catch (err) {
-      console.error('Delete user error:', err);
-      toast.error('Failed to delete user');
-    }
-  };
-
-  const handleUpdateUserRole = async (userId: string, newRole: string) => {
-    try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
-        method: 'PUT',
+      const res = await fetch('/api/admin/bookings', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole }),
+        body: JSON.stringify({ bookingId, attended: !currentAttended }),
       });
 
-      if (!res.ok) throw new Error('Failed to update user role');
-      toast.success('User role updated successfully');
-      fetchUsers();
+      if (!res.ok) throw new Error('Failed to update attendance');
+      toast.success(`Attendance ${!currentAttended ? 'marked' : 'unmarked'}`);
+      fetchBookings();
     } catch (err) {
-      console.error('Update role error:', err);
-      toast.error('Failed to update user role');
+      console.error('Attendance error:', err);
+      toast.error('Failed to update attendance');
     }
   };
 
-  const handleComedianStatusUpdate = async (comedianId: string, status: string) => {
+  const handleComedianStatusUpdate = async (comedianId: string, comedianStatus: string) => {
     try {
       const response = await fetch('/api/admin/comedians', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ comedianId, status }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comedianId, status: comedianStatus }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update comedian status');
+        const errData = await response.json();
+        throw new Error(errData.message || 'Failed to update comedian status');
       }
 
       toast.success('Comedian status updated successfully');
@@ -255,621 +317,926 @@ export default function AdminPanel() {
     }
   };
 
-  const handleResetUserPassword = async () => {
-    if (!selectedUser) return;
-
+  const handleComedianFeatureToggle = async (comedianId: string, currentFeatured: boolean) => {
     try {
-      const res = await fetch('/api/admin/reset-password', {
-        method: 'POST',
+      const response = await fetch('/api/admin/comedians', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: selectedUser._id,
-          newPassword: newPassword
-        })
+        body: JSON.stringify({ comedianId, isFeatured: !currentFeatured }),
       });
 
-      const data = await res.json();
-
-      if (res.ok) {
-        toast.success('Password reset successfully');
-        setPasswordResetModal(false);
-        setNewPassword('');
-        setSelectedUser(null);
-      } else {
-        toast.error(data.message || 'Failed to reset password');
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || 'Failed to update featured status');
       }
-    } catch (err) {
-      console.error('Password reset error:', err);
-      toast.error('An error occurred while resetting password');
+
+      toast.success(!currentFeatured ? 'Comedian featured on homepage' : 'Comedian removed from homepage');
+      fetchComedians();
+    } catch (error: any) {
+      console.error('Feature toggle error:', error);
+      toast.error(error.message || 'Failed to update featured status');
     }
   };
 
-  const handleResetPassword = (user: User) => {
-    setSelectedUser(user);
-    setPasswordResetModal(true);
+  const handleCreateCompBooking = async () => {
+    try {
+      const res = await fetch('/api/admin/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(compForm),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      toast.success(`Complimentary booking created: ${data.bookingId}`);
+      setShowCompModal(false);
+      setCompForm({ fullName: '', email: '', phone: '', numberOfTickets: 1 });
+      fetchBookings();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create booking');
+    }
   };
+
+  const handleMessageStatusUpdate = async (messageId: string, status: 'read' | 'unread') => {
+    try {
+      const res = await fetch('/api/admin/contact-messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId, status })
+      });
+      if (!res.ok) throw new Error('Failed to update message status');
+      fetchMessages();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleMessageDelete = async (messageId: string) => {
+    if (!confirm('Are you sure you want to delete this message?')) return;
+    try {
+      const res = await fetch(`/api/admin/contact-messages?messageId=${messageId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Failed to delete message');
+      toast.success('Message deleted');
+      fetchMessages();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleSaveComedian = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      let photoId = undefined;
+      
+      if (comedianForm.imageFile) {
+        const formData = new FormData();
+        formData.append('file', comedianForm.imageFile);
+        const uploadRes = await fetch('/api/admin/cms/upload', {
+          method: 'POST',
+          body: formData
+        });
+        if (!uploadRes.ok) throw new Error('Failed to upload image');
+        const uploadData = await uploadRes.json();
+        photoId = uploadData.url.split('/').pop();
+      }
+
+      const payload: any = { ...comedianForm };
+      delete payload.imageFile;
+      if (photoId) payload.photoId = photoId;
+      if (payload.id) {
+        payload.name = payload.username; // PUT endpoint expects 'name'
+      }
+
+      const url = payload.id ? `/api/admin/comedians/${payload.id}` : '/api/admin/comedians';
+      const method = payload.id ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      toast.success(payload.id ? 'Comedian updated successfully' : 'Comedian added successfully');
+      setShowAddComedianModal(false);
+      setComedianForm({ username: '', email: '', phone: '', speciality: '', tagline: '', instagramUrl: '', isFeatured: false, imageFile: null });
+      fetchComedians();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save comedian');
+    }
+  };
+
+  const filteredBookings = bookings.filter(b => {
+    if (filterStatus !== 'ALL') {
+      if (filterStatus === 'PENDING' && b.status !== 'pending') return false;
+      if (filterStatus === 'CONFIRMED' && b.status !== 'approved') return false;
+      if (filterStatus === 'CANCELLED' && b.status !== 'cancelled') return false;
+    }
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      b.bookingId?.toLowerCase().includes(q) ||
+      b.fullName?.toLowerCase().includes(q) ||
+      b.email?.toLowerCase().includes(q) ||
+      b.phone?.includes(q)
+    );
+  });
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100">
-        <Navbar />
+      <div className="min-h-screen bg-[#131313] flex items-center justify-center">
         <LoadingSpinner />
       </div>
     );
   }
 
+  const navLinks = [
+    { id: 'dashboard', label: 'Dashboard', icon: 'qr_code_2', short: 'DASH' },
+    { id: 'bookings', label: 'Bookings', icon: 'calendar_today', short: 'BOOK' },
+    { id: 'cms', label: 'CMS', icon: 'widgets', short: 'CMS' },
+    { id: 'messages', label: 'Messages', icon: 'mail', short: 'MSG' },
+    { id: 'payments', label: 'Payments', icon: 'payments', short: 'PAY' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Navbar />
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row items-center justify-between mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <div className="flex items-center space-x-2 mt-4 md:mt-0">
-            <UserCircleIcon className="w-6 h-6 text-purple-600" />
-            <span className="text-gray-600">{session?.user?.email}</span>
+    <div className="bg-[#0e0e0e] text-[#e5e2e1] font-body-md antialiased overflow-hidden flex h-screen w-full">
+      
+      {/* Mobile Top App Bar */}
+      <header className="md:hidden flex justify-between items-center w-full px-5 h-20 bg-[#131313] border-b border-white/5 fixed top-0 left-0 z-50">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center text-primary-container font-bold">
+            HH
+          </div>
+          <h1 className="text-lg font-headline-sm text-primary-container tracking-tight font-bold uppercase">The Humours Hub</h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={handleRegisterPasskey}
+            className="w-10 h-10 rounded-full bg-[#353534] hover:bg-primary-container/20 text-on-surface hover:text-primary-container flex items-center justify-center transition-colors border border-white/5"
+            aria-label="Register Passkey"
+          >
+            <span className="material-symbols-outlined text-lg">fingerprint</span>
+          </button>
+          <button 
+            onClick={() => signOut({ callbackUrl: '/' })}
+            className="w-10 h-10 rounded-full brutalist-border overflow-hidden bg-[#353534] shrink-0 flex items-center justify-center font-bold text-error hover:bg-error/20 transition-colors"
+            aria-label="Logout"
+          >
+            <span className="material-symbols-outlined text-lg">logout</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Desktop Side Navigation */}
+      <nav className="hidden md:flex flex-col h-screen fixed left-0 top-0 py-8 gap-4 bg-[#1c1b1b] border-r border-white/5 w-64 z-40 overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4 px-6 mb-8">
+          <div className="w-12 h-12 rounded-full bg-primary-container/20 border border-white/5 flex items-center justify-center text-primary-container font-bold text-xl">
+            HH
+          </div>
+          <div>
+            <h1 className="text-xl font-headline-sm text-primary-container font-bold uppercase tracking-wide">Admin Portal</h1>
+            <p className="text-[10px] text-on-surface/50 uppercase tracking-wider">Manage Platform</p>
           </div>
         </div>
-
-        {/* Enhanced Tab Navigation */}
-        <div className="bg-white rounded-lg shadow mb-8">
-          <div className="flex flex-col md:flex-row p-2 space-y-2 md:space-y-0 md:space-x-2">
+        
+        {/* Nav Links */}
+        <div className="flex-1 flex flex-col gap-2 px-4">
+          {navLinks.map((link) => (
             <button
-              onClick={() => setActiveTab('bookings')}
-              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'bookings'
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'hover:bg-gray-100 text-gray-700'
-                }`}
+              key={link.id}
+              onClick={() => setActiveTab(link.id as any)}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                activeTab === link.id 
+                  ? 'bg-primary-container text-[#0A0A0A] shadow-[0_0_15px_rgba(255,107,26,0.3)] font-bold' 
+                  : 'text-on-surface/70 hover:bg-white/5 hover:text-on-surface'
+              }`}
             >
-              <TicketIcon className="w-5 h-5" />
-              <span>Bookings</span>
+              <span className="material-symbols-outlined" style={{fontVariationSettings: activeTab === link.id ? "'FILL' 1" : "'FILL' 0"}}>
+                {link.icon}
+              </span>
+              <span className="font-body-md text-sm">{link.label}</span>
             </button>
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'users'
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'hover:bg-gray-100 text-gray-700'
-                }`}
-            >
-              <UsersIcon className="w-5 h-5" />
-              <span>Users</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('comedians')}
-              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'comedians'
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'hover:bg-gray-100 text-gray-700'
-                }`}
-            >
-              <MicrophoneIcon className="w-5 h-5" />
-              <span>Comedians</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('payments')}
-              className={`flex items-center justify-center md:justify-start space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'payments'
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'hover:bg-gray-100 text-gray-700'
-                }`}
-            >
-              <CurrencyDollarIcon className="w-5 h-5" />
-              <span>Payments</span>
-            </button>
-          </div>
+          ))}
         </div>
+        
+        {/* Footer */}
+        <div className="mt-auto px-4">
+          <button 
+            onClick={handleRegisterPasskey}
+            className="w-full flex items-center gap-3 px-4 py-3 text-primary-container hover:bg-white/5 rounded-lg transition-all duration-200"
+          >
+            <span className="material-symbols-outlined">fingerprint</span>
+            <span className="font-body-md text-sm font-medium">Register Passkey</span>
+          </button>
+          <button 
+            onClick={() => signOut({ callbackUrl: '/' })} 
+            className="w-full flex items-center gap-3 px-4 py-3 text-error hover:bg-white/5 rounded-lg transition-all duration-200"
+          >
+            <span className="material-symbols-outlined">logout</span>
+            <span className="font-body-md text-sm font-medium">Logout</span>
+          </button>
+        </div>
+      </nav>
 
-        {/* Payment Stats Cards */}
-        {activeTab === 'payments' && (
-          <>
-            <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Payment Records</h2>
-                <DownloadPaymentsButton
-                  payments={payments}
-                  className="text-sm shadow-md hover:shadow-lg"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-md">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-purple-100">Total Revenue</p>
-                      <p className="text-2xl font-bold mt-1">
-                        {formatCurrency(paymentStats.totalAmount / 100)}
-                      </p>
-                    </div>
-                    <ChartBarIcon className="w-12 h-12 text-purple-200" />
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-md">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-green-100">Successful</p>
-                      <p className="text-2xl font-bold mt-1">{paymentStats.successfulPayments}</p>
-                    </div>
-                    <CheckCircleIcon className="w-12 h-12 text-green-200" />
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-6 text-white shadow-md">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-yellow-100">Pending</p>
-                      <p className="text-2xl font-bold mt-1">
-                        {paymentStats.totalPayments - paymentStats.successfulPayments}
-                      </p>
-                    </div>
-                    <ClockIcon className="w-12 h-12 text-yellow-200" />
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-md">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-blue-100">Total Transactions</p>
-                      <p className="text-2xl font-bold mt-1">{paymentStats.totalPayments}</p>
-                    </div>
-                    <CurrencyDollarIcon className="w-12 h-12 text-blue-200" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto bg-white rounded-lg shadow">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center space-x-1">
-                          <CalendarIcon className="w-4 h-4" />
-                          <span>Date & Time</span>
-                        </div>
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center space-x-1">
-                          <UserCircleIcon className="w-4 h-4" />
-                          <span>Customer Details</span>
-                        </div>
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center space-x-1">
-                          <CurrencyDollarIcon className="w-4 h-4" />
-                          <span>Payment Info</span>
-                        </div>
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center space-x-1">
-                          <TicketIcon className="w-4 h-4" />
-                          <span>Booking Details</span>
-                        </div>
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center space-x-1">
-                          <CurrencyDollarIcon className="w-4 h-4" />
-                          <span>Amount</span>
-                        </div>
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center space-x-1">
-                          <CheckCircleIcon className="w-4 h-4" />
-                          <span>Status</span>
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {payments.map((payment) => (
-                      <tr key={payment._id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {new Date(payment.createdAt).toLocaleDateString('en-IN')}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {new Date(payment.createdAt).toLocaleTimeString('en-IN')}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {payment.bookingDetails?.fullName || 'N/A'}
-                          </div>
-                          <div className="text-sm text-gray-500">{payment.user?.email || 'N/A'}</div>
-                          <div className="text-xs text-gray-400">
-                            {payment.bookingDetails?.phone || 'N/A'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{payment.paymentId}</div>
-                          <div className="text-xs text-gray-500">Order: {payment.orderId}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {payment.bookingDetails?.numberOfTickets
-                              ? `${payment.bookingDetails.numberOfTickets} ticket${payment.bookingDetails.numberOfTickets > 1 ? 's' : ''}`
-                              : 'No booking details'
-                            }
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {payment.type === 'ticket_booking' ? 'Show Ticket' : payment.type}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {formatCurrency(payment.amount / 100)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            ${payment.status === 'completed'
-                              ? 'bg-green-100 text-green-800'
-                              : payment.status === 'failed'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                            }`}
-                          >
-                            {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+      {/* Main Content Area */}
+      <main className="flex-1 md:ml-64 pt-24 md:pt-0 pb-24 md:pb-0 h-screen overflow-y-auto relative bg-[#0e0e0e]">
+        <div className="absolute inset-0 spotlight-glow pointer-events-none z-0"></div>
+        <div className="relative z-10 max-w-container-max mx-auto px-5 md:px-12 py-8 md:py-12">
+          
+          {error && (
+            <div className="bg-error-container/20 border border-error p-4 rounded-lg flex items-center gap-2 text-error mb-8">
+              <span className="material-symbols-outlined">error</span>
+              <p>{error}</p>
             </div>
-          </>
-        )}
+          )}
 
-        {/* Error Alert */}
-        {error && (
-          <div className="flex items-center bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-md">
-            <XCircleIcon className="w-5 h-5 text-red-500 mr-2" />
-            <p className="text-red-700">{error}</p>
-          </div>
-        )}
-
-        {/* Content Sections */}
-        {!loading && (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            {/* Bookings Table */}
-            {activeTab === 'bookings' && (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Booking Records</h2>
-                  <div className="flex space-x-4">
-                    <div className="flex items-center bg-green-100 px-4 py-2 rounded-lg">
-                      <CheckCircleIcon className="w-5 h-5 text-green-600 mr-2" />
-                      <div>
-                        <p className="text-xs text-green-600">Approved</p>
-                        <p className="text-lg font-bold text-green-700">
-                          {bookings.filter(b => b.status === 'approved').length}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center bg-yellow-100 px-4 py-2 rounded-lg">
-                      <ClockIcon className="w-5 h-5 text-yellow-600 mr-2" />
-                      <div>
-                        <p className="text-xs text-yellow-600">Pending</p>
-                        <p className="text-lg font-bold text-yellow-700">
-                          {bookings.filter(b => b.status === 'pending').length}
-                        </p>
-                      </div>
-                    </div>
+          {/* DASHBOARD TAB */}
+          {activeTab === 'dashboard' && (
+            <section className="space-y-6 animate-enter">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                  <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Total Revenue</span>
+                  <div className="flex items-end justify-between mt-2">
+                    <span className="font-headline-md text-3xl font-bold leading-none text-primary-container">{formatCurrency(paymentStats.totalAmount / 100)}</span>
                   </div>
                 </div>
-
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <CalendarIcon className="w-4 h-4" />
-                            <span>Booking Date</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <UserCircleIcon className="w-4 h-4" />
-                            <span>Customer Details</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <TicketIcon className="w-4 h-4" />
-                            <span>Tickets</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <CheckCircleIcon className="w-4 h-4" />
-                            <span>Status</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {bookings.map((booking) => (
-                        <tr key={booking._id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(booking.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm font-medium text-gray-900">{booking.fullName}</div>
-                            <div className="text-sm text-gray-500">{booking.email}</div>
-                            <div className="text-xs text-gray-400">{booking.phone}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {booking.numberOfTickets} ticket(s)
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              ₹149 per ticket
-                            </div>
-                            <div className="text-sm font-medium text-purple-600">
-                              Total: {formatCurrency((booking.numberOfTickets || 0) * 149)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                              ${booking.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                booking.status === 'declined' ? 'bg-red-100 text-red-800' :
-                                  'bg-yellow-100 text-yellow-800'}`}>
-                              {booking.status === 'pending' ? 'pending - Awaiting payment confirmation' : booking.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex justify-end space-x-2">
-                              {booking.status === 'pending' && (
-                                <>
-                                  <button
-                                    onClick={() => handleStatusUpdate(booking._id, 'approved')}
-                                    className="text-green-600 hover:text-green-900 bg-green-50 hover:bg-green-100 px-3 py-1 rounded-md transition-colors"
-                                  >
-                                    Approve
-                                  </button>
-                                  <button
-                                    onClick={() => handleStatusUpdate(booking._id, 'declined')}
-                                    className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors"
-                                  >
-                                    Decline
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                  <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Active Bookings</span>
+                  <div className="flex items-end justify-between mt-2">
+                    <span className="font-headline-md text-3xl font-bold leading-none">{bookings.filter(b => b.status !== 'cancelled').length}</span>
+                  </div>
+                </div>
+                <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                  <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Pending Apps</span>
+                  <div className="flex items-end justify-between mt-2">
+                    <span className="font-headline-md text-3xl font-bold leading-none text-primary-container">{comedians.filter(c => c.comedianProfile?.status === 'pending').length}</span>
+                  </div>
+                </div>
+                <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                  <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Total Tickets</span>
+                  <div className="flex items-end justify-between mt-2">
+                    <span className="font-headline-md text-3xl font-bold leading-none">{bookings.filter(b => b.status === 'approved').reduce((sum, b) => sum + (b.numberOfTickets || 0), 0)}</span>
+                  </div>
+                </div>
+                <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                  <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Total Feedbacks</span>
+                  <div className="flex items-end justify-between mt-2">
+                    <span className="font-headline-md text-3xl font-bold leading-none text-primary-container">{feedbacks.length}</span>
+                  </div>
                 </div>
               </div>
-            )}
-
-            {/* Users Table */}
-            {activeTab === 'users' && (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
-                  <div className="bg-blue-50 px-4 py-2 rounded-lg flex items-center">
-                    <UsersIcon className="w-5 h-5 text-blue-600 mr-2" />
-                    <div>
-                      <p className="text-xs text-blue-600">Total Users</p>
-                      <p className="text-lg font-bold text-blue-700">{users.length}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <UserCircleIcon className="w-4 h-4" />
-                            <span>Username</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <EnvelopeIcon className="w-4 h-4" />
-                            <span>Email</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <span>📞</span>
-                            <span>Phone</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <ShieldCheckIcon className="w-4 h-4" />
-                            <span>Role</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <div className="flex items-center space-x-1">
-                            <CalendarIcon className="w-4 h-4" />
-                            <span>Created At</span>
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {users.map((user) => (
-                        <tr key={user._id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
-                                <UserCircleIcon className="h-5 w-5 text-purple-600" />
-                              </div>
-                              <div className="ml-3">
-                                <div className="text-sm font-medium text-gray-900">{user.username}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500">{user.email}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500">{user.phone || 'N/A'}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                              {user.role}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(user.createdAt).toLocaleDateString('en-IN')}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button
-                              onClick={() => handleResetPassword(user)}
-                              className="text-purple-600 hover:text-purple-900 font-medium"
-                            >
-                              Reset Password
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="bg-[#131313] p-6 rounded brutalist-border mt-4">
+                 <h2 className="text-xl font-headline-md font-bold mb-2 uppercase tracking-wide">Welcome to Admin Portal</h2>
+                 <p className="text-on-surface/70 text-sm">Use the navigation to manage Bookings, Comedian Applications, Payments, or update the Content Management System.</p>
               </div>
-            )}
+            </section>
+          )}
 
-            {/* Comedians Grid */}
-            {activeTab === 'comedians' && (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Comedian Applications</h2>
-                  <div className="flex space-x-4">
-                    <div className="flex items-center bg-green-100 px-4 py-2 rounded-lg">
-                      <CheckCircleIcon className="w-5 h-5 text-green-600 mr-2" />
-                      <div>
-                        <p className="text-xs text-green-600">Approved</p>
-                        <p className="text-lg font-bold text-green-700">
-                          {comedians.filter(c => c.comedianProfile.status === 'approved').length}
-                        </p>
-                      </div>
+          {/* BOOKINGS TAB */}
+          {activeTab === 'bookings' && (
+            <>
+              <section className="pb-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                    <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Pending Approval</span>
+                    <div className="flex items-end justify-between mt-2">
+                      <span className="font-headline-md text-3xl font-bold leading-none text-primary-container">{bookings.filter(b => b.status === 'pending').length}</span>
+                      <span className="material-symbols-outlined text-primary-container/50 text-xl">hourglass_empty</span>
                     </div>
-                    <div className="flex items-center bg-yellow-100 px-4 py-2 rounded-lg">
-                      <ClockIcon className="w-5 h-5 text-yellow-600 mr-2" />
-                      <div>
-                        <p className="text-xs text-yellow-600">Pending</p>
-                        <p className="text-lg font-bold text-yellow-700">
-                          {comedians.filter(c => c.comedianProfile.status === 'pending').length}
-                        </p>
-                      </div>
+                  </div>
+                  <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                    <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Today's Sales</span>
+                    <div className="flex items-end justify-between mt-2">
+                      <span className="font-headline-md text-3xl font-bold leading-none">{bookings.filter(b => b.status === 'approved' && new Date(b.createdAt).toDateString() === new Date().toDateString()).reduce((sum, b) => sum + (b.numberOfTickets || 0), 0)}</span>
+                      <span className="material-symbols-outlined text-on-surface/30 text-xl">confirmation_number</span>
                     </div>
                   </div>
                 </div>
+                <div className="mt-4 flex justify-center md:justify-end">
+                  <button
+                    onClick={() => setShowCompModal(true)}
+                    className="bg-primary-container text-[#0A0A0A] px-4 py-2 font-headline-sm text-sm font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 uppercase tracking-wider"
+                  >
+                    <span className="material-symbols-outlined text-lg">add</span>
+                    Create Complimentary Booking
+                  </button>
+                </div>
+              </section>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {comedians.map((comedian) => (
-                    <div key={comedian._id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-                      <div className="p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="text-lg font-semibold text-gray-900">{comedian.username}</h3>
-                            <p className="text-sm text-gray-500">{comedian.email}</p>
-                            <p className="text-sm text-gray-500">📞 {comedian.phone || 'N/A'}</p>
-                          </div>
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full 
-                            ${comedian.comedianProfile.status === 'approved' ? 'bg-green-100 text-green-800' :
-                              comedian.comedianProfile.status === 'declined' ? 'bg-red-100 text-red-800' :
-                                'bg-yellow-100 text-yellow-800'}`}>
-                            {comedian.comedianProfile.status}
-                          </span>
-                        </div>
-
-                        <div className="space-y-3 mb-4">
-                          <div className="flex items-center text-sm">
-                            <MicrophoneIcon className="w-4 h-4 text-gray-400 mr-2" />
-                            <span className="font-medium text-gray-700">{comedian.comedianProfile.comedianType}</span>
-                          </div>
-                          <div className="flex items-center text-sm">
-                            <CalendarIcon className="w-4 h-4 text-gray-400 mr-2" />
-                            <span className="text-gray-600">{comedian.comedianProfile.experience} Experience</span>
-                          </div>
-                          <div className="flex items-center text-sm">
-                            <StarIcon className="w-4 h-4 text-gray-400 mr-2" />
-                            <span className="text-gray-600">{comedian.comedianProfile.speciality}</span>
-                          </div>
-                        </div>
-
-                        <p className="text-sm text-gray-600 mb-4 line-clamp-3">{comedian.comedianProfile.bio}</p>
-
-                        {comedian.comedianProfile.status === 'pending' && (
-                          <div className="flex justify-end space-x-2 pt-4 border-t">
-                            <button
-                              onClick={() => handleComedianStatusUpdate(comedian._id, 'approved')}
-                              className="px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleComedianStatusUpdate(comedian._id, 'declined')}
-                              className="px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors"
-                            >
-                              Decline
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+              <section className="pb-6 sticky top-0 md:top-[-48px] z-30 bg-[#0e0e0e]/95 backdrop-blur-sm pt-2">
+                <div className="relative w-full h-12 flex items-center rounded brutalist-border bg-[#1c1b1b] focus-within:border-primary-container transition-colors overflow-hidden">
+                  <span className="material-symbols-outlined absolute left-3 text-on-surface/50">search</span>
+                  <input 
+                    className="w-full h-full bg-transparent border-none pl-11 pr-4 text-sm focus:ring-0 placeholder:text-on-surface/30 text-on-surface font-body-md outline-none" 
+                    placeholder="Search ID, Name, or Event..." 
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2 mt-4 overflow-x-auto pb-2 scrollbar-hide">
+                  {['ALL', 'PENDING', 'CONFIRMED', 'CANCELLED'].map((status) => (
+                    <button 
+                      key={status}
+                      onClick={() => setFilterStatus(status as any)}
+                      className={`shrink-0 px-4 py-1.5 rounded-full font-label-caps text-xs transition-colors ${
+                        filterStatus === status 
+                          ? 'bg-[#e5e2e1] text-[#0e0e0e]' 
+                          : 'brutalist-border text-[#e5e2e1]/70 hover:bg-white/5'
+                      }`}
+                    >
+                      {status}
+                    </button>
                   ))}
                 </div>
+              </section>
+
+              <div className="flex flex-col gap-4">
+                {filteredBookings.length === 0 ? (
+                  <div className="text-center py-12 text-on-surface/50">No bookings found.</div>
+                ) : (
+                  filteredBookings.map((booking) => (
+                    <article key={booking._id} className={`bg-[#131313] brutalist-border rounded p-4 relative overflow-hidden flex flex-col gap-5 ${booking.status === 'cancelled' ? 'opacity-60' : ''}`}>
+                      <div className={`absolute top-0 left-0 w-1 h-full ${booking.status === 'pending' ? 'bg-primary-container' : booking.status === 'approved' ? 'bg-white/20' : 'bg-red-500'}`}></div>
+                      <div className="flex justify-between items-start pl-3">
+                        <div>
+                          <div className="font-label-caps text-on-surface/50 text-[10px] mb-1">ID #{booking.bookingId}</div>
+                          <h2 className="font-headline-sm text-lg leading-tight uppercase font-bold">{booking.fullName}</h2>
+                          <div className="text-xs text-on-surface/70 mt-1 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">mail</span>
+                            {booking.email}
+                          </div>
+                          {booking.phone && (
+                            <div className="text-xs text-on-surface/70 mt-1 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[14px]">call</span>
+                              {booking.phone}
+                            </div>
+                          )}
+                        </div>
+                        <span className={`font-label-caps px-2 py-1 rounded text-[10px] brutalist-border ${
+                          booking.status === 'pending' ? 'bg-primary-container/10 text-primary-container border-primary-container/30' :
+                          booking.status === 'approved' ? 'bg-[#201f1f] text-on-surface/70' :
+                          'bg-red-500/10 text-red-500 border-red-500/30'
+                        }`}>
+                          {booking.status === 'approved' ? 'CONFIRMED' : booking.status.toUpperCase()}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-y-4 gap-x-4 pl-3 border-t border-white/5 pt-4">
+                        <div>
+                          <div className="font-label-caps text-on-surface/40 text-[10px] mb-1">TYPE</div>
+                          <div className="text-sm font-medium uppercase">{booking.bookingType}</div>
+                        </div>
+                        <div>
+                          <div className="font-label-caps text-on-surface/40 text-[10px] mb-1">DATE</div>
+                          <div className="text-sm">{new Date(booking.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                        </div>
+                        <div>
+                          <div className="font-label-caps text-on-surface/40 text-[10px] mb-1">TICKETS</div>
+                          <div className="text-sm">{booking.numberOfTickets} x General Admin</div>
+                        </div>
+                        <div>
+                          <div className="font-label-caps text-on-surface/40 text-[10px] mb-1">ATTENDANCE</div>
+                          <div className="text-sm font-headline-sm">
+                            {booking.attended ? <span className="text-green-400">Present</span> : <span className="text-on-surface/50">Pending</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 pl-3 pt-2">
+                        {booking.status === 'pending' ? (
+                          <>
+                            <button onClick={() => handleStatusUpdate(booking.bookingId, 'approved')} className="flex-1 bg-primary-container text-[#0e0e0e] font-headline-sm text-sm h-12 rounded-xl flex items-center justify-center active:scale-[0.98] transition-transform uppercase">APPROVE</button>
+                            <button onClick={() => handleStatusUpdate(booking.bookingId, 'cancelled')} className="flex-1 bg-transparent brutalist-border text-[#e5e2e1] font-headline-sm text-sm h-12 rounded-xl flex items-center justify-center active:bg-[#201f1f] transition-colors uppercase">DECLINE</button>
+                          </>
+                        ) : booking.status === 'approved' ? (
+                          <button 
+                            onClick={() => handleAttendanceToggle(booking.bookingId, !!booking.attended)}
+                            className={`w-full brutalist-border text-sm h-12 rounded-xl flex items-center justify-center gap-2 transition-colors uppercase font-bold tracking-wide ${booking.attended ? 'bg-[#201f1f] text-[#e5e2e1]' : 'bg-[#e5e2e1] text-[#0e0e0e]'}`}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              {booking.attended ? 'check_circle' : 'how_to_reg'}
+                            </span>
+                            {booking.attended ? 'UNMARK ATTENDANCE' : 'MARK ATTENDANCE'}
+                          </button>
+                        ) : (
+                          <div className="w-full text-center text-error font-label-caps text-xs py-2">CANCELLED</div>
+                        )}
+                      </div>
+                    </article>
+                  ))
+                )}
               </div>
-            )}
-          </div>
-        )}
-      </main>
-      <Footer />
-      {/* Password Reset Modal */}
-      {passwordResetModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
-            <h2 className="text-xl font-semibold mb-4">Reset Password for {selectedUser.username}</h2>
-            <div className="mb-4">
-              <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                New Password
-              </label>
-              <input
-                type="password"
-                id="newPassword"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                placeholder="Enter new password"
-                required
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => {
-                  setPasswordResetModal(false);
-                  setNewPassword('');
-                  setSelectedUser(null);
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+            </>
+          )}
+
+          {/* FEEDBACKS TAB */}
+          {activeTab === 'feedbacks' && (
+            <section className="space-y-6 animate-enter mb-24">
+              <button 
+                type="button"
+                onClick={() => setActiveTab('cms')}
+                className="flex w-fit items-center gap-2 px-4 py-2 bg-[#201f1f] brutalist-border rounded-lg text-sm font-label-caps tracking-widest text-on-surface/80 hover:text-on-surface hover:bg-[#2a2a2a] transition-colors uppercase mt-2 mb-4"
               >
-                Cancel
+                <span className="material-symbols-outlined text-lg">arrow_back</span>
+                Back to Hub
+              </button>
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-headline-md font-bold uppercase tracking-wide">User Feedbacks</h2>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {feedbacks.length === 0 ? (
+                  <div className="col-span-full text-center py-12 text-on-surface/50">No feedback submitted yet.</div>
+                ) : (
+                  feedbacks.map((fb) => {
+                    const vibeIcon = fb.vibe === 'hilarious' ? 'sentiment_very_satisfied' :
+                                     fb.vibe === 'great' ? 'theater_comedy' :
+                                     fb.vibe === 'good' ? 'sentiment_satisfied' :
+                                     fb.vibe === 'needs-work' ? 'build' : 'sentiment_dissatisfied';
+                    const vibeScore = fb.vibe === 'hilarious' ? 5 :
+                                      fb.vibe === 'great' ? 4 :
+                                      fb.vibe === 'good' ? 3 :
+                                      fb.vibe === 'needs-work' ? 2 : 1;
+                    return (
+                      <article key={fb._id} className="bg-[#131313] brutalist-border rounded-xl p-5 relative overflow-hidden flex flex-col gap-4">
+                         <div className="flex flex-col sm:flex-row sm:justify-between items-start gap-4 sm:gap-0">
+                            <div className="min-w-0 flex-1 pr-0 sm:pr-4">
+                              <h2 className="font-headline-sm text-lg leading-tight uppercase font-bold break-words">{fb.fullName}</h2>
+                              <div className="text-xs text-on-surface/70 mt-1 flex items-start gap-1">
+                                <span className="material-symbols-outlined text-[14px] shrink-0 mt-0.5">mail</span>
+                                <span className="break-all">{fb.email}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                               <span className="font-headline font-bold text-xl text-primary">{vibeScore}/5</span>
+                               <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary border border-primary/20 shrink-0">
+                                  <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>{vibeIcon}</span>
+                               </div>
+                            </div>
+                         </div>
+                         <div className="text-sm bg-surface-container-low p-3 rounded border border-white/5 text-on-surface/90 italic">
+                            "{fb.comment}"
+                         </div>
+                         <div className="flex justify-between items-end mt-auto pt-2 border-t border-white/5">
+                            <div>
+                               <span className="font-label-caps text-[10px] text-on-surface/50">CATEGORY</span>
+                               <div className="text-xs uppercase tracking-wide font-bold text-on-surface/80">{fb.category}</div>
+                            </div>
+                            <div className="text-right">
+                               <span className="font-label-caps text-[10px] text-on-surface/50">DATE</span>
+                               <div className="text-xs">{new Date(fb.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                            </div>
+                         </div>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* COMEDIANS TAB */}
+          {activeTab === 'comedians' && (
+            <section className="space-y-6 animate-enter mb-24">
+              <button 
+                type="button"
+                onClick={() => {
+                  setActiveTab('cms');
+                  if (window.history.state?.internalTab) {
+                    window.history.back();
+                  }
+                }}
+                className="flex w-fit items-center gap-2 px-4 py-2 bg-[#201f1f] brutalist-border rounded-lg text-sm font-label-caps tracking-widest text-on-surface/80 hover:text-on-surface hover:bg-[#2a2a2a] transition-colors uppercase mt-2 mb-4"
+              >
+                <span className="material-symbols-outlined text-lg">arrow_back</span>
+                Back to Hub
+              </button>
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-headline-md font-bold uppercase tracking-wide">Comedian Apps</h2>
+                <button
+                  onClick={() => setShowAddComedianModal(true)}
+                  className="bg-primary-container text-[#0A0A0A] px-4 py-2 font-headline-sm text-sm font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 uppercase tracking-wider"
+                >
+                  <span className="material-symbols-outlined text-lg">person_add</span>
+                  Add Comedian
+                </button>
+              </div>
+              <div className="flex flex-col gap-4">
+                {comedians.map((comedian) => (
+                  <article key={comedian._id} className="bg-[#131313] brutalist-border rounded p-4 relative overflow-hidden flex flex-col gap-4">
+                     <div className={`absolute top-0 left-0 w-1 h-full ${comedian.comedianProfile?.status === 'pending' ? 'bg-primary-container' : comedian.comedianProfile?.status === 'approved' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                     <div className="flex justify-between items-start pl-3">
+                        <div>
+                          <h2 className="font-headline-sm text-lg leading-tight uppercase font-bold">{comedian.username}</h2>
+                          <div className="text-xs text-on-surface/70 mt-1 flex flex-col gap-1">
+                            <span className="uppercase tracking-wider">{comedian.comedianProfile?.comedianType} • {comedian.comedianProfile?.speciality}</span>
+                            {comedian.email && (
+                              <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">mail</span>{comedian.email}</span>
+                            )}
+                            {comedian.phone && (
+                              <a href={`https://wa.me/${comedian.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-primary-container transition-colors w-fit"><span className="material-symbols-outlined text-[14px]">chat</span>{comedian.phone}</a>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`font-label-caps px-2 py-1 rounded text-[10px] brutalist-border ${
+                          comedian.comedianProfile?.status === 'pending' ? 'bg-primary-container/10 text-primary-container border-primary-container/30' :
+                          comedian.comedianProfile?.status === 'approved' ? 'bg-green-500/10 text-green-500 border-green-500/30' :
+                          'bg-red-500/10 text-red-500 border-red-500/30'
+                        }`}>
+                          {comedian.comedianProfile?.status?.toUpperCase()}
+                        </span>
+                     </div>
+                     <div className="pl-3 text-sm text-on-surface/80">
+                        <p className="mb-2"><strong className="text-primary-container uppercase tracking-wide text-xs">{comedian.comedianProfile?.experience} Stage Experience</strong></p>
+                        <p className="line-clamp-3">{comedian.comedianProfile?.bio}</p>
+                     </div>
+                     <div className="flex flex-wrap gap-2 pl-3 pt-2">
+                        {comedian.comedianProfile?.status === 'pending' && (
+                          <>
+                            <button onClick={() => handleComedianStatusUpdate(comedian._id, 'approved')} className="px-4 py-2 bg-green-500 text-black font-headline-sm text-xs rounded-lg flex items-center justify-center active:scale-[0.98] transition-transform uppercase tracking-wider whitespace-nowrap">APPROVE</button>
+                            <button onClick={() => handleComedianStatusUpdate(comedian._id, 'declined')} className="px-4 py-2 bg-transparent brutalist-border text-red-500 font-headline-sm text-xs rounded-lg flex items-center justify-center active:bg-[#201f1f] transition-colors uppercase tracking-wider whitespace-nowrap">DECLINE</button>
+                          </>
+                        )}
+                        {comedian.comedianProfile?.status === 'approved' && (
+                          <button 
+                            onClick={() => handleComedianFeatureToggle(comedian._id, !!comedian.comedianProfile?.isFeatured)} 
+                            className={`px-4 py-2 font-headline-sm text-xs rounded-lg flex items-center justify-center transition-colors uppercase tracking-wider whitespace-nowrap ${comedian.comedianProfile?.isFeatured ? 'bg-primary-container text-black' : 'bg-transparent brutalist-border text-primary-container'}`}
+                          >
+                            {comedian.comedianProfile?.isFeatured ? 'UNFEATURE' : 'FEATURE'}
+                          </button>
+                        )}
+                        {comedian.comedianProfile?.videoUrl && (
+                          <a href={comedian.comedianProfile.videoUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-[#201f1f] brutalist-border text-[#e5e2e1] font-headline-sm text-xs rounded-lg flex items-center justify-center transition-colors uppercase tracking-wider whitespace-nowrap">WATCH VIDEO</a>
+                        )}
+                        <button 
+                           onClick={() => {
+                             setComedianForm({
+                               id: comedian._id,
+                               username: comedian.username,
+                               email: comedian.email,
+                               phone: comedian.phone || '',
+                               speciality: comedian.comedianProfile?.speciality || '',
+                               tagline: comedian.comedianProfile?.tagline  || '',
+                               instagramUrl: comedian.comedianProfile?.instagramUrl || '',
+                               isFeatured: !!comedian.comedianProfile?.isFeatured,
+                               imageFile: null
+                             });
+                             setShowAddComedianModal(true);
+                           }} 
+                           className="px-4 py-2 bg-transparent brutalist-border text-[#e5e2e1] font-headline-sm text-xs rounded-lg flex items-center justify-center transition-colors uppercase tracking-wider hover:bg-white/5 whitespace-nowrap"
+                        >
+                          EDIT
+                        </button>
+                     </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* PAYMENTS TAB */}
+          {activeTab === 'payments' && (
+            <section className="space-y-6 animate-enter">
+              <div className="flex justify-between items-center mb-4">
+                 <h2 className="text-2xl font-headline-md font-bold uppercase tracking-wide">Payments</h2>
+                 <DownloadPaymentsButton payments={payments} className="!bg-[#201f1f] !text-[#e5e2e1] !text-xs !px-3 !py-1 !rounded brutalist-border" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                    <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Total Processed</span>
+                    <div className="flex items-end justify-between mt-2">
+                      <span className="font-headline-md text-2xl font-bold leading-none text-primary-container">{formatCurrency(paymentStats.totalAmount / 100)}</span>
+                    </div>
+                  </div>
+                  <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
+                    <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase text-green-400">Successful</span>
+                    <div className="flex items-end justify-between mt-2">
+                      <span className="font-headline-md text-2xl font-bold leading-none">{paymentStats.successfulPayments}</span>
+                    </div>
+                  </div>
+              </div>
+              <div className="flex flex-col gap-4 mt-4">
+                {payments.map((payment) => (
+                  <article key={payment._id} className="bg-[#131313] brutalist-border rounded p-4 flex flex-col gap-2">
+                    <div className="flex justify-between items-start">
+                       <div>
+                          <div className="font-mono text-primary-container text-xs mb-1">{payment.bookingId || payment.orderId}</div>
+                          <h2 className="font-headline-sm text-base leading-tight font-bold uppercase">{payment.bookingDetails?.fullName || 'Guest'}</h2>
+                       </div>
+                       <span className="font-headline-md font-bold">{formatCurrency(payment.amount / 100)}</span>
+                    </div>
+                    <div className="flex justify-between items-end mt-2">
+                      <span className="text-xs text-on-surface/50 font-mono">{payment.paymentId}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${payment.status === 'completed' ? 'bg-green-500/20 text-green-400' : payment.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                         {payment.status === 'completed' ? 'SUCCESS' : payment.status}
+                      </span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* MESSAGES TAB */}
+          {activeTab === 'messages' && (
+            <section className="space-y-6 animate-enter">
+              <h2 className="text-2xl font-headline-md font-bold mb-4 uppercase tracking-wide">Messages Inbox</h2>
+              <div className="flex flex-col gap-4">
+                {messages.length === 0 ? (
+                  <div className="bg-[#131313] brutalist-border rounded p-8 text-center text-on-surface/50">
+                    <span className="material-symbols-outlined text-4xl mb-2 opacity-50">inbox</span>
+                    <p>No messages found.</p>
+                  </div>
+                ) : (
+                  messages.map((msg) => (
+                    <article key={msg._id} className={`bg-[#131313] brutalist-border rounded p-4 relative overflow-hidden flex flex-col gap-3 ${msg.status === 'unread' ? 'border-primary-container/30' : 'opacity-70'}`}>
+                      {msg.status === 'unread' && <div className="absolute top-0 left-0 w-1 h-full bg-primary-container"></div>}
+                      <div className="flex justify-between items-start pl-3">
+                        <div>
+                          <h3 className="font-headline-sm text-lg font-bold">{msg.name}</h3>
+                          <div className="text-xs text-on-surface/70 mt-1 flex gap-3">
+                            <span><span className="material-symbols-outlined text-[14px] align-middle mr-1">chat</span>{msg.phone}</span>
+                            <span>{new Date(msg.createdAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <span className={`font-label-caps px-2 py-1 rounded text-[10px] brutalist-border ${msg.status === 'unread' ? 'bg-primary-container/10 text-primary-container border-primary-container/30' : 'bg-white/5 text-white/50 border-white/10'}`}>
+                          {msg.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="pl-3 mt-2">
+                        <div className="text-xs font-label-caps text-on-surface/40 mb-1 tracking-widest uppercase">Subject: {msg.subject}</div>
+                        <p className="text-sm font-body bg-black/20 p-3 rounded">{msg.message}</p>
+                      </div>
+                      <div className="flex gap-2 pl-3 mt-2">
+                        {msg.status === 'unread' ? (
+                          <button onClick={() => handleMessageStatusUpdate(msg._id, 'read')} className="px-4 py-2 bg-primary-container text-black font-headline-sm text-xs rounded-lg active:scale-[0.98] transition-transform uppercase tracking-wider">Mark as Read</button>
+                        ) : (
+                          <button onClick={() => handleMessageStatusUpdate(msg._id, 'unread')} className="px-4 py-2 bg-[#201f1f] brutalist-border text-white font-headline-sm text-xs rounded-lg active:scale-[0.98] transition-transform uppercase tracking-wider">Mark as Unread</button>
+                        )}
+                        <button onClick={() => handleMessageDelete(msg._id)} className="px-4 py-2 bg-transparent brutalist-border text-red-500 font-headline-sm text-xs rounded-lg hover:bg-red-500/10 active:bg-red-500/20 transition-colors uppercase tracking-wider ml-auto">Delete</button>
+                      </div>
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* CMS TAB */}
+          {activeTab === 'cms' && (
+            <section className="animate-enter">
+              <SiteCMS 
+                onNavigateToApps={() => setActiveTab('comedians')} 
+                onNavigateToFeedbacks={() => setActiveTab('feedbacks')}
+              />
+            </section>
+          )}
+        </div>
+      </main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 w-full h-20 bg-surface-container-low border-t border-[rgba(255,255,255,0.05)] z-50 px-2 flex justify-around items-center pb-safe">
+        {navLinks.map((link) => {
+          if (link.id === 'cms') {
+            return (
+              <div key={link.id} className="relative -top-5">
+                <button 
+                  onClick={() => setActiveTab('cms')}
+                  className={`w-14 h-14 rounded-xl shadow-[0_8px_16px_rgba(255,107,26,0.3)] flex items-center justify-center hover:scale-95 active:scale-90 transition-transform ${
+                    activeTab === 'cms' ? 'bg-primary-container text-on-primary-container' : 'bg-[#2a2a2a] text-on-surface'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[28px]" style={{fontVariationSettings: activeTab === 'cms' ? "'FILL' 1" : "'FILL' 0"}}>{link.icon}</span>
+                </button>
+              </div>
+            );
+          }
+          return (
+            <button 
+              key={link.id}
+              onClick={() => setActiveTab(link.id as any)}
+              className={`flex flex-col items-center justify-center min-w-[52px] h-16 gap-1 transition-colors shrink-0 ${
+                activeTab === link.id ? 'text-primary-container' : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[24px]" style={{fontVariationSettings: activeTab === link.id ? "'FILL' 1" : "'FILL' 0"}}>{link.icon}</span>
+              <span className="text-[10px] font-label-caps uppercase tracking-wider">{link.short}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Complimentary Booking Modal */}
+      {showCompModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-sm px-4">
+          <div className="bg-[#131313] brutalist-border rounded-xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-headline-md font-bold text-[#e5e2e1] mb-2 uppercase tracking-wide">Complimentary Booking</h2>
+            <p className="text-xs text-[#e5e2e1]/70 mb-6">Create a free booking for a guest.</p>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Full Name</label>
+                <input
+                  type="text"
+                  value={compForm.fullName}
+                  onChange={e => setCompForm(p => ({ ...p, fullName: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="Guest full name"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Email</label>
+                <input
+                  type="email"
+                  value={compForm.email}
+                  onChange={e => setCompForm(p => ({ ...p, email: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="guest@email.com"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Phone</label>
+                <div className="flex items-stretch bg-[#0e0e0e] brutalist-border rounded-lg focus-within:border-primary-container transition-colors overflow-hidden">
+                  <div className="flex items-center gap-2 pl-3 pr-2 border-r border-[rgba(255,255,255,0.05)] bg-white/[0.02] text-white/50 select-none">
+                    <span className="material-symbols-outlined text-[16px]">phone</span>
+                    <span className="font-label-caps text-xs pt-[1px]">+91</span>
+                  </div>
+                  <input
+                    type="tel"
+                    value={compForm.phone}
+                    onChange={e => setCompForm(p => ({ ...p, phone: e.target.value.replace(/^\+91/, '').replace(/[^0-9]/g, '').slice(0, 10) }))}
+                    className="w-full bg-transparent px-3 py-3 focus:outline-none text-sm border-none placeholder-white/20 focus:ring-0"
+                    placeholder="XXXXXXXXXX"
+                    maxLength={10}
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Tickets</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={compForm.numberOfTickets}
+                  onChange={e => setCompForm(p => ({ ...p, numberOfTickets: Number(e.target.value) }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCompModal(false)}
+                className="flex-1 brutalist-border text-[#e5e2e1]/70 rounded-lg font-headline-sm text-sm h-12 hover:bg-white/5 transition-colors tracking-widest uppercase"
+              >
+                CANCEL
               </button>
               <button
-                onClick={handleResetUserPassword}
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                onClick={handleCreateCompBooking}
+                className="flex-1 bg-primary-container text-[#0e0e0e] rounded-lg font-headline-sm text-sm h-12 hover:opacity-90 transition-opacity tracking-widest uppercase"
               >
-                Reset Password
+                CREATE
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Add Comedian Modal */}
+      {showAddComedianModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-sm px-4 overflow-y-auto py-10">
+          <div className="bg-[#131313] brutalist-border rounded-xl p-6 w-full max-w-md my-auto">
+            <h2 className="text-xl font-headline-md font-bold text-[#e5e2e1] mb-2 uppercase tracking-wide">{comedianForm.id ? 'Edit Comedian' : 'Add Comedian'}</h2>
+            <p className="text-xs text-[#e5e2e1]/70 mb-6">Manually {comedianForm.id ? 'edit' : 'create'} a comedian profile.</p>
+            <form onSubmit={handleSaveComedian} className="space-y-4 mb-6">
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Full Name / Stage Name *</label>
+                <input
+                  type="text"
+                  value={comedianForm.username}
+                  onChange={e => setComedianForm(p => ({ ...p, username: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="John Doe"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Email *</label>
+                <input
+                  type="email"
+                  value={comedianForm.email}
+                  onChange={e => setComedianForm(p => ({ ...p, email: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="comedian@email.com"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Phone</label>
+                <div className="flex items-stretch bg-[#0e0e0e] brutalist-border rounded-lg focus-within:border-primary-container transition-colors overflow-hidden">
+                  <div className="flex items-center gap-2 pl-3 pr-2 border-r border-[rgba(255,255,255,0.05)] bg-white/[0.02] text-white/50 select-none">
+                    <span className="material-symbols-outlined text-[16px]">phone</span>
+                    <span className="font-label-caps text-xs pt-[1px]">+91</span>
+                  </div>
+                  <input
+                    type="tel"
+                    value={comedianForm.phone}
+                    onChange={e => setComedianForm(p => ({ ...p, phone: e.target.value.replace(/^\+91/, '').replace(/[^0-9]/g, '').slice(0, 10) }))}
+                    className="w-full bg-transparent px-3 py-3 focus:outline-none text-sm border-none placeholder-white/20 focus:ring-0"
+                    placeholder="XXXXXXXXXX"
+                    maxLength={10}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Speciality / Art Form *</label>
+                <input
+                  type="text"
+                  value={comedianForm.speciality}
+                  onChange={e => setComedianForm(p => ({ ...p, speciality: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="e.g. Stand-up, Improv"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Tagline</label>
+                <input
+                  type="text"
+                  value={comedianForm.tagline}
+                  onChange={e => setComedianForm(p => ({ ...p, tagline: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="A quick funny quote..."
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Instagram URL</label>
+                <input
+                  type="url"
+                  value={comedianForm.instagramUrl}
+                  onChange={e => setComedianForm(p => ({ ...p, instagramUrl: e.target.value }))}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors"
+                  placeholder="https://instagram.com/..."
+                />
+              </div>
+              
+              <div>
+                <label className="block text-[10px] font-label-caps text-[#e5e2e1]/70 mb-1 uppercase">Profile Image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => {
+                    if (e.target.files && e.target.files[0]) {
+                      setComedianForm(p => ({ ...p, imageFile: e.target.files![0] }));
+                    }
+                  }}
+                  className="w-full bg-[#0e0e0e] px-4 py-3 brutalist-border rounded-lg focus:outline-none focus:border-primary-container text-sm transition-colors text-[#e5e2e1]"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="isFeatured"
+                  checked={comedianForm.isFeatured}
+                  onChange={e => setComedianForm(p => ({ ...p, isFeatured: e.target.checked }))}
+                  className="w-4 h-4 rounded border-white/20 bg-[#0e0e0e] text-primary-container focus:ring-primary-container focus:ring-offset-[#131313]"
+                />
+                <label htmlFor="isFeatured" className="text-sm text-[#e5e2e1]/90">
+                  Feature on Homepage
+                </label>
+              </div>
+              
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddComedianModal(false);
+                    setComedianForm({ username: '', email: '', phone: '', speciality: '', tagline: '', instagramUrl: '', isFeatured: false, imageFile: null });
+                  }}
+                  className="flex-1 brutalist-border text-[#e5e2e1]/70 rounded-lg font-headline-sm text-sm h-12 hover:bg-white/5 transition-colors tracking-widest uppercase"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-primary-container text-[#0e0e0e] rounded-lg font-headline-sm text-sm h-12 hover:opacity-90 transition-opacity tracking-widest uppercase"
+                >
+                  {comedianForm.id ? 'SAVE CHANGES' : 'ADD COMEDIAN'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+}
+

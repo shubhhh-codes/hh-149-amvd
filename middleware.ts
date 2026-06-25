@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 
@@ -12,9 +12,12 @@ export default withAuth(
     const path = req.nextUrl.pathname;
     const session = req.nextauth.token;
 
+    // Force Vercel CLI to print every request live in the terminal
+    console.log(`[Vercel Terminal] ⚡ ${req.method} ${path}`);
+
     if (path.startsWith('/admin')) {
-      if (!session?.email || session.email !== 'admin@humorshub.com') {
-        return NextResponse.redirect(new URL('/', req.url));
+      if (session?.role !== 'admin') {
+        return NextResponse.redirect(new URL('/auth/login', req.url));
       }
     }
 
@@ -24,24 +27,25 @@ export default withAuth(
     callbacks: {
       authorized: ({ req, token }) => {
         if (req.nextUrl.pathname.startsWith('/admin')) {
-          return token?.email === 'admin@humorshub.com';
+          return token?.role === 'admin';
         }
-        return !!token;
+        return true;
       },
     },
     pages: {
-      signIn: '/auth/signin',
+      signIn: '/auth/login',
     },
   }
 );
 
 export const config = {
   matcher: [
-    '/dashboard',
-    '/profile',
-    '/admin',
-    '/dashboard/:path*',
-    '/profile/:path*',
-    '/admin/:path*',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
-}; 
+};

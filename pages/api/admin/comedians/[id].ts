@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -15,8 +15,8 @@ export default async function handler(
 ) {
   try {
     const session = await getServerSession(req, res, authOptions);
-    
-    if (!session?.user?.email || session.user.email !== 'admin@humorshub.com') {
+
+    if (session?.user?.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -29,22 +29,50 @@ export default async function handler(
     const db = client.db();
 
     if (req.method === 'PUT') {
-      const { status } = req.body;
-      
-      if (!['pending', 'approved', 'declined'].includes(status)) {
-        return res.status(400).json({ message: 'Invalid status' });
+      const {
+        status,
+        name,
+        speciality,
+        tagline,
+        instagramUrl,
+        photoId,
+        displayOrder,
+        isFeatured
+      } = req.body;
+
+      const updateData: any = {
+        updatedAt: new Date()
+      };
+
+      // Get user ObjectId for audit trailing
+      const adminUser = await db.collection('users').findOne({ email: session.user.email });
+      if (adminUser) {
+        updateData['comedianProfile.updatedBy'] = adminUser._id;
+        updateData['comedianProfile.updatedAt'] = new Date();
       }
 
+      if (status !== undefined) {
+        if (!['pending', 'approved', 'declined'].includes(status)) {
+          return res.status(400).json({ message: 'Invalid status' });
+        }
+        updateData['comedianProfile.status'] = status;
+      }
+
+      if (name !== undefined) updateData.username = name;
+      if (speciality !== undefined) updateData['comedianProfile.speciality'] = speciality;
+      if (tagline !== undefined) updateData['comedianProfile.tagline'] = tagline;
+      if (instagramUrl !== undefined) updateData['comedianProfile.instagramUrl'] = instagramUrl;
+      if (photoId !== undefined) updateData['comedianProfile.photoId'] = photoId ? new ObjectId(photoId) : null;
+      if (displayOrder !== undefined) updateData['comedianProfile.displayOrder'] = displayOrder;
+      if (isFeatured !== undefined) updateData['comedianProfile.isFeatured'] = isFeatured;
+
       const result = await db.collection('users').updateOne(
-        { 
+        {
           _id: new ObjectId(id),
-          isComedian: true 
+          isComedian: true
         },
-        { 
-          $set: { 
-            'comedianProfile.status': status,
-            updatedAt: new Date()
-          } 
+        {
+          $set: updateData
         }
       );
 
@@ -52,11 +80,22 @@ export default async function handler(
         return res.status(404).json({ message: 'Comedian not found' });
       }
 
-      if (result.modifiedCount === 0) {
-        return res.status(400).json({ message: 'Status update failed' });
+      try { await res.revalidate('/'); } catch (err) { console.error('Failed to revalidate /:', err); }
+      return res.status(200).json({ message: 'Comedian updated successfully' });
+    }
+
+    if (req.method === 'DELETE') {
+      const result = await db.collection('users').deleteOne({
+        _id: new ObjectId(id),
+        isComedian: true
+      });
+
+      if (result.deletedCount === 0) {
+        return res.status(404).json({ message: 'Comedian not found' });
       }
 
-      return res.status(200).json({ message: 'Comedian status updated successfully' });
+      try { await res.revalidate('/'); } catch (err) { console.error('Failed to revalidate /:', err); }
+      return res.status(200).json({ message: 'Comedian deleted successfully' });
     }
 
     return res.status(405).json({ message: 'Method not allowed' });

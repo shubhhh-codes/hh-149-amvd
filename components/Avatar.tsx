@@ -1,6 +1,7 @@
+import React from 'react';
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 import Image from 'next/image';
@@ -41,7 +42,7 @@ export default function Avatar({ src, name, size = 'md', className = '' }: Avata
       hash = name.charCodeAt(i) + ((hash << 5) - hash);
     }
     return Math.abs(hash % colors.length);
-  }, [name]);
+  }, [name, colors.length]);
 
   if (src) {
     return (
@@ -57,7 +58,7 @@ export default function Avatar({ src, name, size = 'md', className = '' }: Avata
   }
 
   return (
-    <div 
+    <div
       className={`
         ${sizeClasses[size]} 
         ${colors[colorIndex]} 

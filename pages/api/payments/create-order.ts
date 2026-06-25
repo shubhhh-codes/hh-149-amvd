@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Razorpay from 'razorpay';
 
+import clientPromise from '../../../lib/mongodb';
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -25,19 +27,49 @@ export default async function handler(
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    const { numberOfTickets } = req.body;
+    const { numberOfTickets, bookingId, cart } = req.body;
 
     if (!numberOfTickets || numberOfTickets < 1) {
       return res.status(400).json({ message: 'Invalid number of tickets' });
     }
 
-    const amount = numberOfTickets * 14900; // ₹149 per ticket in paise
+    if (!cart || !Array.isArray(cart) || cart.length === 0) {
+      return res.status(400).json({ message: 'Cart is empty' });
+    }
+
+    // Fetch dynamic ticket tier from CMS
+    const client = await clientPromise;
+    const DEFAULT_TIERS = [
+      { key: 'solo', name: 'Solo Pass', label: 'SOLO', price: 499, seats: 1, badge: null, displayOrder: 1 },
+      { key: 'duo', name: 'Duo Pass', label: 'DUO', price: 899, seats: 2, badge: 'MOST POPULAR', displayOrder: 2 },
+      { key: 'squad', name: 'Squad Pass', label: 'SQUAD', price: 1599, seats: 4, badge: null, displayOrder: 3 },
+    ];
+
+    const db = client.db();
+    const settings = await db.collection('settings').findOne({ type: 'ticket-tiers' });
+    let tiers = settings?.tiers || [];
+    
+    if (tiers.length === 0) {
+      tiers = DEFAULT_TIERS;
+    }
+
+    let calculatedTotal = 0;
+    for (const item of cart) {
+      const tier = tiers.find((t: any) => t.key === item.tierKey);
+      if (!tier) {
+        return res.status(400).json({ message: `Invalid or missing ticket tier: ${item.tierKey}` });
+      }
+      const itemUnits = Number(item.units) || 1;
+      calculatedTotal += itemUnits * tier.price;
+    }
+
+    const amount = calculatedTotal * 100; // total price in paise
     const currency = 'INR';
 
     const options = {
       amount,
       currency,
-      receipt: `receipt_${Date.now()}`,
+      receipt: bookingId || `receipt_${Date.now()}`,
     };
 
     console.log('Creating Razorpay order with options:', {

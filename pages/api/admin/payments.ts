@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import clientPromise from '../../../lib/mongodb';
-import { ObjectId, Document } from 'mongodb';
+import { Document } from 'mongodb';
 
 export default async function handler(
   req: NextApiRequest,
@@ -11,7 +11,7 @@ export default async function handler(
   try {
     const session = await getServerSession(req, res, authOptions);
 
-    if (!session?.user?.email || session.user.email !== 'admin@humorshub.com') {
+    if (session?.user?.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -19,79 +19,19 @@ export default async function handler(
     const db = client.db();
 
     if (req.method === 'GET') {
-      // Get all payments with user and booking details
+      // Get all payments (bookingDetails are already embedded in the payment document now)
       const payments = await db.collection('payments')
-        .aggregate([
-          {
-            $lookup: {
-              from: 'users',
-              let: { userId: { $toObjectId: '$userId' } },
-              pipeline: [
-                {
-                  $match: {
-                    $expr: { $eq: ['$_id', '$$userId'] }
-                  }
-                },
-                {
-                  $project: {
-                    username: 1,
-                    email: 1
-                  }
-                }
-              ],
-              as: 'user'
-            }
-          },
-          {
-            $lookup: {
-              from: 'bookings',
-              let: { bookingId: { $toObjectId: '$bookingId' } },
-              pipeline: [
-                {
-                  $match: {
-                    $expr: { $eq: ['$_id', '$$bookingId'] }
-                  }
-                }
-              ],
-              as: 'booking'
-            }
-          },
-          {
-            $unwind: {
-              path: '$user',
-              preserveNullAndEmptyArrays: true
-            }
-          },
-          {
-            $unwind: {
-              path: '$booking',
-              preserveNullAndEmptyArrays: true
-            }
-          },
-          {
-            $addFields: {
-              bookingDetails: {
-                $cond: {
-                  if: { $ifNull: ['$bookingDetails', false] },
-                  then: '$bookingDetails',
-                  else: {
-                    numberOfTickets: '$booking.numberOfTickets',
-                    fullName: '$booking.fullName'
-                  }
-                }
-              }
-            }
-          },
-          {
-            $sort: { createdAt: -1 }
-          }
-        ]).toArray();
+        .find({})
+        .sort({ createdAt: -1 })
+        .toArray();
 
       console.log('Fetched payments:', payments.length);
 
       // Calculate statistics
       const stats = {
-        totalAmount: payments.reduce((sum: number, p: Document) => sum + ((p.amount as number) || 0), 0),
+        totalAmount: payments
+          .filter((p: Document) => p.status === 'completed')
+          .reduce((sum: number, p: Document) => sum + ((p.amount as number) || 0), 0),
         totalPayments: payments.length,
         successfulPayments: payments.filter((p: Document) => p.status === 'completed').length,
         failedPayments: payments.filter((p: Document) => p.status !== 'completed').length,

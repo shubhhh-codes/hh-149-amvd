@@ -1,6 +1,6 @@
 /**
  * @copyright (c) 2024 - Present
- * @author github.com/KunalG932
+ * @author github.com/shubhhh-codes
  * @license MIT
  */
 import { MongoClient } from 'mongodb';
@@ -54,6 +54,22 @@ async function initializeDatabase() {
       { key: { status: 1 } },
       { key: { createdAt: -1 } },
       { key: { userId: 1 } }
+    ]);
+
+    // Create homepage_content indexes
+    await db.collection('homepage_content').createIndexes([
+      { key: { type: 1 } },
+      { key: { displayOrder: 1 } },
+      { key: { isVisible: 1 } },
+      { key: { isDeleted: 1 } },
+    ]);
+
+    // Ensure users index for comedians
+    await db.collection('users').createIndexes([
+      { key: { isComedian: 1 } },
+      { key: { 'comedianProfile.status': 1 } },
+      { key: { 'comedianProfile.isFeatured': 1 } },
+      { key: { 'comedianProfile.displayOrder': 1 } }
     ]);
 
     console.log('Database initialized successfully');

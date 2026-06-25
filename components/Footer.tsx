@@ -1,160 +1,109 @@
-import { motion } from 'framer-motion';
-import { 
-  Instagram, 
-  Mail, 
-  Ticket, 
-  Mic, 
-  BarChart, 
-  ScrollText, 
-  Calendar 
-} from 'lucide-react';
-import { FaWhatsapp } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { FaInstagram, FaEnvelope, FaWhatsapp } from 'react-icons/fa';
 
 export default function Footer() {
-  const socialLinks = [
-    {
-      icon: Instagram,
-      href: "https://www.instagram.com/the.humourshub",
-      label: "Follow on Instagram",
-      color: "text-pink-500"
-    },
-    {
-      icon: FaWhatsapp,
-      href: "https://chat.whatsapp.com/JrExMaZiT6F2LmylOuU8NL",
-      label: "Contact on WhatsApp",
-      color: "text-green-500"
-    }
-  ];
+  const [footerConfig, setFooterConfig] = useState<any>(null);
 
-  const quickLinks = [
-    { 
-      icon: Ticket, 
-      href: "/book-tickets", 
-      label: "Book Tickets" 
-    },
-    { 
-      icon: Mic, 
-      href: "/book-tickets?type=comedian", 
-      label: "Join as Comedian" 
-    },
-    { 
-      icon: BarChart, 
-      href: "/dashboard", 
-      label: "Dashboard" 
-    },
-    { 
-      icon: ScrollText, 
-      href: "/policies", 
-      label: "Terms & Policies" 
-    }
-  ];
+  useEffect(() => {
+    fetch('/api/cms/footer')
+      .then(res => res.json())
+      .then(data => {
+        if (data.content) {
+          setFooterConfig(data.content.metadata);
+        }
+      })
+      .catch(err => console.error('Failed to load footer settings:', err));
+  }, []);
+
+  const showInstagram = footerConfig ? footerConfig.showInstagram : true;
+  const showWhatsapp = footerConfig ? footerConfig.showWhatsapp : true;
+  const showEmail = footerConfig ? footerConfig.showEmail : true;
+  const instagramUrl = footerConfig?.instagramUrl || '';
+  const whatsappUrl = footerConfig?.whatsappUrl || '';
+  const emailAddress = footerConfig?.emailAddress || '';
 
   return (
-    <footer className="bg-gradient-to-b from-gray-900 to-black text-white relative overflow-hidden">
-      {/* Subtle Background Decorations */}
-      <div className="absolute top-0 left-0 right-0 bottom-0 opacity-10">
-        <div className="absolute w-96 h-96 bg-purple-500 rounded-full -top-32 -left-32 blur-3xl"></div>
-        <div className="absolute w-96 h-96 bg-pink-500 rounded-full -bottom-32 -right-32 blur-3xl"></div>
-      </div>
-
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 relative z-10"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-          {/* About Section */}
-          <motion.div 
-            whileHover={{ scale: 1.05 }}
-            className="space-y-4"
-          >
-            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <Calendar className="text-purple-400" />
-              About Us
-            </h3>
-            <p className="text-gray-300 leading-relaxed">
-              Humors Hub brings you the best comedy entertainment in Junagadh. 
-              Join us for unforgettable nights of laughter, connection, and pure joy!
-            </p>
-          </motion.div>
-
-          {/* Quick Links */}
-          <motion.div 
-            whileHover={{ scale: 1.05 }}
-            className="space-y-4"
-          >
-            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <ScrollText className="text-purple-400" />
-              Quick Links
-            </h3>
-            <ul className="space-y-3">
-              {quickLinks.map((link, index) => (
-                <li key={index}>
-                  <Link 
-                    href={link.href} 
-                    className="group flex items-center gap-3 text-gray-300 hover:text-white transition-all duration-300"
-                  >
-                    <link.icon 
-                      className="text-purple-400 group-hover:text-purple-300 transition-colors" 
-                      size={20} 
-                    />
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
+    <footer className="bg-[#0A0A0A] border-t border-white/[0.07] font-body">
+      <div className="max-w-[1280px] mx-auto px-margin-mobile lg:px-margin-desktop py-16 md:py-24">
+        {/* Top Section: 4-Column Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-gutter gap-y-12 mb-20">
+          {/* Column 1: Brand Info */}
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <h3 className="font-display font-bold text-2xl lg:text-3xl tracking-tighter uppercase text-white/90">The Humours Hub</h3>
+              <p className="text-white/45 text-sm lg:text-base leading-relaxed">
+                Ahmedabad's Own. <br className="hidden lg:block" /> A bridge between the local urban community and emerging artists.
+              </p>
+            </div>
+            <div className="flex items-center space-x-5 pt-2">
+              {showInstagram && instagramUrl && (
+                <a aria-label="Instagram" className="text-white/45 hover:text-primary-container transition-all duration-300 transform hover:-translate-y-1" href={instagramUrl} target="_blank" rel="noopener noreferrer">
+                  <FaInstagram className="text-xl" />
+                </a>
+              )}
+              {showWhatsapp && whatsappUrl && (
+                <a aria-label="WhatsApp" className="text-white/45 hover:text-primary-container transition-all duration-300 transform hover:-translate-y-1" href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                  <FaWhatsapp className="text-xl" />
+                </a>
+              )}
+              {showEmail && emailAddress && (
+                <a aria-label="Email" className="text-white/45 hover:text-primary-container transition-all duration-300 transform hover:-translate-y-1" href={`mailto:${emailAddress}`}>
+                  <FaEnvelope className="text-xl" />
+                </a>
+              )}
+            </div>
+          </div>
+          {/* Column 2: Explore */}
+          <div className="space-y-6">
+            <h4 className="font-display font-bold text-sm uppercase tracking-[0.2em] text-primary-container">Explore</h4>
+            <ul className="space-y-4 text-sm lg:text-base">
+              <li><Link className="text-white/45 hover:text-white transition-colors" href="/">Home</Link></li>
+              <li><Link className="text-white/45 hover:text-white transition-colors" href="/shows">Shows</Link></li>
+              <li><Link className="text-white/45 hover:text-white transition-colors" href="/gallery">Gallery</Link></li>
+              <li><Link className="text-white/45 hover:text-white transition-colors" href="/about">About Us</Link></li>
             </ul>
-          </motion.div>
-
-          {/* Contact Section */}
-          <motion.div 
-            whileHover={{ scale: 1.05 }}
-            className="space-y-4"
-          >
-            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <Mail className="text-purple-400" />
-              Contact Us
-            </h3>
-            <ul className="space-y-3">
-              {socialLinks.map((social, index) => (
-                <li key={index}>
-                  <a
-                    href={social.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex items-center gap-3 text-gray-300 hover:text-white transition-all duration-300"
-                  >
-                    <social.icon 
-                      className={`${social.color} group-hover:scale-110 transition-transform`} 
-                      size={20} 
-                    />
-                    {social.label}
-                  </a>
-                </li>
-              ))}
-              <li className="flex items-center gap-3 text-gray-300">
-                <Mail className="text-purple-400" size={20} />
-                shubhammvaghela999@gmail.com
-              </li>
+          </div>
+          {/* Column 3: Community */}
+          <div className="space-y-6">
+            <h4 className="font-display font-bold text-sm uppercase tracking-[0.2em] text-primary-container">Community</h4>
+            <ul className="space-y-4 text-sm lg:text-base">
+              <li><Link className="text-white/45 hover:text-white transition-colors" href="/perform-with-us">Perform With Us</Link></li>
+              <li><Link className="text-white/45 hover:text-white transition-colors" href="/contact">Contact</Link></li>
+              <li><Link className="text-white/45 hover:text-white transition-colors" href="/support">Support</Link></li>
             </ul>
-          </motion.div>
+          </div>
+          {/* Column 4: Newsletter & Legal */}
+          <div className="space-y-8">
+            <div className="space-y-6">
+              <h4 className="font-display font-bold text-sm uppercase tracking-[0.2em] text-primary-container">Legal</h4>
+              <ul className="space-y-4 text-sm lg:text-base">
+                {/* <li><Link className="text-white/45 hover:text-white transition-colors" href="/policies">Privacy Policy</Link></li> */}
+                {/* <li><Link className="text-white/45 hover:text-white transition-colors" href="/policies">Terms of Service</Link></li> */}
+                <li><Link className="text-white/45 hover:text-white transition-colors" href="/policies">Policies & Terms
+                </Link></li>
+              </ul>
+            </div>
+          </div>
         </div>
-
-        {/* Footer Bottom */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="border-t border-gray-800 mt-12 pt-8 text-center"
-        >
-          <p className="text-gray-400 flex items-center justify-center gap-2">
-            {new Date().getFullYear()} Humors Hub. 
-            All rights reserved. 
-            <span className="text-red-400">❤️</span>
+        {/* Bottom Bar: Developer Credit & Copyright */}
+        <div className="pt-10 border-t border-white/[0.05] flex flex-col md:flex-row justify-between items-center gap-6">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-white/30 text-center md:text-left">
+            © 2024 The Humours Hub. Cultivating Culture in Ahmedabad.
           </p>
-        </motion.div>
-      </motion.div>
+          <div className="group relative flex justify-center md:justify-start">
+            <Link className="inline-flex items-center gap-x-1.5 md:gap-x-2 px-3 md:px-4 py-2 rounded-full border border-white/10 bg-white/[0.02] transition-all duration-500 ease-out hover:border-primary-container/50 hover:bg-primary-container/[0.05] hover:drop-shadow-[0_0_15px_rgba(255,107,26,0.2)] whitespace-nowrap" href="https://shubhhh.in" target="_blank" rel="noopener noreferrer">
+              <span className="text-[9px] md:text-[10px] uppercase tracking-wider md:tracking-[0.2em] text-white/45 font-medium">
+                Crafted with passion by
+              </span>
+              <span className="text-[10px] md:text-[11px] uppercase tracking-widest font-bold bg-gradient-to-r from-white via-primary-container to-white bg-[length:200%_auto] bg-clip-text text-transparent group-hover:from-primary-container group-hover:to-white" style={{ animation: 'shimmer 3s linear infinite' }}>
+                Shubham Vaghela
+              </span>
+            </Link>
+            <div className="absolute inset-0 rounded-full bg-primary-container/5 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+          </div>
+        </div>
+      </div>
     </footer>
   );
 }
