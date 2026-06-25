@@ -81,7 +81,11 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
   const totalAmount = selectedTier ? selectedTier.price * units : 0;
   const totalSeats = selectedTier ? selectedTier.seats * units : 1;
   const venueDisplay = tiersData?.venue || 'The Humours Hub, Ahmedabad';
-  const dateDisplay = tiersData?.date || 'Saturday, 8:30 PM';
+  
+  // Format the date/time string from the CMS
+  const cmsDate = tiersData?.date || 'Saturday';
+  const cmsTime = tiersData?.time || '8:30 PM';
+  const dateDisplay = `${cmsDate}, ${cmsTime}`;
 
   const handleAction = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -203,10 +207,8 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
   return (
     <div className="antialiased min-h-screen flex flex-col bg-[#0A0A0A] font-['DM_Sans',sans-serif] text-white">
       <Head>
-        <title>Book Tickets - Conversion Optimized - The Humours Hub</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Hind:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+        <title>The Humours Hub</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, interactive-widget=overlays-content" />
       </Head>
 
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
@@ -232,9 +234,20 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
             
             {/* Header & Info */}
             <header className="text-center md:text-left mb-6">
-              <h1 className="font-['Hind',sans-serif] text-2xl md:text-4xl font-bold text-white mb-2 md:mb-8 leading-tight">Secure Your Spot</h1>
+              <h1 className="font-['Hind',sans-serif] text-2xl md:text-4xl font-bold text-white mb-4 md:mb-8 leading-tight">Secure Your Spot</h1>
               
-              <div className="grid grid-cols-3 gap-3 md:gap-6 items-end mb-8 mt-6 md:mt-0 px-1 md:px-0">
+              <div className="flex flex-col gap-2 mb-6 text-sm font-['DM_Sans',sans-serif] md:hidden">
+                <div className="flex items-center justify-center gap-2 bg-[#141414] rounded-md py-2 border border-white/5">
+                  <span className="material-symbols-outlined text-[#FF6B1A] text-sm">location_on</span>
+                  <span className="font-bold text-[#a3a3a3]">{venueDisplay}</span>
+                </div>
+                <div className="flex items-center justify-center gap-2 bg-[#141414] rounded-md py-2 border border-white/5">
+                  <span className="material-symbols-outlined text-[#FF6B1A] text-sm">calendar_today</span>
+                  <span className="font-bold text-[#a3a3a3]">{dateDisplay}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 md:gap-6 items-end mb-8 md:mt-0 px-1 md:px-0">
                 {tiers.map((tier: TicketTier) => {
                   const isActive = selectedTier?.key === tier.key;
                   return (
@@ -264,46 +277,10 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
                 })}
               </div>
 
-              <div className="flex flex-col gap-2 mt-4 text-sm font-['DM_Sans',sans-serif] md:hidden">
-                <div className="flex items-center justify-center gap-2 bg-[#141414] rounded-md py-2 border border-white/5">
-                  <span className="material-symbols-outlined text-[#FF6B1A] text-sm">location_on</span>
-                  <span className="font-bold text-[#a3a3a3]">{venueDisplay}</span>
-                </div>
-                <div className="flex items-center justify-center gap-2 bg-[#141414] rounded-md py-2 border border-white/5">
-                  <span className="material-symbols-outlined text-[#FF6B1A] text-sm">calendar_today</span>
-                  <span className="font-bold text-[#a3a3a3]">{dateDisplay}</span>
-                </div>
-              </div>
             </header>
 
             {/* View 2: Form & Summary */}
             <div className="block">
-              {/* Accordion Summary */}
-              <div className="mb-4 bg-[#141414] border border-white/10 rounded-lg overflow-hidden md:hidden">
-                <button 
-                  className="w-full px-4 py-3 flex justify-between items-center text-sm font-bold bg-[#111]" 
-                  onClick={() => setShowSummaryDetails(!showSummaryDetails)}
-                >
-                  <span>Total: <span className="text-[#FF6B1A]">₹{totalAmount}</span></span>
-                  <span className="text-xs text-[#a3a3a3] flex items-center gap-1">
-                    View Details <span className="material-symbols-outlined text-[14px]">
-                      {showSummaryDetails ? 'arrow_drop_up' : 'arrow_drop_down'}
-                    </span>
-                  </span>
-                </button>
-                {showSummaryDetails && (
-                  <div className="px-4 py-3 bg-[#141414] border-t border-white/5 text-xs text-[#a3a3a3] flex flex-col gap-2">
-                    <div className="flex justify-between">
-                      <span>Pass Type</span>
-                      <span className="text-white font-bold">{selectedTier?.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Quantity</span>
-                      <span className="text-white font-bold">{units}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
 
               {/* Compact Form */}
               <div className="bg-[#141414] border border-white/10 rounded-xl p-4 md:p-6 relative overflow-hidden">
@@ -320,6 +297,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
                 <div className="flex flex-col gap-3 md:gap-5 relative z-10">
                   <input 
                     aria-label="Full Name"
+                    autoComplete="name"
                     className="w-full bg-[#080808] border border-white/10 rounded-md md:rounded-lg py-2 md:py-3 px-3 md:px-4 text-white focus:border-[#FF6B1A] outline-none text-sm md:text-base font-['DM_Sans',sans-serif] transition-colors" 
                     placeholder="Full Name" 
                     type="text" 
@@ -328,18 +306,23 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
                   />
                   <input 
                     aria-label="Email Address"
+                    autoComplete="email"
                     className="w-full bg-[#080808] border border-white/10 rounded-md md:rounded-lg py-2 md:py-3 px-3 md:px-4 text-white focus:border-[#FF6B1A] outline-none text-sm md:text-base font-['DM_Sans',sans-serif] transition-colors" 
                     placeholder="Email Address" 
                     type="email" 
                     value={customerEmail}
                     onChange={e => setEmail(e.target.value)}
                   />
-                  <div className="flex gap-2 md:gap-4">
-                    <div className="bg-[#080808] border border-white/10 rounded-md md:rounded-lg py-2 md:py-3 px-2 md:px-4 text-[#a3a3a3] text-sm md:text-base shrink-0 flex items-center select-none">+91</div>
+                  <div className="flex items-stretch bg-[#080808] border border-white/10 rounded-md md:rounded-lg focus-within:border-[#FF6B1A] focus-within:shadow-[0_0_0_1px_#FF6B1A] transition-all duration-300 overflow-hidden">
+                    <div className="flex items-center gap-2 pl-4 pr-3 border-r border-white/5 bg-white/[0.02] text-[#a3a3a3] select-none">
+                      <span className="material-symbols-outlined text-[20px]">phone</span>
+                      <span className="font-['DM_Sans',sans-serif] font-bold text-white/40 pt-[1px]">+91</span>
+                    </div>
                     <input 
                       aria-label="Phone Number"
-                      className="w-full bg-[#080808] border border-white/10 rounded-md md:rounded-lg py-2 md:py-3 px-3 md:px-4 text-white focus:border-[#FF6B1A] outline-none text-sm md:text-base font-['DM_Sans',sans-serif] transition-colors" 
-                      placeholder="Phone Number" 
+                      autoComplete="tel"
+                      className="w-full bg-transparent border-none py-2 md:py-3 pl-3 pr-4 font-['DM_Sans',sans-serif] text-sm md:text-base text-white placeholder-white/20 focus:outline-none focus:ring-0" 
+                      placeholder="XXXXXXXXXX" 
                       type="tel"
                       maxLength={10}
                       value={customerPhone}
@@ -416,36 +399,58 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
       </main>
 
       {/* Sticky Checkout Bar (Mobile) */}
-      <div className="fixed bottom-0 w-full bg-[#111] border-t border-white/10 p-4 pb-safe z-50 md:hidden">
+      <div className="fixed bottom-0 w-full bg-[#111] border-t border-white/10 px-4 py-3 pb-safe z-50 md:hidden">
         <div className="max-w-md mx-auto">
-          <div className="mb-4 px-1">
-            <div className="flex justify-between items-end mb-4">
-              <div className="flex flex-col gap-3">
+          {showSummaryDetails && (
+            <div className="mb-4 px-4 py-3 bg-[#141414] rounded-xl border border-white/10 text-xs text-[#a3a3a3] flex flex-col gap-2.5 shadow-2xl">
+              <div className="flex justify-between items-center">
+                <span>Pass Type</span>
+                <span className="text-white font-bold">{selectedTier?.name}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Quantity</span>
+                <span className="text-white font-bold">{units}</span>
+              </div>
+              <div className="flex justify-between items-center mt-1 pt-2.5 border-t border-white/10">
+                <span>Total Amount</span>
+                <span className="text-[#FF6B1A] font-bold text-sm">₹{totalAmount}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="mb-3 px-1">
+            <div className="flex justify-between items-start mb-2">
+              <div className="flex flex-col gap-1.5">
                 <span className="font-['Hind',sans-serif] text-[10px] font-bold tracking-wider text-[#FF6B1A] uppercase">Number of Tickets</span>
                 <div className="flex items-center gap-4">
-                  <button onClick={() => setUnits(u => Math.max(1, u - 1))} disabled={units <= 1} className="w-10 h-10 rounded bg-[#141414] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all disabled:opacity-50 text-white">
-                    <span className="material-symbols-outlined text-[#a3a3a3]">remove</span>
+                  <button onClick={() => setUnits(u => Math.max(1, u - 1))} disabled={units <= 1} className="w-8 h-8 rounded bg-[#141414] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all disabled:opacity-50 text-white">
+                    <span className="material-symbols-outlined text-[#a3a3a3] text-sm">remove</span>
                   </button>
                   <span className="font-['Hind',sans-serif] text-lg font-bold w-4 text-center text-white">{units}</span>
-                  <button onClick={() => setUnits(u => Math.min(10, u + 1))} disabled={units >= 10} className="w-10 h-10 rounded bg-[#141414] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all disabled:opacity-50 text-white">
-                    <span className="material-symbols-outlined text-[#a3a3a3]">add</span>
+                  <button onClick={() => setUnits(u => Math.min(10, u + 1))} disabled={units >= 10} className="w-8 h-8 rounded bg-[#141414] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all disabled:opacity-50 text-white">
+                    <span className="material-symbols-outlined text-[#a3a3a3] text-sm">add</span>
                   </button>
                 </div>
               </div>
-              <div className="text-right">
-                <span className="font-['Hind',sans-serif] text-[10px] font-bold tracking-wider text-[#a3a3a3] uppercase block mb-1">Total Amount</span>
-                <div className="font-['Hind',sans-serif] text-2xl font-bold text-[#FF6B1A] leading-none">₹{totalAmount}</div>
-                <div className="text-[10px] text-[#a3a3a3] mt-1">₹{selectedTier?.price} per ticket</div>
+              <div className="text-right flex flex-col items-end gap-1.5">
+                <span className="font-['Hind',sans-serif] text-[10px] font-bold tracking-wider text-[#a3a3a3] uppercase block">Total Amount</span>
+                <div className="font-['Hind',sans-serif] text-xl font-bold text-[#FF6B1A] leading-none">₹{totalAmount}</div>
+                <button 
+                  onClick={() => setShowSummaryDetails(!showSummaryDetails)}
+                  className="text-[10px] text-[#a3a3a3] hover:text-white transition-colors flex items-center gap-0.5"
+                >
+                  View Details <span className="material-symbols-outlined text-[12px]">{showSummaryDetails ? 'arrow_drop_down' : 'arrow_drop_up'}</span>
+                </button>
               </div>
             </div>
             <div className="text-[10px] text-[#a3a3a3]">Maximum 10 tickets per booking</div>
-            <div className="mt-4 border-t border-white/5"></div>
+            <div className="mt-2 border-t border-white/5"></div>
           </div>
           
           <button 
             onClick={handleAction}
             disabled={isLoading || !selectedTier}
-            className="w-full bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white font-['Hind',sans-serif] font-bold py-3.5 rounded-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wide"
+            className="w-full bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white font-['Hind',sans-serif] font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wide"
           >
             {isLoading ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

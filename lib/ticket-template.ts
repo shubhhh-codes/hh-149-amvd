@@ -15,6 +15,9 @@ export interface TicketTemplateData {
   bookingType: string;        // e.g. "paid" | "complimentary"
   numberOfTickets?: number;
   qrCodeDataUri: string;      // base64 PNG data URI
+  tierName?: string;
+  units?: number;
+  price?: number;
 }
 
 export function generateTicketHtml(data: TicketTemplateData): string {
@@ -163,7 +166,7 @@ export function generateTicketHtml(data: TicketTemplateData): string {
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 14px;
     overflow: hidden;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
   }
 
   .cell {
@@ -314,12 +317,19 @@ export function generateTicketHtml(data: TicketTemplateData): string {
         </div>
       </div>
 
-      <!-- Ticket count -->
-      ${data.numberOfTickets ? `
-      <div class="count-pill">
-        <span class="count-pill-label">Tickets</span>
-        <span class="count-pill-value">${data.numberOfTickets}&times; ${data.seatType}</span>
-      </div>` : ''}
+      <!-- Order Details Grid -->
+      <div class="grid" style="margin-bottom: 24px;">
+        <div class="cell">
+          <p class="cell-label">Pass / Type</p>
+          <p class="cell-value">${data.tierName || data.seatType}</p>
+          <p class="cell-sub">${data.units ? `${data.units} Passes (${data.numberOfTickets} Seats)` : `${data.numberOfTickets} Seats`}</p>
+        </div>
+        <div class="cell">
+          <p class="cell-label">Amount Paid</p>
+          <p class="cell-value">${data.price ? `₹${data.price}` : (isComplimentary ? 'FREE' : 'N/A')}</p>
+          <p class="cell-sub">${data.bookingType.toUpperCase()} via Online</p>
+        </div>
+      </div>
 
       <!-- QR Code -->
       <div class="qr-wrap">

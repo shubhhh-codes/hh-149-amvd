@@ -130,18 +130,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .collection('homepage_content')
       .findOne({ type: 'next_show' });
 
-    const eventTitle    = nextShowDoc?.title                                   || 'The Humours Hub: Open Mic Night';
-    const eventDate     = nextShowDoc?.metadata?.date && nextShowDoc?.metadata?.month
-                            ? `${nextShowDoc.metadata.date} ${nextShowDoc.metadata.month}`
-                            : new Date(booking.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-    const eventDay      = nextShowDoc?.metadata?.day  || '';
-    const eventTime     = nextShowDoc?.metadata?.time?.split('\n')[0] || '8:00 PM';
-    const eventLocation = nextShowDoc?.metadata?.location || 'The Studio, SG Highway';
+    const tiersDoc = await db.collection('settings').findOne({ type: 'ticket-tiers' });
+    const tiers = tiersDoc?.tiers || [];
+    const tier = tiers.find((t: any) => t.key === (booking.tierKey || 'solo'));
+    const tierName = tier ? tier.name : 'Solo Pass';
+    const units = booking.units || 1;
+    const price = tier ? tier.price * units : (499 * units);
 
+    const eventTitle    = nextShowDoc?.title || 'The Humours Hub: Comedy Show';
+    
+    const eventLocation = tiersDoc?.venue || nextShowDoc?.metadata?.location || 'The Studio, SG Highway';
     const venueParts    = eventLocation.split(',').map((s: string) => s.trim());
-    const venueName     = venueParts[0]                || 'The Studio';
+    const venueName     = venueParts[0] || 'The Studio';
     const venueLocation = venueParts.slice(1).join(', ') || 'SG Highway';
-    const fullEventDate = `${eventDate}${eventDay ? ', ' + eventDay : ''}`;
+    
+    const fullEventDate = tiersDoc?.date || new Date(booking.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    const eventTime     = tiersDoc?.time || nextShowDoc?.metadata?.time?.split('\n')[0] || '8:00 PM';
 
     // ── 7. Generate QR code ──────────────────────────────────────────────────
     const qrData: QRBookingData = {
@@ -171,10 +175,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       eventTime,
       venueName,
       venueLocation,
-      seatType:        'General',
+      seatType:        tierName,
       bookingType:     booking.bookingType || 'paid',
       numberOfTickets: booking.numberOfTickets,
       qrCodeDataUri,
+      tierName,
+      units,
+      price,
     };
 
     const htmlContent = generateTicketHtml(templateData);

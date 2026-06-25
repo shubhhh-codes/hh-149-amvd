@@ -18,6 +18,7 @@ export default function RetrieveTickets() {
   const [phone, setPhone] = useState('');
   const [activeBookings, setActiveBookings] = useState<BookingItem[]>([]);
   const [cancelledBookings, setCancelledBookings] = useState<BookingItem[]>([]);
+  const [pendingBookings, setPendingBookings] = useState<BookingItem[]>([]);
   const [searched, setSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -77,6 +78,7 @@ export default function RetrieveTickets() {
 
       setActiveBookings(data.activeBookings || []);
       setCancelledBookings(data.cancelledBookings || []);
+      setPendingBookings(data.pendingBookings || []);
       setSearched(true);
 
       setTimeout(() => {
@@ -403,10 +405,18 @@ export default function RetrieveTickets() {
         {searched && (
           <div className="w-full max-w-4xl flex flex-col gap-8" id="results-section">
 
-
+            {(activeBookings.length === 0 && pendingBookings.length === 0 && cancelledBookings.length === 0) && (
+              <>
+                <h2 className="font-headline-md text-[32px] font-bold text-white border-b border-white/10 pb-4 uppercase reveal-item delay-1">BOOKINGS</h2>
+                <div className="text-center py-12 text-on-surface-variant reveal-item delay-2">
+                  <span className="material-symbols-outlined text-4xl mb-2 block">search_off</span>
+                  <p className="font-body-md text-[16px]">No bookings found for this search.</p>
+                </div>
+              </>
+            )}
 
             {/* Active Bookings */}
-            {activeBookings.length > 0 ? (
+            {activeBookings.length > 0 && (
               <>
                 <h2 className="font-headline-md text-[32px] font-bold text-white border-b border-white/10 pb-4 uppercase reveal-item delay-1">
                   ACTIVE BOOKINGS
@@ -462,13 +472,30 @@ export default function RetrieveTickets() {
                   </div>
                 ))}
               </>
-            ) : (
+            )}
+
+            {/* Pending Bookings */}
+            {pendingBookings.length > 0 && (
               <>
-                <h2 className="font-headline-md text-[32px] font-bold text-white border-b border-white/10 pb-4 uppercase reveal-item delay-1">ACTIVE BOOKINGS</h2>
-                <div className="text-center py-12 text-on-surface-variant reveal-item delay-2">
-                  <span className="material-symbols-outlined text-4xl mb-2 block">search_off</span>
-                  <p className="font-body-md text-[16px]">No active bookings found for this search.</p>
-                </div>
+                <h2 className="font-headline-md text-[32px] font-bold text-yellow-500 border-b border-white/10 pb-4 mt-8 uppercase reveal-item delay-2">
+                  PENDING BOOKINGS
+                </h2>
+                {pendingBookings.map(booking => (
+                  <div key={booking.bookingId} className="ticket-notch flex flex-col md:flex-row w-full border border-yellow-500/30 rounded-xl overflow-hidden reveal-item delay-2">
+                    <div className="p-6 md:p-8 flex-1">
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="bg-yellow-500/20 text-yellow-500 font-label-caps tracking-widest text-[12px] font-bold px-3 py-1 rounded-full">PENDING</span>
+                        <span className="text-on-surface-variant font-label-caps tracking-widest text-xs">ID: {booking.bookingId}</span>
+                      </div>
+                      <h3 className="font-headline-sm text-[24px] font-bold text-white mb-2 uppercase">{booking.fullName}</h3>
+                      <p className="font-body-md text-[16px] text-on-surface-variant flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px]">calendar_today</span>
+                        {new Date(booking.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </p>
+                      <p className="text-yellow-500/70 text-sm mt-4 font-bold border-t border-yellow-500/20 pt-4 inline-block">Payment is incomplete or still processing.</p>
+                    </div>
+                  </div>
+                ))}
               </>
             )}
 

@@ -4,6 +4,9 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 
 export default function TicketTiersManager() {
   const [tiers, setTiers] = useState<any[]>([]);
+  const [venue, setVenue] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -17,6 +20,9 @@ export default function TicketTiersManager() {
       if (res.ok) {
         const data = await res.json();
         setTiers(data.tiers || []);
+        setVenue(data.venue || '');
+        setDate(data.date || '');
+        setTime(data.time || '');
       }
     } catch (err) {
       console.error(err);
@@ -32,7 +38,7 @@ export default function TicketTiersManager() {
       const res = await fetch('/api/admin/cms/ticket-tiers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tiers: updatedTiers }),
+        body: JSON.stringify({ tiers: updatedTiers, venue, date, time }),
       });
       if (res.ok) {
         setTiers(updatedTiers);
@@ -54,15 +60,7 @@ export default function TicketTiersManager() {
     setTiers(newTiers);
   };
 
-  const addTier = () => {
-    const newTiers = [...tiers, { key: `tier-${Date.now()}`, name: 'New Tier', label: 'NEW', price: 0, seats: 1, badge: null, displayOrder: tiers.length + 1 }];
-    setTiers(newTiers);
-  };
-
-  const removeTier = (index: number) => {
-    const newTiers = tiers.filter((_, i) => i !== index);
-    setTiers(newTiers);
-  };
+  // Removed addTier and removeTier to enforce strict Solo/Duo/Squad constraints
 
   if (loading) return <LoadingSpinner />;
 
@@ -82,12 +80,27 @@ export default function TicketTiersManager() {
         </button>
       </div>
 
+      <div className="bg-[#141414] p-4 rounded-xl border border-white/10 space-y-4">
+        <h3 className="font-bold text-white/80 border-b border-white/10 pb-2 mb-4">Event Details</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="text-xs text-white/60">Venue</label>
+            <input type="text" value={venue} onChange={(e) => setVenue(e.target.value)} className="w-full bg-[#080808] p-2 rounded border border-white/10 mt-1" placeholder="e.g. The Humours Hub, Ahmedabad" />
+          </div>
+          <div>
+            <label className="text-xs text-white/60">Date</label>
+            <input type="text" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-[#080808] p-2 rounded border border-white/10 mt-1" placeholder="e.g. Saturday" />
+          </div>
+          <div>
+            <label className="text-xs text-white/60">Time</label>
+            <input type="text" value={time} onChange={(e) => setTime(e.target.value)} className="w-full bg-[#080808] p-2 rounded border border-white/10 mt-1" placeholder="e.g. 8:30 PM" />
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-4">
         {tiers.map((tier, idx) => (
           <div key={idx} className="bg-[#141414] p-4 rounded-xl border border-white/10 space-y-4 relative">
-            <button onClick={() => removeTier(idx)} className="absolute top-4 right-4 text-error">
-              <span className="material-symbols-outlined">delete</span>
-            </button>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-white/60">Tier Key (Internal)</label>
@@ -116,10 +129,6 @@ export default function TicketTiersManager() {
             </div>
           </div>
         ))}
-        
-        <button onClick={addTier} className="w-full border border-dashed border-white/20 p-4 rounded-xl text-white/60 hover:text-white hover:border-white/50 transition-all flex items-center justify-center gap-2">
-          <span className="material-symbols-outlined">add</span> Add New Tier
-        </button>
       </div>
     </div>
   );

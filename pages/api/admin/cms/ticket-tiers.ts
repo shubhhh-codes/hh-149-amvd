@@ -18,11 +18,16 @@ export default async function handler(
         { key: 'squad', name: 'Squad Pass', label: 'SQUAD', price: 1599, seats: 4, badge: null, displayOrder: 3 },
       ];
 
-      return res.status(200).json({ tiers });
+      return res.status(200).json({ 
+        tiers,
+        venue: settings?.venue || 'The Humours Hub, Ahmedabad',
+        date: settings?.date || 'Saturday',
+        time: settings?.time || '8:30 PM'
+      });
     }
 
     if (req.method === 'POST') {
-      const { tiers } = req.body;
+      const { tiers, venue, date, time } = req.body;
       
       if (!Array.isArray(tiers)) {
         return res.status(400).json({ message: 'Invalid tiers data' });
@@ -30,7 +35,7 @@ export default async function handler(
 
       await db.collection('settings').updateOne(
         { type: 'ticket-tiers' },
-        { $set: { tiers, updatedAt: new Date() } },
+        { $set: { tiers, venue, date, time, updatedAt: new Date() } },
         { upsert: true }
       );
 
