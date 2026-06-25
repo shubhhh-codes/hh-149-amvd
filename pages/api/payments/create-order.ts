@@ -27,10 +27,14 @@ export default async function handler(
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    const { numberOfTickets, bookingId, tierKey, units } = req.body;
+    const { numberOfTickets, bookingId, cart } = req.body;
 
     if (!numberOfTickets || numberOfTickets < 1) {
       return res.status(400).json({ message: 'Invalid number of tickets' });
+    }
+
+    if (!cart || !Array.isArray(cart) || cart.length === 0) {
+      return res.status(400).json({ message: 'Cart is empty' });
     }
 
     // Fetch dynamic ticket tier from CMS
@@ -49,16 +53,17 @@ export default async function handler(
       tiers = DEFAULT_TIERS;
     }
 
-    const tier = tiers.find((t: any) => t.key === tierKey);
-    
-    if (!tier) {
-      return res.status(400).json({ message: 'Invalid or missing ticket tier' });
+    let calculatedTotal = 0;
+    for (const item of cart) {
+      const tier = tiers.find((t: any) => t.key === item.tierKey);
+      if (!tier) {
+        return res.status(400).json({ message: `Invalid or missing ticket tier: ${item.tierKey}` });
+      }
+      const itemUnits = Number(item.units) || 1;
+      calculatedTotal += itemUnits * tier.price;
     }
-    
-    const ticketPrice = tier.price; 
-    const numberOfUnits = units || 1;
 
-    const amount = numberOfUnits * ticketPrice * 100; // total price in paise
+    const amount = calculatedTotal * 100; // total price in paise
     const currency = 'INR';
 
     const options = {

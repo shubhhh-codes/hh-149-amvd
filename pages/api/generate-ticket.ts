@@ -132,10 +132,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const tiersDoc = await db.collection('settings').findOne({ type: 'ticket-tiers' });
     const tiers = tiersDoc?.tiers || [];
-    const tier = tiers.find((t: any) => t.key === (booking.tierKey || 'solo'));
-    const tierName = tier ? tier.name : 'Solo Pass';
-    const units = booking.units || 1;
-    const price = tier ? tier.price * units : (499 * units);
+    let tierName = 'Solo Pass';
+    let units = booking.units || 1;
+    let price = booking.totalAmount;
+
+    if (booking.cart && booking.cart.length > 0) {
+      tierName = booking.cart.map((item: any) => {
+        const t = tiers.find((t: any) => t.key === item.tierKey);
+        return `${item.units}x ${t ? t.name : item.tierKey.replace('-', ' ')}`;
+      }).join(', ');
+      units = booking.cart.reduce((sum: number, item: any) => sum + item.units, 0);
+    } else {
+      const tier = tiers.find((t: any) => t.key === (booking.tierKey || 'solo'));
+      tierName = tier ? tier.name : 'Solo Pass';
+      price = price || (tier ? tier.price * units : 499 * units);
+    }
 
     const eventTitle    = nextShowDoc?.title || 'The Humours Hub: Comedy Show';
     

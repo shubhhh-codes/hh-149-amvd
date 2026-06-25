@@ -24,12 +24,11 @@ export default async function handler(
       email,
       phone,
       numberOfTickets,
-      tierKey,
-      units,
+      cart,
     } = req.body;
 
     // Validate required fields
-    if (!fullName || !email || !phone || !numberOfTickets) {
+    if (!fullName || !email || !phone || !numberOfTickets || !cart) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
@@ -63,8 +62,7 @@ export default async function handler(
       email: email.toLowerCase().trim(),
       phone: phone.trim(),
       numberOfTickets: Number(numberOfTickets),
-      tierKey: tierKey || 'solo',
-      units: Number(units || 1),
+      cart: cart, // array of { tierKey, units, seats, price }
       bookingType: 'paid',
       status: 'pending',
       attended: false,

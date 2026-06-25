@@ -11,6 +11,8 @@ interface BookingItem {
   bookingType: string;
   createdAt: string;
   downloadToken: string;
+  tierKey?: string;
+  cart?: { tierKey: string; units: number; price?: number; seats?: number }[];
 }
 
 export default function RetrieveTickets() {
@@ -282,6 +284,7 @@ export default function RetrieveTickets() {
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">mail</span>
                   <input
+                    autoComplete="email"
                     className="premium-input w-full rounded-DEFAULT py-3 pl-12 pr-4 font-body-md text-body-md"
                     placeholder="you@example.com"
                     type="email"
@@ -299,6 +302,7 @@ export default function RetrieveTickets() {
                     <span className="font-body-md font-bold text-white/40 pt-[1px]">+91</span>
                   </div>
                   <input
+                    autoComplete="tel"
                     className="w-full bg-transparent border-none py-3 pl-3 pr-4 font-body-md text-white placeholder-white/20 focus:outline-none focus:ring-0"
                     placeholder="XXXXXXXXXX"
                     type="tel"
@@ -356,6 +360,7 @@ export default function RetrieveTickets() {
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">mail</span>
                   <input
+                    autoComplete="email"
                     className="premium-input w-full rounded-DEFAULT py-3 pl-12 pr-4 font-body-md text-body-md"
                     placeholder="you@example.com"
                     type="email"
@@ -375,6 +380,7 @@ export default function RetrieveTickets() {
                     <span className="font-body-md font-bold text-white/40 pt-[1px]">+91</span>
                   </div>
                   <input
+                    autoComplete="tel"
                     className="w-full bg-transparent border-none py-3 pl-3 pr-4 font-body-md text-white placeholder-white/20 focus:outline-none focus:ring-0"
                     placeholder="XXXXXXXXXX"
                     type="tel"
@@ -405,7 +411,7 @@ export default function RetrieveTickets() {
         {searched && (
           <div className="w-full max-w-4xl flex flex-col gap-8" id="results-section">
 
-            {(activeBookings.length === 0 && pendingBookings.length === 0 && cancelledBookings.length === 0) && (
+            {(activeBookings.length === 0 && cancelledBookings.length === 0) && (
               <>
                 <h2 className="font-headline-md text-[32px] font-bold text-white border-b border-white/10 pb-4 uppercase reveal-item delay-1">BOOKINGS</h2>
                 <div className="text-center py-12 text-on-surface-variant reveal-item delay-2">
@@ -445,9 +451,19 @@ export default function RetrieveTickets() {
                       <div className="mt-6 flex gap-6">
                         <div>
                           <p className="text-xs font-label-caps tracking-widest text-on-surface-variant mb-1 font-bold">TICKETS</p>
-                          <p className="font-headline-sm text-white uppercase text-[24px] font-bold">
-                            {booking.numberOfTickets} <span className="text-sm font-body-md text-on-surface-variant normal-case font-normal">× General</span>
-                          </p>
+                          <div className="font-headline-sm text-white uppercase text-[24px] font-bold">
+                            {booking.cart && booking.cart.length > 0 ? (
+                              <div className="flex flex-col gap-1 mt-1 text-base md:text-lg font-body-md normal-case font-bold leading-tight">
+                                {booking.cart.map((item: any, idx: number) => (
+                                  <span key={idx}>{item.units} × <span className="text-[#a3a3a3] capitalize">{item.tierKey.replace('-', ' ')}</span></span>
+                                ))}
+                              </div>
+                            ) : (
+                              <>
+                                {booking.numberOfTickets} <span className="text-sm font-body-md text-on-surface-variant normal-case font-normal">× {booking.tierKey ? booking.tierKey.replace('-', ' ') : 'General'}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                         <div>
                           <p className="text-xs font-label-caps tracking-widest text-on-surface-variant mb-1 font-bold">STATUS</p>
@@ -474,30 +490,7 @@ export default function RetrieveTickets() {
               </>
             )}
 
-            {/* Pending Bookings */}
-            {pendingBookings.length > 0 && (
-              <>
-                <h2 className="font-headline-md text-[32px] font-bold text-yellow-500 border-b border-white/10 pb-4 mt-8 uppercase reveal-item delay-2">
-                  PENDING BOOKINGS
-                </h2>
-                {pendingBookings.map(booking => (
-                  <div key={booking.bookingId} className="ticket-notch flex flex-col md:flex-row w-full border border-yellow-500/30 rounded-xl overflow-hidden reveal-item delay-2">
-                    <div className="p-6 md:p-8 flex-1">
-                      <div className="flex items-center gap-3 mb-4">
-                        <span className="bg-yellow-500/20 text-yellow-500 font-label-caps tracking-widest text-[12px] font-bold px-3 py-1 rounded-full">PENDING</span>
-                        <span className="text-on-surface-variant font-label-caps tracking-widest text-xs">ID: {booking.bookingId}</span>
-                      </div>
-                      <h3 className="font-headline-sm text-[24px] font-bold text-white mb-2 uppercase">{booking.fullName}</h3>
-                      <p className="font-body-md text-[16px] text-on-surface-variant flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px]">calendar_today</span>
-                        {new Date(booking.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}
-                      </p>
-                      <p className="text-yellow-500/70 text-sm mt-4 font-bold border-t border-yellow-500/20 pt-4 inline-block">Payment is incomplete or still processing.</p>
-                    </div>
-                  </div>
-                ))}
-              </>
-            )}
+
 
             {/* Cancelled Bookings */}
             {cancelledBookings.length > 0 && (

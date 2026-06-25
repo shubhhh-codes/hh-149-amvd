@@ -60,8 +60,7 @@ export async function getServerSideProps() {
 export default function BookTickets({ tiersData }: { tiersData: any }) {
   const router = useRouter();
 
-  const [selectedTier, setSelectedTier] = useState<TicketTier | null>(null);
-  const [units, setUnits] = useState(1);
+  const [cart, setCart] = useState<Record<string, number>>({});
   const [customerName, setName] = useState('');
   const [customerEmail, setEmail] = useState('');
   const [customerPhone, setPhone] = useState('');
@@ -73,13 +72,24 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
   useEffect(() => {
     if (tiersData?.tiers && tiersData.tiers.length > 0) {
       const defaultTier = tiersData.tiers.find((t: any) => t.badge === 'MOST POPULAR') || tiersData.tiers[0];
-      setSelectedTier(defaultTier);
+      setCart({ [defaultTier.key]: 1 });
     }
     setMode('active');
   }, [tiersData]);
 
-  const totalAmount = selectedTier ? selectedTier.price * units : 0;
-  const totalSeats = selectedTier ? selectedTier.seats * units : 1;
+  const tiers = tiersData?.tiers ?? [];
+
+  const totalAmount = tiers.reduce((acc: number, tier: TicketTier) => {
+    return acc + (tier.price * (cart[tier.key] || 0));
+  }, 0);
+
+  const totalSeats = tiers.reduce((acc: number, tier: TicketTier) => {
+    return acc + (tier.seats * (cart[tier.key] || 0));
+  }, 0);
+
+  const totalTickets = tiers.reduce((acc: number, tier: TicketTier) => {
+    return acc + (cart[tier.key] || 0);
+  }, 0);
   const venueDisplay = tiersData?.venue || 'The Humours Hub, Ahmedabad';
   
   // Format the date/time string from the CMS
@@ -89,7 +99,18 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
 
   const handleAction = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!selectedTier || units < 1) return;
+    
+    const cartArray = Object.entries(cart)
+      .filter(([_, qty]) => qty > 0)
+      .map(([tierKey, units]) => {
+        const tier = tiers.find((t: any) => t.key === tierKey);
+        return { tierKey, units, price: tier?.price || 0, seats: tier?.seats || 1 };
+      });
+
+    if (cartArray.length === 0) {
+      setError('Please select at least one ticket.');
+      return;
+    }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!customerName.trim() || !emailRegex.test(customerEmail.trim()) || customerPhone.trim().length !== 10) {
       setError('Please provide a valid name, email, and 10-digit phone number.');
@@ -100,7 +121,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
     setError(null);
 
     try {
-      // 1. Create local booking via our API (using tierKey and units)
+      // 1. Create local booking via our API (using cart)
       const bookRes = await fetch('/api/bookings/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -109,8 +130,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
           email: customerEmail.trim(),
           phone: customerPhone.trim(),
           numberOfTickets: totalSeats,
-          tierKey: selectedTier.key,
-          units: units,
+          cart: cartArray,
         }),
       });
 
@@ -122,7 +142,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
       const orderRes = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ numberOfTickets: totalSeats, bookingId, tierKey: selectedTier.key, units }),
+        body: JSON.stringify({ numberOfTickets: totalSeats, bookingId, cart: cartArray }),
       });
 
       const orderData = await orderRes.json();
@@ -202,7 +222,6 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
     );
   }
 
-  const tiers = tiersData?.tiers ?? [];
 
   return (
     <div className="antialiased min-h-screen flex flex-col bg-[#0A0A0A] font-['DM_Sans',sans-serif] text-white">
@@ -228,7 +247,18 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
       {/* TopNavBar */}
       <Navbar />
 
-      <main className="flex-1 pb-24 md:pb-12">
+      <main 
+        className="flex-1 pb-24 md:pb-12"
+        onClick={() => {
+          if (showSummaryDetails) setShowSummaryDetails(false);
+        }}
+        onTouchMove={() => {
+          if (showSummaryDetails) setShowSummaryDetails(false);
+        }}
+        onWheel={() => {
+          if (showSummaryDetails) setShowSummaryDetails(false);
+        }}
+      >
         <div className="md:max-w-5xl lg:max-w-6xl md:mx-auto md:px-6 md:py-10 md:grid md:grid-cols-12 md:gap-8 lg:gap-12 md:items-start">
           <div className="max-w-md mx-auto px-4 pt-4 md:max-w-none md:p-0 md:col-span-7 lg:col-span-8">
             
@@ -247,31 +277,54 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 md:gap-6 items-end mb-8 md:mt-0 px-1 md:px-0">
+              <div className="grid grid-cols-3 gap-2 md:gap-4 mb-8 md:mt-0 px-1 md:px-0">
                 {tiers.map((tier: TicketTier) => {
-                  const isActive = selectedTier?.key === tier.key;
+                  const qty = cart[tier.key] || 0;
+                  const isActive = qty > 0;
                   return (
                     <div
                       key={tier.key}
-                      onClick={() => {
-                        setSelectedTier(tier);
-                        setUnits(1);
-                      }}
-                      className={`cursor-pointer bg-[#141414] rounded-lg p-3 md:p-5 text-center transition-all flex flex-col justify-center relative 
-                        ${isActive ? 'border-[#FF6B1A] border-2 shadow-[0_0_15px_rgba(255,107,26,0.4)] bg-[rgba(255,107,26,0.05)] scale-[1.05] z-10' : 'border-white/10 border scale-100'} 
-                        ${isActive ? 'h-28 md:h-36' : 'h-24 md:h-32'}`}
+                      className={`bg-[#141414] rounded-xl p-3 md:p-4 transition-all flex flex-col items-center justify-between relative 
+                        ${isActive ? 'border-[#FF6B1A] border shadow-[0_0_15px_rgba(255,107,26,0.2)] bg-[rgba(255,107,26,0.08)] scale-[1.02] z-10' : 'border-white/10 border'} 
+                        h-[140px] md:h-44`}
                     >
                       {tier.badge && (
-                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#FF6B1A] px-2 py-0.5 rounded text-[8px] md:text-[10px] font-bold text-white whitespace-nowrap shadow-md uppercase">
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#FF6B1A] px-2 py-0.5 rounded text-[8px] md:text-[10px] font-bold text-white shadow-lg uppercase whitespace-nowrap z-20">
                           {tier.badge}
                         </div>
                       )}
-                      <span className={`font-['Hind',sans-serif] text-[9px] md:text-[11px] font-bold tracking-wider uppercase block mb-1 md:mb-2 ${isActive ? 'text-[#FF6B1A]' : 'text-[#a3a3a3]'}`}>
-                        {tier.label}
-                      </span>
-                      <h3 className="font-['Hind',sans-serif] text-lg md:text-3xl font-bold text-white">
-                        ₹{tier.price}
-                      </h3>
+                      
+                      <div className="flex flex-col items-center w-full flex-1 pt-1">
+                        {/* Fixed height container for label to force price alignment */}
+                        <div className="h-8 md:h-10 flex items-end justify-center w-full mb-1 md:mb-2">
+                          <span className={`font-['Hind',sans-serif] text-[10px] md:text-sm font-bold tracking-wider uppercase text-center leading-tight line-clamp-2 ${isActive ? 'text-[#FF6B1A]' : 'text-[#a3a3a3]'}`}>
+                            {tier.label}
+                          </span>
+                        </div>
+                        <div className="flex-1 flex items-start justify-center">
+                          <h3 className="font-['Hind',sans-serif] text-xl md:text-3xl font-black text-white leading-none tracking-tight">
+                            ₹{tier.price}
+                          </h3>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between bg-[#080808] border border-white/10 rounded-md w-full overflow-hidden mt-1 h-8 md:h-10 shrink-0">
+                        <button 
+                          onClick={() => setCart(prev => ({ ...prev, [tier.key]: Math.max(0, (prev[tier.key] || 0) - 1) }))} 
+                          disabled={qty === 0}
+                          className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <span className="material-symbols-outlined text-[16px] md:text-[18px]">remove</span>
+                        </button>
+                        <span className="font-['Hind',sans-serif] text-[13px] md:text-base font-bold text-white w-1/3 text-center">{qty}</span>
+                        <button 
+                          onClick={() => setCart(prev => ({ ...prev, [tier.key]: Math.min(10, (prev[tier.key] || 0) + 1) }))} 
+                          disabled={qty >= 10}
+                          className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <span className="material-symbols-outlined text-[16px] md:text-[18px]">add</span>
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -356,33 +409,32 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
 
             {/* Desktop Summary */}
             <h3 className="font-['Hind',sans-serif] text-xl font-bold mb-6 text-white uppercase tracking-wide">Order Summary</h3>
-            <div className="flex justify-between items-center mb-8">
-              <div className="flex flex-col">
-                <span className="font-['Hind',sans-serif] text-xs font-bold tracking-wider text-[#a3a3a3] uppercase mb-1">Pass Type</span>
-                <span className="font-['Hind',sans-serif] text-xl font-bold text-white uppercase">{selectedTier?.name}</span>
-              </div>
-              <div className="flex items-center gap-4">
-                <button onClick={() => setUnits(u => Math.max(1, u - 1))} disabled={units <= 1} className="w-10 h-10 rounded bg-[#080808] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all text-white disabled:opacity-50">
-                  <span className="material-symbols-outlined text-sm">remove</span>
-                </button>
-                <span className="font-['Hind',sans-serif] text-xl font-bold w-6 text-center text-white">{units}</span>
-                <button onClick={() => setUnits(u => Math.min(10, u + 1))} disabled={units >= 10} className="w-10 h-10 rounded bg-[#080808] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all text-white disabled:opacity-50">
-                  <span className="material-symbols-outlined text-sm">add</span>
-                </button>
-              </div>
+            <div className="flex flex-col gap-4 mb-8">
+              {tiers.filter((t: TicketTier) => cart[t.key] > 0).map((tier: TicketTier) => (
+                <div key={tier.key} className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="font-['Hind',sans-serif] text-xs font-bold tracking-wider text-[#a3a3a3] uppercase mb-1">{tier.name}</span>
+                    <span className="text-xs text-[#a3a3a3]">₹{tier.price} × {cart[tier.key]}</span>
+                  </div>
+                  <span className="font-['Hind',sans-serif] text-lg font-bold text-white">₹{tier.price * cart[tier.key]}</span>
+                </div>
+              ))}
+              {totalTickets === 0 && (
+                <div className="text-sm text-[#a3a3a3] italic">No tickets selected</div>
+              )}
             </div>
 
             <div className="flex justify-between items-end mb-8 pt-8 border-t border-white/10">
               <span className="font-['Hind',sans-serif] text-xs font-bold tracking-wider text-[#a3a3a3] uppercase">Total Amount</span>
               <div className="text-right">
                 <div className="font-['Hind',sans-serif] text-4xl font-bold text-[#FF6B1A] leading-none">₹{totalAmount}</div>
-                <div className="text-xs text-[#a3a3a3] mt-2">₹{selectedTier?.price} per ticket</div>
+                <div className="text-xs text-[#a3a3a3] mt-2">{totalTickets} tickets total</div>
               </div>
             </div>
 
             <button 
               onClick={handleAction}
-              disabled={isLoading || !selectedTier}
+              disabled={isLoading || totalTickets === 0}
               className="w-full bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white font-['Hind',sans-serif] font-bold py-4 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-all text-lg disabled:opacity-50 uppercase tracking-wide"
             >
               {isLoading ? (
@@ -403,14 +455,15 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
         <div className="max-w-md mx-auto">
           {showSummaryDetails && (
             <div className="mb-4 px-4 py-3 bg-[#141414] rounded-xl border border-white/10 text-xs text-[#a3a3a3] flex flex-col gap-2.5 shadow-2xl">
-              <div className="flex justify-between items-center">
-                <span>Pass Type</span>
-                <span className="text-white font-bold">{selectedTier?.name}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>Quantity</span>
-                <span className="text-white font-bold">{units}</span>
-              </div>
+              {tiers.filter((t: TicketTier) => cart[t.key] > 0).map((tier: TicketTier) => (
+                <div key={tier.key} className="flex justify-between items-center">
+                  <span>{tier.name} <span className="text-white/50">× {cart[tier.key]}</span></span>
+                  <span className="text-white font-bold">₹{tier.price * cart[tier.key]}</span>
+                </div>
+              ))}
+              {totalTickets === 0 && (
+                <div className="text-center italic opacity-50 py-2">Cart is empty</div>
+              )}
               <div className="flex justify-between items-center mt-1 pt-2.5 border-t border-white/10">
                 <span>Total Amount</span>
                 <span className="text-[#FF6B1A] font-bold text-sm">₹{totalAmount}</span>
@@ -420,16 +473,10 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
 
           <div className="mb-3 px-1">
             <div className="flex justify-between items-start mb-2">
-              <div className="flex flex-col gap-1.5">
-                <span className="font-['Hind',sans-serif] text-[10px] font-bold tracking-wider text-[#FF6B1A] uppercase">Number of Tickets</span>
-                <div className="flex items-center gap-4">
-                  <button onClick={() => setUnits(u => Math.max(1, u - 1))} disabled={units <= 1} className="w-8 h-8 rounded bg-[#141414] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all disabled:opacity-50 text-white">
-                    <span className="material-symbols-outlined text-[#a3a3a3] text-sm">remove</span>
-                  </button>
-                  <span className="font-['Hind',sans-serif] text-lg font-bold w-4 text-center text-white">{units}</span>
-                  <button onClick={() => setUnits(u => Math.min(10, u + 1))} disabled={units >= 10} className="w-8 h-8 rounded bg-[#141414] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all disabled:opacity-50 text-white">
-                    <span className="material-symbols-outlined text-[#a3a3a3] text-sm">add</span>
-                  </button>
+              <div className="flex items-center gap-3">
+                <div className="bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-2 flex flex-col items-center justify-center min-w-[64px]">
+                  <span className="font-['Hind',sans-serif] text-[9px] font-bold tracking-wider text-[#a3a3a3] uppercase mb-1">Tickets</span>
+                  <span className="font-['Hind',sans-serif] text-xl font-bold text-white leading-none">{totalTickets}</span>
                 </div>
               </div>
               <div className="text-right flex flex-col items-end gap-1.5">
@@ -443,13 +490,12 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
                 </button>
               </div>
             </div>
-            <div className="text-[10px] text-[#a3a3a3]">Maximum 10 tickets per booking</div>
             <div className="mt-2 border-t border-white/5"></div>
           </div>
           
           <button 
             onClick={handleAction}
-            disabled={isLoading || !selectedTier}
+            disabled={isLoading || totalTickets === 0}
             className="w-full bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white font-['Hind',sans-serif] font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wide"
           >
             {isLoading ? (
