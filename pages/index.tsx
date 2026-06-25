@@ -24,7 +24,7 @@ interface Performer {
 interface GalleryItem {
   _id: string;
   title: string;
-  imageId: string;
+  imageUrl: string;
   displayOrder: number;
 }
 
@@ -363,23 +363,26 @@ export default function Home({ performers, gallery, nextShow }: Props) {
             </div>
           ) : (
             <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
-              {gallery.map((item) => (
-                <div key={item._id} className="relative group rounded-card overflow-hidden bg-brand-overlay break-inside-avoid">
+              {gallery.map((item, index) => {
+                const aspectClasses = ['aspect-square', 'aspect-video', 'aspect-[3/4]', 'aspect-video'];
+                const aspectClass = aspectClasses[index % aspectClasses.length];
+                
+                return (
+                <div key={item._id} className={`relative group rounded-card overflow-hidden bg-brand-overlay break-inside-avoid ${aspectClass}`}>
                   <Image
-                    src={`/api/images/${item.imageId}`}
+                    src={item.imageUrl}
                     alt={item.title || 'Show Moment'}
-                    className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500"
-                    width={800}
-                    height={600}
+                    fill
+                    className="object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
                   />
                   {item.title && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
                       <p className="text-white text-sm font-headline-sm">{item.title}</p>
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-primary-container/0 group-hover:bg-primary-container/10 transition-colors duration-300"></div>
+                  <div className="absolute inset-0 bg-primary-container/0 group-hover:bg-primary-container/40 transition-colors duration-300"></div>
                 </div>
-              ))}
+              )})}
             </div>
           )}
         </section>
@@ -453,13 +456,14 @@ export const getStaticProps: GetStaticProps = async () => {
       .sort({ 'comedianProfile.displayOrder': 1 })
       .toArray();
 
-    // Fetch visible gallery items, sorted by displayOrder
+    // Fetch visible gallery items, sorted by displayOrder, max 5 for homepage
     const galleryDocs = await db.collection('homepage_content').find({
       type: 'gallery',
       isVisible: true,
-      isDeleted: false,
+      isDeleted: { $ne: true },
     })
       .sort({ displayOrder: 1 })
+      .limit(5)
       .toArray();
 
     // Fetch next show
@@ -483,12 +487,18 @@ export const getStaticProps: GetStaticProps = async () => {
       },
     }));
 
-    const gallery = galleryDocs.map(doc => ({
-      _id: doc._id.toString(),
-      title: doc.title || '',
-      imageId: doc.imageId?.toString() || '',
-      displayOrder: doc.displayOrder || 0,
-    }));
+    const gallery = galleryDocs.map(doc => {
+      let url = doc.imageUrl || '';
+      if (!url && doc.imageId) {
+        url = `/api/images/${doc.imageId}`;
+      }
+      return {
+        _id: doc._id.toString(),
+        title: doc.title || '',
+        imageUrl: url,
+        displayOrder: doc.displayOrder || 0,
+      };
+    });
 
     const nextShow = nextShowDoc ? {
       _id: nextShowDoc._id.toString(),
