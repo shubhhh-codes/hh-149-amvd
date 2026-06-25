@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Script from 'next/script';
@@ -69,6 +69,39 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
   const [error, setError] = useState<string | null>(null);
   const [showSummaryDetails, setShowSummaryDetails] = useState(false);
 
+  const mountTime = useRef(Date.now());
+  const hasBooked = useRef(false);
+  const customerNameRef = useRef('');
+  const customerEmailRef = useRef('');
+  const customerPhoneRef = useRef('');
+
+  useEffect(() => { customerNameRef.current = customerName; }, [customerName]);
+  useEffect(() => { customerEmailRef.current = customerEmail; }, [customerEmail]);
+  useEffect(() => { customerPhoneRef.current = customerPhone; }, [customerPhone]);
+
+  useEffect(() => {
+    mountTime.current = Date.now();
+    const handleBeforeUnload = () => {
+      if (!hasBooked.current) {
+        const timeSpent = Math.floor((Date.now() - mountTime.current) / 1000);
+        const data = JSON.stringify({
+          event: 'abandonment',
+          actionDetails: 'User left checkout page without completing booking.',
+          timeSpentOnPage: timeSpent,
+          userDetails: {
+            name: customerNameRef.current,
+            email: customerEmailRef.current,
+            phone: customerPhoneRef.current
+          }
+        });
+        navigator.sendBeacon('/api/analytics/track', new Blob([data], { type: 'application/json' }));
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   useEffect(() => {
     if (tiersData?.tiers && tiersData.tiers.length > 0) {
       const defaultTier = tiersData.tiers.find((t: any) => t.badge === 'MOST POPULAR') || tiersData.tiers[0];
@@ -119,6 +152,15 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
 
     setLoading(true);
     setError(null);
+
+    fetch('/api/analytics/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'click',
+        actionDetails: `User clicked 'Pay & Book Ticket' for ₹${totalAmount}`
+      })
+    }).catch(() => {});
 
     try {
       // 1. Create local booking via our API (using cart)
@@ -178,6 +220,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
         },
         handler: async (response: Record<string, string>) => {
           try {
+            hasBooked.current = true;
             const verifyRes = await fetch('/api/payments/verify', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

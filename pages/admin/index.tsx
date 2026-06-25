@@ -262,6 +262,18 @@ export default function AdminPanel() {
     }
   };
 
+  const handleTriggerCron = async () => {
+    try {
+      toast.info('Triggering Daily Digest...');
+      const res = await fetch('/api/cron/daily-digest');
+      if (!res.ok) throw new Error('Failed to trigger daily digest');
+      toast.success('Daily Digest sent to Slack successfully!');
+    } catch (err: any) {
+      console.error('Cron error:', err);
+      toast.error('Failed to trigger Daily Digest. Is your Slack webhook configured?');
+    }
+  };
+
   const handleStatusUpdate = async (bookingId: string, bookingStatus: string) => {
     try {
       const res = await fetch('/api/admin/bookings', {
@@ -591,9 +603,18 @@ export default function AdminPanel() {
                   </div>
                 </div>
               </div>
-              <div className="bg-[#131313] p-6 rounded brutalist-border mt-4">
-                 <h2 className="text-xl font-headline-md font-bold mb-2 uppercase tracking-wide">Welcome to Admin Portal</h2>
-                 <p className="text-on-surface/70 text-sm">Use the navigation to manage Bookings, Comedian Applications, Payments, or update the Content Management System.</p>
+              <div className="bg-[#131313] p-6 rounded brutalist-border mt-4 flex justify-between items-center">
+                 <div>
+                   <h2 className="text-xl font-headline-md font-bold mb-2 uppercase tracking-wide">Welcome to Admin Portal</h2>
+                   <p className="text-on-surface/70 text-sm">Use the navigation to manage Bookings, Comedian Applications, Payments, or update the Content Management System.</p>
+                 </div>
+                 <button 
+                   onClick={handleTriggerCron}
+                   className="bg-primary-container text-[#0A0A0A] px-6 py-3 rounded-lg font-bold text-sm tracking-widest uppercase hover:scale-[1.02] active:scale-[0.98] transition-transform flex items-center gap-2 brutalist-border"
+                 >
+                   <span className="material-symbols-outlined">send</span>
+                   Send Daily Digest
+                 </button>
               </div>
             </section>
           )}

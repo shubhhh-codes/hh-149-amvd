@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import clientPromise from '../../../lib/mongodb';
 import { sanitizeText } from '../../../lib/sanitize';
+import { sendFeedbackNotification } from '../../../lib/slack';
 
 export const config = {
   api: {
@@ -51,6 +52,8 @@ export default async function handler(
       comment: sanitizeText(comment),
       createdAt: new Date(),
     });
+
+    sendFeedbackNotification({ fullName, email: email.toLowerCase().trim(), category, vibe, comment });
 
     return res.status(201).json({ message: 'Feedback submitted successfully' });
   } catch (error) {

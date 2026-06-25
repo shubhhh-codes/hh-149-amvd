@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import clientPromise from '../../../lib/mongodb';
 import { issueDownloadToken } from '../../../lib/download-token';
+import { sendSlackNotification, sendCapacityAlert } from '../../../lib/slack';
 
 export default async function handler(
   req: NextApiRequest,
@@ -133,6 +134,38 @@ export default async function handler(
       }
     );
     console.log('Booking updated:', bookingId);
+
+    // Calculate Time-to-Convert
+    const timeToConvertMs = Date.now() - new Date(booking.createdAt).getTime();
+    const timeToConvertSeconds = Math.floor(timeToConvertMs / 1000);
+
+    // Dispatch Slack Notification in the background (fire and forget)
+    sendSlackNotification({
+      bookingId,
+      fullName: booking.fullName,
+      email: booking.email,
+      phone: booking.phone,
+      numberOfTickets: booking.numberOfTickets,
+      bookingType: 'paid',
+      cart: booking.cart,
+      amountPaid: payment.amount / 100, // Razorpay amount is in paise
+      timeToConvertSeconds
+    });
+
+    // Check Capacity for "Almost Sold Out" alert
+    const VENUE_CAPACITY = 150;
+    const allApproved = await db.collection('bookings').find({ status: 'approved' }).toArray();
+    const totalConfirmedSeats = allApproved.reduce((sum, b) => sum + (b.numberOfTickets || 0), 0);
+    const prevConfirmedSeats = totalConfirmedSeats - booking.numberOfTickets;
+    
+    const currentPercent = (totalConfirmedSeats / VENUE_CAPACITY) * 100;
+    const prevPercent = (prevConfirmedSeats / VENUE_CAPACITY) * 100;
+
+    // Alert triggers exactly when crossing the thresholds
+    if (prevPercent < 80 && currentPercent >= 80) await sendCapacityAlert(80, totalConfirmedSeats, VENUE_CAPACITY);
+    else if (prevPercent < 90 && currentPercent >= 90) await sendCapacityAlert(90, totalConfirmedSeats, VENUE_CAPACITY);
+    else if (prevPercent < 95 && currentPercent >= 95) await sendCapacityAlert(95, totalConfirmedSeats, VENUE_CAPACITY);
+    else if (prevPercent < 100 && currentPercent >= 100) await sendCapacityAlert(100, totalConfirmedSeats, VENUE_CAPACITY);
 
     // Issue a signed 30-minute download token so booking-success can fetch the PDF
     // without requiring the user to go through the retrieve page first.

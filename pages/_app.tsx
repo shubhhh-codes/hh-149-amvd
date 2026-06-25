@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 /**
  * @copyright (c) 2024 - Present
  * @author github.com/shubhhh-codes
@@ -14,8 +14,25 @@ import 'react-toastify/dist/ReactToastify.css';
 import '@/styles/globals.css';
 
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { useJourneyTracker } from '@/hooks/useJourneyTracker';
 
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
+  useJourneyTracker();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hasVisited = sessionStorage.getItem('hh_visited');
+      if (!hasVisited) {
+        sessionStorage.setItem('hh_visited', 'true');
+        fetch('/api/analytics/visit', { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referrer: document.referrer })
+        }).catch(() => {});
+      }
+    }
+  }, []);
+
   return (
     <SessionProvider session={session}>
       <Head>

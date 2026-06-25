@@ -8,6 +8,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import clientPromise from '../../../lib/mongodb';
 import { generateBookingId } from '../../../lib/bookingId';
+import { sendSlackNotification } from '../../../lib/slack';
 
 const VENUE_CAPACITY = 150;
 
@@ -57,6 +58,16 @@ export default async function handler(
         attendedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+      });
+
+      // Dispatch Slack Notification
+      sendSlackNotification({
+        bookingId,
+        fullName,
+        email: email.toLowerCase().trim(),
+        phone: phone.trim(),
+        numberOfTickets: Number(numberOfTickets),
+        bookingType: 'complimentary'
       });
 
       return res.status(201).json({ message: 'Complimentary booking created', bookingId });
