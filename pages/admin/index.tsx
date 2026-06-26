@@ -472,9 +472,8 @@ export default function AdminPanel() {
   const navLinks = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', short: 'DASH' },
     { id: 'scanner', label: 'QR Scanner', icon: 'document_scanner', short: 'SCAN' },
-    { id: 'bookings', label: 'Bookings', icon: 'calendar_today', short: 'BOOK' },
     { id: 'cms', label: 'CMS', icon: 'widgets', short: 'CMS' },
-    { id: 'messages', label: 'Messages', icon: 'mail', short: 'MSG' },
+    { id: 'bookings', label: 'Bookings', icon: 'calendar_today', short: 'BOOK' },
     { id: 'payments', label: 'Payments', icon: 'payments', short: 'PAY' },
   ];
 
@@ -982,7 +981,15 @@ export default function AdminPanel() {
 
           {/* MESSAGES TAB */}
           {activeTab === 'messages' && (
-            <section className="space-y-6 animate-enter">
+            <section className="space-y-6 animate-enter mb-24">
+              <button 
+                type="button"
+                onClick={() => setActiveTab('cms')}
+                className="flex w-fit items-center gap-2 px-4 py-2 bg-[#201f1f] brutalist-border rounded-lg text-sm font-label-caps tracking-widest text-on-surface/80 hover:text-on-surface hover:bg-[#2a2a2a] transition-colors uppercase mt-2 mb-4"
+              >
+                <span className="material-symbols-outlined text-lg">arrow_back</span>
+                Back to Hub
+              </button>
               <h2 className="text-2xl font-headline-md font-bold mb-4 uppercase tracking-wide">Messages Inbox</h2>
               <div className="flex flex-col gap-4">
                 {messages.length === 0 ? (
@@ -1031,6 +1038,7 @@ export default function AdminPanel() {
               <SiteCMS 
                 onNavigateToApps={() => setActiveTab('comedians')} 
                 onNavigateToFeedbacks={() => setActiveTab('feedbacks')}
+                onNavigateToMessages={() => setActiveTab('messages')}
               />
             </section>
           )}

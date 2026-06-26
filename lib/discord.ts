@@ -128,6 +128,44 @@ export async function sendDiscordNotification(data: DiscordBookingData) {
   }
 }
 
+export interface CheckInData {
+  bookingId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  checkInQuantity: number;
+  totalCheckedIn: number;
+  totalTickets: number;
+  bookingType: string;
+}
+
+export async function sendCheckInNotification(data: CheckInData) {
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  const payload = {
+    embeds: [{
+      author: { name: "Humours Hub Check-in", icon_url: "https://humourshub.in/favicon.ico" },
+      title: "✅ Guest Checked In",
+      color: 3066993, // #2ECC71
+      description: `**${data.fullName}** just checked in at the venue.`,
+      fields: [
+        { name: '🎟️ Tickets Scanned', value: `${data.checkInQuantity} Passes`, inline: true },
+        { name: '📊 Attendance', value: `${data.totalCheckedIn} / ${data.totalTickets} Checked In`, inline: true },
+        { name: '📞 Phone', value: data.phone || 'N/A', inline: true }
+      ],
+      footer: { text: `ID: ${data.bookingId} • ${data.bookingType.toUpperCase()}` },
+      timestamp: new Date().toISOString()
+    }]
+  };
+
+  try {
+    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  } catch (err) {
+    console.error('[Discord] Error sending check-in notification:', err);
+  }
+}
+
 export interface VisitorData {
   ip: string;
   location: string;

@@ -8,6 +8,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import clientPromise from '../../../../lib/mongodb';
 
+import { sendCheckInNotification } from '../../../../lib/discord';
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
@@ -66,6 +68,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (result.modifiedCount === 0) {
       return res.status(400).json({ message: 'Failed to update attendance' });
     }
+
+    // Fire webhook notification asynchronously
+    sendCheckInNotification({
+      bookingId: booking.bookingId,
+      fullName: booking.fullName,
+      email: booking.email,
+      phone: booking.phone,
+      checkInQuantity,
+      totalCheckedIn: newCheckedInCount,
+      totalTickets,
+      bookingType: booking.bookingType
+    }).catch(console.error);
 
     return res.status(200).json({
       message: `Successfully checked in ${checkInQuantity} people`,
