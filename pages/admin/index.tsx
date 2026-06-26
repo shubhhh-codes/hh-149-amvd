@@ -92,7 +92,7 @@ interface Feedback {
 export default function AdminPanel() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'scanner' | 'bookings' | 'comedians' | 'payments' | 'messages' | 'cms' | 'feedbacks'>('scanner');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'scanner' | 'bookings' | 'comedians' | 'payments' | 'messages' | 'cms' | 'feedbacks'>('dashboard');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [comedians, setComedians] = useState<ComedianProfile[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -478,7 +478,7 @@ export default function AdminPanel() {
   ];
 
   return (
-    <div className="bg-[#0e0e0e] text-[#e5e2e1] font-body-md antialiased overflow-hidden flex h-screen w-full">
+    <div className="bg-[#0e0e0e] text-[#e5e2e1] font-body-md antialiased flex h-screen w-full">
       
       {/* Mobile Top App Bar */}
       <header className="md:hidden flex justify-between items-center w-full px-5 h-20 bg-[#131313] border-b border-white/5 fixed top-0 left-0 z-50">
@@ -1045,9 +1045,26 @@ export default function AdminPanel() {
         </div>
       </main>
 
+      {/* SCANNER OVERLAY */}
+      {activeTab === 'scanner' && (
+        <QRScanner onClose={() => setActiveTab('dashboard')} />
+      )}
+
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full h-20 bg-surface-container-low border-t border-[rgba(255,255,255,0.05)] z-50 px-2 flex justify-around items-center pb-safe">
         {navLinks.map((link) => {
+          if (link.id === 'scanner') {
+            return (
+              <div key={link.id} className="relative -top-5">
+                <button
+                  onClick={() => setActiveTab('scanner')}
+                  className={`w-14 h-14 rounded-xl flex items-center justify-center hover:scale-95 active:scale-90 transition-transform ${activeTab === 'scanner' ? 'bg-primary-container text-on-primary-container shadow-[0_8px_16px_rgba(255,107,26,0.4)]' : 'bg-[#2a2a2a] text-on-surface shadow-[0_4px_12px_rgba(0,0,0,0.5)]'}`}
+                >
+                  <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: activeTab === 'scanner' ? "'FILL' 1" : "'FILL' 0" }}>{link.icon}</span>
+                </button>
+              </div>
+            );
+          }
           if (link.id === 'cms') {
             return (
               <div key={link.id} className="relative -top-5">

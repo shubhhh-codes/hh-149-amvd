@@ -20,7 +20,7 @@ interface ScannedBooking {
   attended: boolean;
 }
 
-export default function QRScanner() {
+export default function QRScanner({ onClose }: { onClose?: () => void }) {
   const [scannedBooking, setScannedBooking] = useState<ScannedBooking | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -50,9 +50,7 @@ export default function QRScanner() {
           case 'warning': navigator.vibrate([20, 50, 20]); break;
           case 'error': navigator.vibrate([30]); break;
         }
-      } catch(e) {
-        // Silently ignore unsupported devices
-      }
+      } catch(e) {}
     }
   }, []);
 
@@ -69,25 +67,28 @@ export default function QRScanner() {
     }
   };
 
-  const startScanner = async (cameraIdOrConfig: any) => {
+  const startScanner = async (cameraIdOrConfig?: any) => {
     if (!scannerRef.current) return;
     try {
-      await stopScanner(); // Ensure any existing stream is stopped
+      await stopScanner();
       
+      const targetConfig = cameraIdOrConfig || activeCameraId || { facingMode: "environment" };
+
       await scannerRef.current.start(
-        cameraIdOrConfig,
+        targetConfig,
         {
-          fps: 15,
+          fps: 60, // High FPS for faster decode
           qrbox: (viewfinderWidth, viewfinderHeight) => {
-            // Dynamic qrbox size based on screen
             const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-            const qrboxSize = Math.floor(minEdgeSize * 0.7); // 70% of screen
-            return { width: qrboxSize, height: qrboxSize };
+            return { width: Math.floor(minEdgeSize * 0.65), height: Math.floor(minEdgeSize * 0.65) };
           },
           aspectRatio: 1.0,
+          videoConstraints: {
+            width: { ideal: 1280 }, // 720p for faster processing
+            height: { ideal: 720 },
+          }
         },
         async (decodedText) => {
-          // Ignore if already processing a scan
           if (stateRefs.current.loading || stateRefs.current.scannedBooking) return;
           
           triggerHaptic('detect');
@@ -96,10 +97,8 @@ export default function QRScanner() {
             setLoading(true);
             setErrorMsg('');
             
-            // Pause camera to prevent duplicate scans
-            if (scannerRef.current?.isScanning) {
-              scannerRef.current.pause();
-            }
+            // Fully stop camera when QR is detected
+            await stopScanner();
 
             const res = await fetch('/api/admin/bookings/scan', {
               method: 'POST',
@@ -112,9 +111,9 @@ export default function QRScanner() {
             if (!res.ok) {
               triggerHaptic('warning');
               setErrorMsg(data.message || 'Invalid Ticket');
-              setTimeout(() => { 
+              setTimeout(async () => { 
                 setErrorMsg(''); 
-                if (scannerRef.current?.isScanning) scannerRef.current.resume();
+                await startScanner(targetConfig);
               }, 3000);
               return;
             }
@@ -132,31 +131,67 @@ export default function QRScanner() {
           } catch (err: any) {
             triggerHaptic('error');
             setErrorMsg('Failed to process QR code');
-            setTimeout(() => { 
+            setTimeout(async () => { 
               setErrorMsg(''); 
-              if (scannerRef.current?.isScanning) scannerRef.current.resume();
+              await startScanner(targetConfig);
             }, 3000);
           } finally {
             setLoading(false);
           }
         },
-        (error) => {
-          // Ignore normal scan failures (no QR code in frame)
-        }
+        (error) => {} // Ignore normal scan failures
       );
       
       isScanningRef.current = true;
       
-      // Check if Torch (Flashlight) is supported on the active track
-      if (typeof (scannerRef.current as any).getRunningTrack === 'function') {
-        const track = (scannerRef.current as any).getRunningTrack();
-        if (track && typeof track.getCapabilities === 'function') {
-          const capabilities = track.getCapabilities();
-          if (capabilities && capabilities.torch) {
+      // Auto-exposure controller
+      setTimeout(async () => {
+        try {
+          if (!scannerRef.current || !isScanningRef.current) return;
+          const getTrack = (scannerRef.current as any).getRunningTrack;
+          if (typeof getTrack !== 'function') return;
+          
+          const track: MediaStreamTrack = getTrack.call(scannerRef.current);
+          if (!track) return;
+
+          const capabilities = track.getCapabilities() as any;
+          const constraints: any = { advanced: [] };
+          const adv: any = {};
+
+          if (capabilities.focusMode?.includes('continuous')) {
+            adv.focusMode = 'continuous';
+          }
+          if (capabilities.zoom) {
+            adv.zoom = 1.0;
+          }
+
+          if (capabilities.exposureMode?.includes('manual')) {
+            adv.exposureMode = 'manual';
+            if (capabilities.exposureTime) {
+              const minExp = capabilities.exposureTime.min;
+              const maxExp = capabilities.exposureTime.max;
+              adv.exposureTime = Math.min(Math.max(2000, minExp), maxExp);
+            }
+          } else if (capabilities.exposureMode?.includes('continuous')) {
+            adv.exposureMode = 'continuous';
+          }
+
+          if (capabilities.exposureCompensation && !adv.exposureMode?.includes('manual')) {
+            const minComp = capabilities.exposureCompensation.min;
+            adv.exposureCompensation = Math.max(-1, minComp);
+          }
+
+          if (capabilities.torch) {
             setTorchSupported(true);
           }
-        }
-      }
+
+          if (Object.keys(adv).length > 0) {
+            constraints.advanced.push(adv);
+            await track.applyConstraints(constraints);
+          }
+        } catch (e) { }
+      }, 1000);
+
     } catch (err: any) {
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         setPermissionError(true);
@@ -172,12 +207,10 @@ export default function QRScanner() {
     const init = async () => {
       try {
         setLoading(true);
-        // 1. Manually request camera permission FIRST
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         stream.getTracks().forEach(track => track.stop());
         setPermissionError(false);
 
-        // 2. Enumerate cameras and auto-select the best one
         const devices = await Html5Qrcode.getCameras();
         if (devices && devices.length > 0) {
           setCameras(devices);
@@ -188,19 +221,23 @@ export default function QRScanner() {
           if (savedCamera && devices.find(d => d.id === savedCamera)) {
             targetCamera = savedCamera;
           } else {
-            // Find environment/back camera automatically
-            const envCam = devices.find(d => 
-              d.label.toLowerCase().includes('back') || 
-              d.label.toLowerCase().includes('environment') ||
-              d.label.toLowerCase().includes('rear')
-            );
-            if (envCam) targetCamera = envCam.id;
+            // Find main back camera, avoiding macro/ultra-wide lenses on flagships
+            const backCameras = devices.filter(d => {
+              const label = d.label.toLowerCase();
+              return label.includes('back') || label.includes('environment') || label.includes('rear') || label.includes('0');
+            });
+            if (backCameras.length > 0) {
+              const primaryBack = backCameras.find(d => {
+                const label = d.label.toLowerCase();
+                return !label.includes('ultra') && !label.includes('macro') && !label.includes('wide');
+              });
+              targetCamera = primaryBack ? primaryBack.id : backCameras[0].id;
+            }
           }
           
           setActiveCameraId(targetCamera);
           await startScanner(targetCamera);
         } else {
-          // Fallback if specific enumeration fails
           await startScanner({ facingMode: "environment" });
         }
       } catch (err: any) {
@@ -216,7 +253,6 @@ export default function QRScanner() {
 
     init();
 
-    // Cleanup strictly on unmount
     return () => {
       if (scannerRef.current) {
         if (isScanningRef.current) {
@@ -278,8 +314,7 @@ export default function QRScanner() {
       setScannedBooking(null);
       setErrorMsg('');
       
-      // Resume scanning after check-in
-      if (scannerRef.current?.isScanning) scannerRef.current.resume();
+      await startScanner(activeCameraId);
       
     } catch (err: any) {
       toast.error(err.message || 'Check-in failed');
@@ -288,15 +323,24 @@ export default function QRScanner() {
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     setScannedBooking(null);
     setErrorMsg('');
-    if (scannerRef.current?.isScanning) scannerRef.current.resume();
+    await startScanner(activeCameraId);
   };
 
   return (
-    <div className="relative w-full h-[75vh] min-h-[500px] bg-[#0e0e0e] rounded-xl brutalist-border overflow-hidden flex flex-col">
-      
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col overflow-hidden animate-enter">
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 z-[60] p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent pt-safe">
+        <h2 className="text-xl font-headline-md font-bold text-white uppercase tracking-wide">Scanner</h2>
+        {onClose && (
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        )}
+      </div>
+
       {permissionError ? (
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-red-400 bg-black">
           <span className="material-symbols-outlined text-5xl mb-4 text-red-500">videocam_off</span>
@@ -341,11 +385,11 @@ export default function QRScanner() {
           </div>
 
           {/* Floating Action Buttons */}
-          <div className="absolute bottom-8 left-0 right-0 z-20 flex justify-center items-center gap-6 pointer-events-auto">
+          <div className="absolute bottom-12 left-0 right-0 z-[60] flex justify-center items-center gap-6 pointer-events-auto">
             {cameras.length > 1 && (
               <button 
                 onClick={handleSwitchCamera} 
-                className="w-14 h-14 bg-black/60 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center text-white active:scale-95 transition-transform"
+                className="w-14 h-14 bg-black/60 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center text-white active:scale-95 transition-transform shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
                 aria-label="Switch Camera"
               >
                 <span className="material-symbols-outlined text-2xl">flip_camera_ios</span>
@@ -355,7 +399,7 @@ export default function QRScanner() {
             {torchSupported && (
               <button 
                 onClick={toggleTorch} 
-                className={`w-14 h-14 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center transition-all active:scale-95 ${torchOn ? 'bg-primary-container text-black' : 'bg-black/60 text-white'}`}
+                className={`w-14 h-14 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center transition-all active:scale-95 shadow-[0_4px_20px_rgba(0,0,0,0.5)] ${torchOn ? 'bg-primary-container text-black' : 'bg-black/60 text-white'}`}
                 aria-label="Toggle Flashlight"
               >
                 <span className="material-symbols-outlined text-2xl">{torchOn ? 'flashlight_off' : 'flashlight_on'}</span>
@@ -381,39 +425,44 @@ export default function QRScanner() {
         </div>
       )}
 
-      {/* Detail Overlay (Manual Check-In) */}
+      {/* Detail Overlay (Manual Check-In) Bottom Sheet */}
       {scannedBooking && (
-        <div className="absolute inset-0 z-40 bg-[#0e0e0e] flex flex-col animate-enter">
-          <div className="p-6 overflow-y-auto flex-1">
-            <div className="flex justify-between items-start mb-6">
+        <div className="absolute inset-x-0 bottom-0 z-[70] bg-[#131313] rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col animate-slide-up pb-safe max-h-[85vh]">
+          {/* Drag Handle */}
+          <div className="w-full flex justify-center pt-3 pb-1">
+            <div className="w-12 h-1.5 bg-white/20 rounded-full"></div>
+          </div>
+          
+          <div className="px-6 py-4 flex-1 overflow-y-auto">
+            <div className="flex justify-between items-start mb-4">
               <div>
                 <span className="font-label-caps text-on-surface/50 text-[10px] uppercase tracking-widest block mb-1">Scanned Ticket</span>
-                <h3 className="font-headline-md text-2xl font-bold uppercase text-primary-container">{scannedBooking.fullName}</h3>
+                <h3 className="font-headline-md text-2xl font-bold uppercase text-primary-container leading-tight">{scannedBooking.fullName}</h3>
                 <p className="text-on-surface/70 text-sm mt-1">{scannedBooking.email}</p>
               </div>
-              <button onClick={handleCancel} className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center active:scale-95 transition-transform">
+              <button onClick={handleCancel} className="w-10 h-10 shrink-0 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center active:scale-95 transition-transform text-white/70">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
-            <div className="bg-[#1c1b1b] brutalist-border rounded-xl p-4 mb-6">
-              <div className="flex justify-between mb-3">
-                <span className="text-on-surface/60 text-sm font-label-caps uppercase">Total Seats Booked</span>
-                <span className="font-bold text-lg">{scannedBooking.numberOfTickets}</span>
+            <div className="grid grid-cols-3 gap-2 bg-[#1c1b1b] brutalist-border rounded-xl p-3 mb-4">
+              <div className="flex flex-col items-center justify-center text-center">
+                <span className="text-on-surface/50 text-[10px] font-label-caps uppercase mb-1">Total</span>
+                <span className="font-bold text-lg leading-none">{scannedBooking.numberOfTickets}</span>
               </div>
-              <div className="flex justify-between mb-3">
-                <span className="text-on-surface/60 text-sm font-label-caps uppercase">Already Checked In</span>
-                <span className="font-bold text-lg text-green-400">{scannedBooking.checkedInCount}</span>
+              <div className="flex flex-col items-center justify-center text-center border-l border-white/10">
+                <span className="text-on-surface/50 text-[10px] font-label-caps uppercase mb-1">Checked In</span>
+                <span className="font-bold text-lg leading-none text-green-400">{scannedBooking.checkedInCount}</span>
               </div>
-              <div className="flex justify-between border-t border-white/10 pt-3 mt-1">
-                <span className="text-on-surface/60 text-sm font-label-caps uppercase">Seats Remaining</span>
-                <span className="font-bold text-lg text-primary-container">{scannedBooking.numberOfTickets - scannedBooking.checkedInCount}</span>
+              <div className="flex flex-col items-center justify-center text-center border-l border-white/10">
+                <span className="text-on-surface/50 text-[10px] font-label-caps uppercase mb-1">Remaining</span>
+                <span className="font-bold text-lg leading-none text-primary-container">{scannedBooking.numberOfTickets - scannedBooking.checkedInCount}</span>
               </div>
             </div>
 
             {scannedBooking.numberOfTickets - scannedBooking.checkedInCount > 0 ? (
-              <div className="flex flex-col items-center gap-4 mt-8">
-                <span className="text-on-surface/70 text-sm uppercase tracking-widest font-bold">Select Check-In Quantity</span>
+              <div className="flex flex-col items-center gap-3 mt-4 mb-2">
+                <span className="text-on-surface/70 text-xs uppercase tracking-widest font-bold">Select Quantity</span>
                 <div className="flex items-center gap-6 bg-[#1c1b1b] p-2 rounded-full brutalist-border">
                   <button 
                     className="w-14 h-14 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center active:scale-95 transition-transform"
@@ -431,13 +480,13 @@ export default function QRScanner() {
                 </div>
               </div>
             ) : (
-              <div className="bg-red-500/20 text-red-400 border border-red-500/30 p-4 rounded-xl text-center uppercase tracking-wider font-bold mt-8">
+              <div className="bg-red-500/20 text-red-400 border border-red-500/30 p-4 rounded-xl text-center uppercase tracking-wider font-bold my-6">
                 Ticket Fully Used
               </div>
             )}
           </div>
 
-          <div className="p-4 border-t border-white/5 bg-[#131313]">
+          <div className="p-4 border-t border-white/5 bg-[#0e0e0e]">
             <button 
               onClick={handleConfirmCheckIn}
               disabled={checkInQuantity <= 0}
@@ -471,6 +520,13 @@ export default function QRScanner() {
         }
         .animate-scan-line {
           animation: scan-line-anim 2.5s ease-in-out infinite;
+        }
+        @keyframes slide-up {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+        .animate-slide-up {
+          animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
     </div>

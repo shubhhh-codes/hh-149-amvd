@@ -140,7 +140,7 @@ export interface CheckInData {
 }
 
 export async function sendCheckInNotification(data: CheckInData) {
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  const webhookUrl = process.env.DISCORD_CHECKIN_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL;
   if (!webhookUrl) return;
 
   const payload = {
