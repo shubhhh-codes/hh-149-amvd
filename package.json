@@ -48,6 +48,7 @@
     "ua-parser-js": "^2.0.10"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/bcryptjs": "^3.0.0",
     "@types/formidable": "^3.5.1",
     "@types/node": "^26.0.0",
