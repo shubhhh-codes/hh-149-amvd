@@ -8,7 +8,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import clientPromise from '../../../lib/mongodb';
 import { generateBookingId } from '../../../lib/bookingId';
-import { sendSlackNotification } from '../../../lib/slack';
+import { sendDiscordNotification } from '../../../lib/discord';
 
 const VENUE_CAPACITY = 150;
 
@@ -60,8 +60,7 @@ export default async function handler(
         updatedAt: new Date(),
       });
 
-      // Dispatch Slack Notification
-      sendSlackNotification({
+      sendDiscordNotification({
         bookingId,
         fullName,
         email: email.toLowerCase().trim(),

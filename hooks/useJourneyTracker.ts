@@ -33,13 +33,13 @@ export function useJourneyTracker() {
         const tag = clickable.tagName.toLowerCase();
         
         if (['input', 'select', 'textarea'].includes(tag)) {
-          const name = clickable.getAttribute('name') || clickable.getAttribute('id') || clickable.getAttribute('placeholder') || tag;
-          text = `Filled form field '${name}'`;
+          // We handle actual filling in the 'change' event now, but we can log focus
+          const name = clickable.getAttribute('name') || clickable.getAttribute('placeholder') || clickable.getAttribute('id') || tag;
+          text = `Focused on '${name}'`;
         } else if (tag === 'img') {
           const alt = clickable.getAttribute('alt');
           text = alt ? `Clicked image '${alt}'` : `Clicked on an image`;
         } else {
-          // Extract text but strip common Material Symbols/Icons that pollute the log
           let rawText = clickable.getAttribute('aria-label') || (clickable as HTMLElement).innerText || clickable.textContent || '';
           const iconWords = ['edit_note', 'sentiment_very_satisfied', 'arrow_forward', 'check_circle', 'phone', 'mail', 'menu', 'close'];
           iconWords.forEach(icon => { rawText = rawText.replace(new RegExp(icon, 'gi'), ''); });
@@ -54,15 +54,30 @@ export function useJourneyTracker() {
         }
         addJourneyEvent(text);
       } else {
-        // Random click on a non-interactive element
         const tag = target.tagName.toLowerCase();
         if (tag !== 'html' && tag !== 'body' && tag !== 'main' && tag !== 'section') {
-          let text = (target as HTMLElement).innerText?.trim();
-          if (text) {
-            text = text.replace(/\n/g, ' ').slice(0, 25);
-            addJourneyEvent(`Read / Clicked text: "${text}..."`);
+          // Only log if it's a small, specific text element like p, span, h1-h6
+          if (['p', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'].includes(tag) || (target.childNodes.length === 1 && target.firstChild?.nodeType === Node.TEXT_NODE)) {
+            let text = (target as HTMLElement).innerText?.trim();
+            if (text && text.length < 100) { // Ignore giant paragraphs
+              text = text.replace(/\n/g, ' ').slice(0, 40);
+              addJourneyEvent(`Read: "${text}..."`);
+            }
           }
-          // If it's just an empty div, we silently ignore it to prevent log spam!
+        }
+      }
+    };
+
+    const handleChange = (e: Event) => {
+      const target = e.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+      if (target) {
+        const name = target.getAttribute('name') || target.getAttribute('placeholder') || target.getAttribute('id') || target.tagName.toLowerCase();
+        const value = target.value;
+        // Don't log passwords or empty values
+        if (value && target.type !== 'password') {
+          // Mask long numbers like credit cards just in case, but keep phone/names visible
+          const displayValue = value.length > 20 ? value.substring(0, 4) + '...' : value;
+          addJourneyEvent(`Typed '${displayValue}' in '${name}'`);
         }
       }
     };
@@ -126,11 +141,13 @@ export function useJourneyTracker() {
     };
 
     window.addEventListener('click', handleClick);
+    window.addEventListener('change', handleChange, true); // Use capture phase to ensure we catch it
     window.addEventListener('scroll', handleScroll);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       window.removeEventListener('click', handleClick);
+      window.removeEventListener('change', handleChange, true);
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };

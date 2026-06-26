@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { sendVisitorNotification } from '../../../lib/slack';
+import { sendVisitorNotification } from '../../../lib/discord';
 import { UAParser } from 'ua-parser-js';
 
 export default async function handler(
@@ -48,16 +48,27 @@ export default async function handler(
     let location = 'Unknown Location';
     let isp = 'Unknown ISP';
 
-    if (ip && ip !== '::1' && ip !== '127.0.0.1' && ip !== 'Unknown IP') {
+    // Prioritize Vercel's built-in, highly accurate IP headers (requires no API calls!)
+    const vercelCity = req.headers['x-vercel-ip-city'] as string;
+    const vercelCountry = req.headers['x-vercel-ip-country'] as string;
+    const vercelRegion = req.headers['x-vercel-ip-country-region'] as string;
+
+    if (vercelCity && vercelCountry) {
+      location = `${decodeURIComponent(vercelCity)}, ${vercelRegion ? decodeURIComponent(vercelRegion) + ', ' : ''}${vercelCountry}`;
+    } else {
+      // Fallback for Local Dev or custom hosting
+      const isLocal = ip === '::1' || ip === '127.0.0.1' || ip === 'Unknown IP';
+      const apiUrl = isLocal ? 'http://ip-api.com/json/?fields=status,country,regionName,city,isp,org' : `http://ip-api.com/json/${ip}?fields=status,country,regionName,city,isp,org`;
+
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1000); // Speed timeout
-        const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,city,isp,org`, { signal: controller.signal });
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2-second timeout
+        const geoRes = await fetch(apiUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
         const geoData = await geoRes.json();
         
         if (geoData.status === 'success') {
-          location = `${geoData.city}, ${geoData.country}`;
+          location = `${geoData.city}, ${geoData.regionName}, ${geoData.country}`;
           isp = geoData.org || geoData.isp || 'Unknown ISP';
         }
       } catch (err) {

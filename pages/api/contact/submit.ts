@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import clientPromise from '@/lib/mongodb';
 import { sanitizeText } from '@/lib/sanitize';
-import { sendContactNotification } from '@/lib/slack';
+import { sendContactNotification } from '@/lib/discord';
 
 export const config = {
   api: {

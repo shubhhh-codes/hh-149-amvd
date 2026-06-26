@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import clientPromise from '../../../lib/mongodb';
-import { sendPaymentCancelledNotification } from '../../../lib/slack';
+import { sendPaymentCancelledNotification } from '../../../lib/discord';
 
 export const config = {
   api: {
