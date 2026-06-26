@@ -64,20 +64,6 @@ const nextConfig = {
   },
 
   webpack: (config) => {
-    config.module.rules.push({
-      test: /\.(woff|woff2|eot|ttf|otf)$/i,
-      use: [
-        {
-          loader: 'file-loader',
-          options: {
-            name: '[name].[ext]',
-            outputPath: 'static/fonts/',
-            publicPath: '/_next/static/fonts/',
-          },
-        },
-      ],
-    });
-
     // ── CRITICAL: Prevent Webpack from bundling Chromium ─────────────────────
     // @sparticuz/chromium is a pure ESM package ("type":"module") that uses
     // import.meta.url inside paths.js to locate its .br binary files on disk.

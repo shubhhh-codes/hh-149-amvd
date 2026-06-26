@@ -319,7 +319,8 @@ export default function Home({ performers, gallery, nextShow }: Props) {
                         className="w-full h-full object-cover"
                         width={256}
                         height={256}
-                        quality={95}
+                        quality={80}
+                        loading="lazy"
                         unoptimized={false}
                       />
                     ) : (
@@ -373,6 +374,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
                     src={item.imageUrl}
                     alt={item.title || 'Show Moment'}
                     fill
+                    loading="lazy"
                     className="object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
                   />
                   {item.title && (

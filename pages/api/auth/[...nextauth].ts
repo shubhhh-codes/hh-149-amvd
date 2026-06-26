@@ -6,6 +6,18 @@
 import NextAuth from 'next-auth';
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import crypto from 'crypto';
+
+/** Timing-safe string comparison — prevents password timing attacks */
+function safeCompare(a: string, b: string): boolean {
+  const aBuf = Buffer.from(
+    crypto.createHmac('sha256', 'cmp-salt').update(a).digest('hex')
+  );
+  const bBuf = Buffer.from(
+    crypto.createHmac('sha256', 'cmp-salt').update(b).digest('hex')
+  );
+  return aBuf.length === bBuf.length && crypto.timingSafeEqual(aBuf, bBuf);
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -28,7 +40,7 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Server environment is missing admin credentials configuration');
         }
 
-        if (credentials.email !== allowedAdminEmail || credentials.password !== allowedAdminPassword) {
+        if (!safeCompare(credentials.email, allowedAdminEmail) || !safeCompare(credentials.password, allowedAdminPassword)) {
           throw new Error('Invalid email or password');
         }
 

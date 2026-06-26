@@ -126,6 +126,7 @@ export default function GalleryPage({ galleryItems }: { galleryItems: any[] }) {
                 <Image
                   width={800}
                   height={600}
+                  loading="lazy"
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
                   src={item.imageUrl}
                   alt={item.title || "Gallery image"}

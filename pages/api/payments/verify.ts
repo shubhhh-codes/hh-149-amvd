@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import clientPromise from '../../../lib/mongodb';
 import { issueDownloadToken } from '../../../lib/download-token';
-import { sendSlackNotification, sendCapacityAlert } from '../../../lib/slack';
+import { sendDiscordNotification, sendCapacityAlert } from '../../../lib/discord';
 
 export default async function handler(
   req: NextApiRequest,
@@ -26,14 +26,16 @@ export default async function handler(
       return res.status(400).json({ message: 'Missing required payment details' });
     }
 
-    console.log('Verifying payment:', {
-      orderId: razorpay_order_id,
-      paymentId: razorpay_payment_id,
-      bookingId
-    });
+    // ── Guard: must check credentials BEFORE using them in HMAC ──────────────
+    // Moving this check here prevents a crash when RAZORPAY_KEY_SECRET is
+    // undefined — the non-null assertion (!) passes TypeScript but throws at
+    // runtime if the env var is missing.
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      return res.status(500).json({ message: 'Missing Razorpay credentials' });
+    }
 
     // Verify Razorpay signature
-    const shasum = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!);
+    const shasum = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
     shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
     const digest = shasum.digest('hex');
 
@@ -43,10 +45,6 @@ export default async function handler(
         received: razorpay_signature
       });
       return res.status(400).json({ message: 'Invalid payment signature' });
-    }
-
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      return res.status(500).json({ message: 'Missing Razorpay credentials' });
     }
 
     const razorpay = new Razorpay({
@@ -139,8 +137,8 @@ export default async function handler(
     const timeToConvertMs = Date.now() - new Date(booking.createdAt).getTime();
     const timeToConvertSeconds = Math.floor(timeToConvertMs / 1000);
 
-    // Dispatch Slack Notification in the background (fire and forget)
-    sendSlackNotification({
+    // Dispatch Discord Notification in the background (fire and forget)
+    sendDiscordNotification({
       bookingId,
       fullName: booking.fullName,
       email: booking.email,

@@ -190,8 +190,17 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
       const orderData = await orderRes.json();
       if (!orderRes.ok) throw new Error(orderData.message ?? 'Failed to initiate payment');
 
-      // 3. Open Razorpay checkout
-      if (!window.Razorpay) throw new Error('Razorpay SDK not loaded');
+      // 3. Wait for Razorpay SDK to load (lazyOnload may not be ready yet)
+      const razorpayReady = await new Promise<boolean>((resolve) => {
+        if (window.Razorpay) { resolve(true); return; }
+        let attempts = 0;
+        const interval = setInterval(() => {
+          attempts++;
+          if (window.Razorpay) { clearInterval(interval); resolve(true); }
+          else if (attempts >= 50) { clearInterval(interval); resolve(false); } // 5s timeout
+        }, 100);
+      });
+      if (!razorpayReady) throw new Error('Payment SDK failed to load. Please refresh and try again.');
 
       const rzp = new window.Razorpay({
         key: orderData.keyId,
