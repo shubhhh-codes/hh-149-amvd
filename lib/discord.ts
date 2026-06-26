@@ -67,16 +67,16 @@ export async function sendDiscordNotification(data: DiscordBookingData) {
   }
 
   const fields = [
-    { name: 'Name', value: data.fullName, inline: true },
-    { name: 'Amount Paid', value: isPaid && data.amountPaid ? `₹${data.amountPaid}` : 'FREE', inline: true },
-    { name: 'Tickets', value: cartDetails, inline: false }
+    { name: '🎟️ Tickets', value: cartDetails, inline: true },
+    { name: '💳 Amount Paid', value: isPaid && data.amountPaid ? `₹${data.amountPaid}` : 'FREE', inline: true },
+    { name: '📞 Phone', value: data.phone, inline: true }
   ];
 
   if (data.timeToConvertSeconds) {
     fields.push({
       name: '⏱️ Time to Convert',
       value: `${Math.floor(data.timeToConvertSeconds / 60)}m ${data.timeToConvertSeconds % 60}s`,
-      inline: false
+      inline: true
     });
   }
 
@@ -86,9 +86,9 @@ export async function sendDiscordNotification(data: DiscordBookingData) {
         author: { name: "Humours Hub Bookings", icon_url: "https://humourshub.in/favicon.ico" },
         title,
         color,
-        description: `**${data.fullName}** just booked tickets!`,
+        description: `**${data.fullName}** just booked ${isPaid ? 'tickets' : 'complimentary passes'}.`,
         fields,
-        footer: { text: `ID: ${data.bookingId} | 📧 ${data.email} | 📞 ${data.phone}` },
+        footer: { text: `ID: ${data.bookingId} • ${data.email}` },
         timestamp: new Date().toISOString()
       }
     ]
@@ -108,10 +108,16 @@ export async function sendDiscordNotification(data: DiscordBookingData) {
       const statsPayload = {
         embeds: [
           {
+            author: { name: "Humours Hub Analytics", icon_url: "https://humourshub.in/favicon.ico" },
             title: "📊 Today's Conversion Stats",
             color: 3066993, // #2ECC71
-            description: `✅ Confirmed: **${stats.confirmed}** (₹${stats.confirmedRevenue.toLocaleString()})\n⏳ Pending: **${stats.pending}**\n❌ Cancelled: **${stats.cancelled}**`,
-            footer: { text: `📈 Conversion Rate: ${stats.conversionRate}% | 💰 Revenue: ₹${stats.confirmedRevenue.toLocaleString()}` }
+            fields: [
+              { name: '✅ Confirmed', value: `${stats.confirmed} (₹${stats.confirmedRevenue.toLocaleString()})`, inline: true },
+              { name: '⏳ Pending', value: `${stats.pending}`, inline: true },
+              { name: '❌ Cancelled', value: `${stats.cancelled}`, inline: true }
+            ],
+            footer: { text: `Conversion Rate: ${stats.conversionRate}%` },
+            timestamp: new Date().toISOString()
           }
         ]
       };
@@ -138,11 +144,15 @@ export async function sendVisitorNotification(visitorData: VisitorData) {
 
   const payload = {
     embeds: [{
-      author: { name: "Humours Hub Live Traffic", icon_url: "https://humourshub.in/favicon.ico" },
-      title: "🟢 New Active Visitor",
+      author: { name: "Humours Hub Traffic", icon_url: "https://humourshub.in/favicon.ico" },
+      title: "🟢 Active Visitor on Site",
       color: 16739098, // #FF6B1A
-      description: `**Location:** ${visitorData.location}\n**Device:** ${visitorData.device}\n**Source:** ${visitorData.source || 'Direct'}\n\n*${visitorData.os} / ${visitorData.browser}*`,
-      footer: { text: `IP: ${visitorData.ip} | ISP: ${visitorData.isp}` },
+      fields: [
+        { name: '📍 Location', value: visitorData.location, inline: true },
+        { name: '💻 Device', value: `${visitorData.device} (${visitorData.os})`, inline: true },
+        { name: '🌐 Source', value: visitorData.source || 'Direct', inline: true }
+      ],
+      footer: { text: `IP: ${visitorData.ip} • ISP: ${visitorData.isp}` },
       timestamp: new Date().toISOString()
     }]
   };
@@ -171,36 +181,42 @@ export async function sendTrackingNotification(data: TrackingData) {
 
   let color = 16739098; // Default Orange #FF6B1A
   let title = '📍 User Journey Event';
-  if (data.event === 'abandonment') { color = 16711680; title = '🚨 Cart Abandoned'; }
+  if (data.event === 'abandonment') { color = 16711680; title = '🚨 Cart Abandonment'; }
   if (data.event === 'journey') { color = 9807270; title = '🏁 Session Completed'; }
 
   const timeText = data.timeSpentOnPage ? `${Math.floor(data.timeSpentOnPage / 60)}m ${data.timeSpentOnPage % 60}s` : `N/A`;
 
   const fields: any[] = [
     { name: '📍 Location', value: data.visitorData.location, inline: true },
-    { name: '💻 Device', value: `${data.visitorData.device}`, inline: true },
+    { name: '💻 Device', value: data.visitorData.device, inline: true },
     { name: '⏱️ Duration', value: timeText, inline: true }
   ];
 
-  let description = `> ${data.actionDetails}`;
-
   if (data.userDetails && (data.userDetails.name || data.userDetails.email || data.userDetails.phone)) {
-    description += `\n\n**👤 User Identified:**\n\`Name:\` ${data.userDetails.name || 'N/A'}\n\`Email:\` ${data.userDetails.email || 'N/A'}\n\`Phone:\` ${data.userDetails.phone || 'N/A'}`;
+    fields.push({
+      name: '👤 User Identified',
+      value: `\`${data.userDetails.name || 'N/A'}\` • \`${data.userDetails.email || 'N/A'}\` • \`${data.userDetails.phone || 'N/A'}\``,
+      inline: false
+    });
   }
 
   if (data.timeline && data.timeline.length > 0) {
-    const log = data.timeline.map(t => `• ${t}`).join('\n');
-    description += `\n\n**📝 Activity Log:**\n\`\`\`\n${log.slice(0, 1000)}\n\`\`\``;
+    const log = data.timeline.map(t => `${t}`).join('\n');
+    fields.push({
+      name: '📝 Activity Log',
+      value: `\`\`\`\n${log.slice(0, 1000)}\n\`\`\``,
+      inline: false
+    });
   }
 
   const payload = {
     embeds: [{
-      author: { name: "Humours Hub Analytics", icon_url: "https://humourshub.in/favicon.ico" },
+      author: { name: "Humours Hub Tracker", icon_url: "https://humourshub.in/favicon.ico" },
       title,
-      description,
+      description: `> ${data.actionDetails}`,
       color,
       fields,
-      footer: { text: `IP: ${data.visitorData.ip} | ISP: ${data.visitorData.isp}` },
+      footer: { text: `IP: ${data.visitorData.ip} • ISP: ${data.visitorData.isp}` },
       timestamp: new Date().toISOString()
     }]
   };
@@ -229,8 +245,12 @@ export async function sendContactNotification(data: ContactData) {
       author: { name: "Humours Hub Contact", icon_url: "https://humourshub.in/favicon.ico" },
       title: "📬 New Message Received",
       color: 15965202, // #F39C12
-      description: `**From:** ${data.name} (<${data.email}>)\n**Subject:** ${data.subject}\n\n**Message:**\n\`\`\`\n${data.message.slice(0, 2000)}\n\`\`\``,
-      footer: { text: `📞 ${data.phone}` },
+      description: `**Subject:** ${data.subject}\n\n**Message:**\n\`\`\`\n${data.message.slice(0, 2000)}\n\`\`\``,
+      fields: [
+        { name: '👤 From', value: data.name, inline: true },
+        { name: '📞 Phone', value: data.phone, inline: true },
+        { name: '📧 Email', value: data.email, inline: true }
+      ],
       timestamp: new Date().toISOString()
     }]
   };
@@ -271,10 +291,15 @@ export async function sendFeedbackNotification(data: FeedbackData) {
   const payload = {
     embeds: [{
       author: { name: "Humours Hub Feedback", icon_url: "https://humourshub.in/favicon.ico" },
-      title: `💬 New Feedback: ${data.category}`,
+      title: "💬 New User Feedback",
       color: 10181046, // #9B59B6
-      description: `**From:** ${data.fullName}\n**Vibe:** ${vibeStars}\n\n**Comment:**\n> ${data.comment.replace(/\n/g, '\n> ')}`,
-      footer: { text: `📧 ${data.email}` },
+      description: `> "${data.comment.replace(/\n/g, '\n> ')}"`,
+      fields: [
+        { name: '👤 From', value: data.fullName, inline: true },
+        { name: '📂 Category', value: data.category, inline: true },
+        { name: '✨ Vibe', value: vibeStars, inline: true }
+      ],
+      footer: { text: `${data.email}` },
       timestamp: new Date().toISOString()
     }]
   };
@@ -309,25 +334,24 @@ export async function sendPaymentCancelledNotification(data: DiscordPaymentCance
   }
   
   const fields = [
-    { name: 'Name', value: data.fullName, inline: true },
-    { name: 'Tickets', value: cartDetails, inline: true }
+    { name: '👤 Name', value: data.fullName, inline: true },
+    { name: '🎟️ Tickets', value: cartDetails, inline: true },
+    { name: '📞 Action', value: `[💬 WhatsApp](https://wa.me/91${data.phone.replace(/[^0-9]/g, '')})`, inline: true }
   ];
 
   let description = '';
   if (data.repeatAttempter) {
-    description = `**🔥 HOT LEAD — REPEAT ATTEMPTER**\nThis person has tried to book **${data.totalAttempts} times** recently but keeps cancelling at the paywall!\n[💬 Message on WhatsApp](https://wa.me/91${data.phone.replace(/[^0-9]/g, '')})`;
-  } else {
-    description = `[💬 Message on WhatsApp](https://wa.me/91${data.phone.replace(/[^0-9]/g, '')})`;
+    description = `**🔥 HOT LEAD — REPEAT ATTEMPTER**\nThis person has tried to book **${data.totalAttempts} times** recently but keeps cancelling at the paywall!`;
   }
 
   const payload = {
     embeds: [{
       author: { name: "Humours Hub Sales", icon_url: "https://humourshub.in/favicon.ico" },
-      title: "🚨 Payment Cancelled / Failed",
+      title: "🚨 Checkout Abandoned",
       color: 15158332, // #E74C3C
-      description: `**${data.fullName}** abandoned the checkout page.\n\n` + description,
+      description: description,
       fields,
-      footer: { text: `ID: ${data.bookingId} | 📧 ${data.email}` },
+      footer: { text: `ID: ${data.bookingId} • ${data.email}` },
       timestamp: new Date().toISOString()
     }]
   };
@@ -345,10 +369,14 @@ export async function sendCapacityAlert(percent: number, totalSeats: number, cap
 
   const payload = {
     embeds: [{
-      author: { name: "Humours Hub Capacity", icon_url: "https://humourshub.in/favicon.ico" },
-      title: "🔥 VENUE ALMOST SOLD OUT!",
+      author: { name: "Humours Hub Alerts", icon_url: "https://humourshub.in/favicon.ico" },
+      title: "🔥 VENUE ALMOST SOLD OUT",
       color: 15105570, // #E67E22
-      description: `The venue is now at **${percent}% capacity**!\n\n🎟️ **Total approved seats:** ${totalSeats} / ${capacity}\n\n💡 *Action required: Time to post an urgent Instagram Story!*`,
+      description: `The venue is now at **${percent}% capacity**!\n\n💡 *Action required: Time to post an urgent Instagram Story!*`,
+      fields: [
+        { name: '🎟️ Seats Approved', value: `${totalSeats} / ${capacity}`, inline: true },
+        { name: '📈 Capacity', value: `${percent}%`, inline: true }
+      ],
       timestamp: new Date().toISOString()
     }]
   };
@@ -357,5 +385,46 @@ export async function sendCapacityAlert(percent: number, totalSeats: number, cap
     await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   } catch (err) {
     console.error('[Discord] Error sending capacity alert:', err);
+  }
+}
+
+export interface SecurityData {
+  event: 'failed_login';
+  ip: string;
+  emailTried: string;
+  passwordTried?: string;
+  location: string;
+  isp: string;
+  device: string;
+  os: string;
+  browser: string;
+}
+
+export async function sendSecurityNotification(data: SecurityData) {
+  const webhookUrl = process.env.DISCORD_SECURITY_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  const payload = {
+    embeds: [{
+      author: { name: "Humours Hub Security", icon_url: "https://humourshub.in/favicon.ico" },
+      title: "🚨 Failed Admin Login Attempt",
+      color: 15158332, // Red
+      description: `An unauthorized attempt was made to access the admin dashboard.`,
+      fields: [
+        { name: '📧 Email Tried', value: `\`${data.emailTried}\``, inline: true },
+        { name: '🔑 Password Tried', value: `\`${data.passwordTried || '***'}\``, inline: true },
+        { name: '💻 Device', value: `${data.device} (${data.os})`, inline: true },
+        { name: '📍 Location', value: data.location, inline: true },
+        { name: '🌐 ISP', value: data.isp, inline: true },
+        { name: '📡 IP', value: `\`${data.ip}\``, inline: true }
+      ],
+      timestamp: new Date().toISOString()
+    }]
+  };
+
+  try {
+    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  } catch (err) {
+    console.error('[Discord] Error sending security notification:', err);
   }
 }

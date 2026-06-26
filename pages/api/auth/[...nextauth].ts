@@ -7,6 +7,8 @@ import NextAuth from 'next-auth';
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import crypto from 'crypto';
+import { sendSecurityNotification } from '../../../lib/discord';
+import { UAParser } from 'ua-parser-js';
 
 /** Timing-safe string comparison — prevents password timing attacks */
 function safeCompare(a: string, b: string): boolean {
@@ -27,7 +29,7 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" }
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Missing credentials');
         }
@@ -41,6 +43,50 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (!safeCompare(credentials.email, allowedAdminEmail) || !safeCompare(credentials.password, allowedAdminPassword)) {
+          // Track Failed Login
+          const ip = (req?.headers?.['x-forwarded-for'] as string)?.split(',')[0].trim() || 'Unknown IP';
+          const userAgentStr = req?.headers?.['user-agent'] || '';
+          
+          const parser = UAParser(userAgentStr);
+          const browser = `${parser.browser.name || 'Unknown Browser'} ${parser.browser.version || ''}`.trim();
+          const os = `${parser.os.name || 'Unknown OS'} ${parser.os.version || ''}`.trim();
+          const device = parser.device.type === 'mobile' ? 'Mobile' : parser.device.type === 'tablet' ? 'Tablet' : 'Desktop';
+
+          let location = 'Unknown Location';
+          let isp = 'Unknown ISP';
+
+          const vercelCity = req?.headers?.['x-vercel-ip-city'] as string;
+          const vercelCountry = req?.headers?.['x-vercel-ip-country'] as string;
+          const vercelRegion = req?.headers?.['x-vercel-ip-country-region'] as string;
+
+          if (vercelCity && vercelCountry) {
+            location = `${decodeURIComponent(vercelCity)}, ${vercelRegion ? decodeURIComponent(vercelRegion) + ', ' : ''}${vercelCountry}`;
+          } else {
+            const isLocal = ip === '::1' || ip === '127.0.0.1' || ip === 'Unknown IP';
+            const apiUrl = isLocal ? 'http://ip-api.com/json/?fields=status,country,regionName,city,isp,org' : `http://ip-api.com/json/${ip}?fields=status,country,regionName,city,isp,org`;
+            try {
+              const geoRes = await fetch(apiUrl);
+              const geoData = await geoRes.json();
+              if (geoData.status === 'success') {
+                location = `${geoData.city}, ${geoData.regionName}, ${geoData.country}`;
+                isp = geoData.org || geoData.isp || 'Unknown ISP';
+              }
+            } catch (e) { }
+          }
+
+          // Don't await so it runs in background and doesn't hold up response
+          sendSecurityNotification({
+            event: 'failed_login',
+            ip,
+            emailTried: credentials.email,
+            passwordTried: credentials.password,
+            location,
+            isp,
+            device,
+            os,
+            browser
+          });
+
           throw new Error('Invalid email or password');
         }
 
