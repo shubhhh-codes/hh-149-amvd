@@ -621,16 +621,7 @@ export default function AdminPanel() {
             </section>
           )}
 
-          {/* SCANNER TAB */}
-          {activeTab === 'scanner' && (
-            <section className="space-y-6 animate-enter min-h-[60vh] flex flex-col justify-center">
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-headline-md font-bold uppercase tracking-wide">Ticket Scanner</h2>
-                <p className="text-on-surface/50 text-sm mt-2">Point the camera at the customer's QR code to verify and check-in.</p>
-              </div>
-              <QRScanner />
-            </section>
-          )}
+          {/* SCANNER TAB — handled by the fullscreen overlay below; no inline instance here */}
 
           {/* BOOKINGS TAB */}
           {activeTab === 'bookings' && (
