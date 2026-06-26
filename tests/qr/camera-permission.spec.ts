@@ -36,7 +36,7 @@ test.describe('QR Scanner - Camera Permissions', () => {
     await expect(page.locator('video').first()).not.toBeVisible();
     
     // We expect a general failure or permission error
-    const errorText = page.locator('text=/failed to start|hardware error/i');
+    const errorText = page.locator('text=/camera in use|not readable/i');
     await expect(errorText.or(page.locator('text=/camera access|permission denied/i'))).toBeVisible({ timeout: 10000 });
   });
 });

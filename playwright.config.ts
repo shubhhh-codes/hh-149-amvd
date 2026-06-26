@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const isCI = !!process.env.CI;
 
 export default defineConfig({
-  testDir: './tests/qr',
+  testDir: './tests',
   
   // Global timeout for standard tests
   timeout: 30 * 1000,
@@ -36,6 +36,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     contextOptions: {
       permissions: ['camera']
+    },
+    launchOptions: {
+      args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']
     }
   },
 

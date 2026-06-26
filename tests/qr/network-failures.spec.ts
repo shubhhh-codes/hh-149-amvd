@@ -59,6 +59,6 @@ test.describe('QR Scanner - Network Failures', () => {
       window['triggerQRScan']('OFFLINE-1234');
     });
 
-    await expect(page.locator('text=Failed to process QR code')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=/network error|timed out|poor connection/i')).toBeVisible({ timeout: 10000 });
   });
 });

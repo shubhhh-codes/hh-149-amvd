@@ -151,7 +151,7 @@ interface ScannedBooking {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 function hasBarcodeDetector(): boolean {
-  return typeof window !== 'undefined' && 'BarcodeDetector' in window;
+  return typeof window !== 'undefined' && typeof (window as any).BarcodeDetector === 'function';
 }
 
 /** Build getUserMedia constraints: prefer 720p @ 30–60 fps, continuous AF */
@@ -178,6 +178,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
   const [checkInLoading,   setCheckInLoading]   = useState(false);
   const [checkInQuantity,  setCheckInQuantity]  = useState(1);
   const [permissionError,  setPermissionError]  = useState(false);
+  const [hardwareError,    setHardwareError]    = useState(false);
   const [cameras,          setCameras]          = useState<CameraDevice[]>([]);
   const [activeCameraId,   setActiveCameraId]   = useState<string | null>(null);
   const [torchSupported,   setTorchSupported]   = useState(false);
@@ -211,12 +212,12 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
   const streamRef     = useRef<MediaStream | null>(null);
   const trackRef      = useRef<MediaStreamTrack | null>(null);
   const detectorRef   = useRef<BDInstance | null>(null);
-  const roiCanvas     = useRef<OffscreenCanvas | null>(null);
-  const roiCtx        = useRef<OffscreenCanvasRenderingContext2D | null>(null); // cached ctx
+  const roiCanvas     = useRef<OffscreenCanvas | HTMLCanvasElement | null>(null);
+  const roiCtx        = useRef<any>(null); // cached ctx
   const luxCanvas     = useRef<OffscreenCanvas | HTMLCanvasElement | null>(null);
-  const luxCtx        = useRef<OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null>(null); // cached ctx
-  const prevCanvas    = useRef<OffscreenCanvas | null>(null); // previous frame for motion-blur delta
-  const prevCtx       = useRef<OffscreenCanvasRenderingContext2D | null>(null);
+  const luxCtx        = useRef<any>(null); // cached ctx
+  const prevCanvas    = useRef<OffscreenCanvas | HTMLCanvasElement | null>(null); // previous frame for motion-blur delta
+  const prevCtx       = useRef<any>(null);
   const isDecoding    = useRef(false);
   const expandROI     = useRef(false);
   const noDetectCtr   = useRef(0);
@@ -241,6 +242,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
 
   // html5-qrcode fallback
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fallbackFocusTimer = useRef<any>(null);
 
   // Duplicate suppression
   const lastDecoded = useRef({ text: '', at: 0 });
@@ -320,12 +322,16 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
       setErrorMsg('');
       await stopFn();
 
+      if (isDestroyed.current) return;
+
       const res = await fetch('/api/admin/bookings/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qrData: text }),
         signal: abortController.signal,
       });
+
+      if (isDestroyed.current) return;
 
       if (!res.ok) {
         let errorMsgToSet = 'Server error';
@@ -337,6 +343,8 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
         } catch (parseError) {
           // Failed to parse JSON error response
         }
+
+        if (isDestroyed.current) return;
 
         haptic('warning');
         setErrorMsg(errorMsgToSet);
@@ -351,6 +359,8 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
       }
 
       const data = await res.json();
+      if (isDestroyed.current) return;
+
       haptic('success');
       const remaining = data.numberOfTickets - (data.checkedInCount ?? 0);
       setScannedBooking(data);
@@ -358,6 +368,8 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
       if (remaining <= 0) { haptic('warning'); setErrorMsg('Ticket Fully Used (0 Seats Remaining)'); }
 
     } catch (error: any) {
+      if (isDestroyed.current) return;
+
       haptic('error');
       if (error?.name === 'AbortError') {
         setErrorMsg('Request timed out / Poor connection');
@@ -376,7 +388,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
       }, 3000);
     } finally {
       clearTimeout(fetchTimeout);
-      setLoading(false);
+      if (!isDestroyed.current) setLoading(false);
     }
   }, [cancelRetry, haptic]);
 
@@ -500,9 +512,11 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
     trackRef.current  = null;
 
     scannerState.current = 'idle';
-    setPreviewReady(false);
-    setTorchOn(false);
-    setTorchSupported(false);
+    if (!isDestroyed.current) {
+      setPreviewReady(false);
+      setTorchOn(false);
+      setTorchSupported(false);
+    }
   }, []);
 
   /** Forward-declared so the frame loop can reference the latest version */
@@ -518,7 +532,14 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
     if (!video || !video.videoWidth) return false;
     try {
       if (!prevCanvas.current) {
-        prevCanvas.current = new OffscreenCanvas(16, 16);
+        if (typeof OffscreenCanvas !== 'undefined') {
+          prevCanvas.current = new OffscreenCanvas(16, 16);
+        } else {
+          const canvas = document.createElement('canvas');
+          canvas.width = 16;
+          canvas.height = 16;
+          prevCanvas.current = canvas;
+        }
         prevCtx.current    = prevCanvas.current.getContext('2d', { willReadFrequently: true });
         motionBuf.current  = new Uint8Array(16 * 16); // stores previous lum values
       }
@@ -582,8 +603,15 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
 
     // Ensure ROI canvas is correct size; reuse context
     if (!roiCanvas.current) {
-      roiCanvas.current = new OffscreenCanvas(rw, rh);
-      roiCtx.current    = roiCanvas.current.getContext('2d', { willReadFrequently: true });
+      if (typeof OffscreenCanvas !== 'undefined') {
+        roiCanvas.current = new OffscreenCanvas(rw, rh);
+      } else {
+        const canvas = document.createElement('canvas');
+        canvas.width = rw;
+        canvas.height = rh;
+        roiCanvas.current = canvas;
+      }
+      roiCtx.current = roiCanvas.current.getContext('2d', { willReadFrequently: true });
     } else if (roiCanvas.current.width !== rw || roiCanvas.current.height !== rh) {
       roiCanvas.current.width  = rw;
       roiCanvas.current.height = rh;
@@ -668,6 +696,8 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
       scannerState.current = 'starting';
       setLoading(true);
       setPreviewReady(false);
+      setPermissionError(false);
+      setHardwareError(false);
       expandROI.current   = false;
       noDetectCtr.current = 0;
       luxFrameCtr.current = 0;
@@ -746,9 +776,13 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
 
       } catch (err: any) {
         scannerState.current = 'idle';
+        if (isDestroyed.current) return;
         setLoading(false);
         if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
           setPermissionError(true); return;
+        }
+        if (err?.name === 'NotReadableError' || err?.name === 'TrackStartError') {
+          setHardwareError(true); return;
         }
         // Specific device failed → retry with env facing mode
         if (deviceId && !isDestroyed.current) {
@@ -782,11 +816,14 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
     if (scannerState.current !== 'running') return;
     log('FB STOP');
     scannerState.current = 'stopping';
-    try { await scannerRef.current?.stop(); } catch (e) { console.error('[QR] fb stop:', e); }
+    if (fallbackFocusTimer.current) clearTimeout(fallbackFocusTimer.current);
+    try { await scannerRef.current?.stop(); } catch (e) { if (process.env.NODE_ENV !== 'production') console.error('[QR] fb stop:', e); }
     scannerState.current = 'idle';
-    setPreviewReady(false);
-    setTorchOn(false);
-    setTorchSupported(false);
+    if (!isDestroyed.current) {
+      setPreviewReady(false);
+      setTorchOn(false);
+      setTorchSupported(false);
+    }
   }, []);
 
   const startFallback = useCallback((config?: any) => {
@@ -799,6 +836,8 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
       log(`FB START config=${JSON.stringify(cfg)}`);
       scannerState.current = 'starting';
       setLoading(true);
+      setPermissionError(false);
+      setHardwareError(false);
       lastDecoded.current = { text: '', at: 0 };
 
       try {
@@ -821,7 +860,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
 
         if (isDestroyed.current) {
           try { await scannerRef.current?.stop(); } catch (_) {}
-          scannerState.current = 'idle'; setLoading(false); return;
+          scannerState.current = 'idle'; return;
         }
 
         scannerState.current = 'running';
@@ -830,7 +869,8 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
         log('FB START done');
 
         // P1 — Detect capabilities and apply CAF after fallback stream settles
-        setTimeout(async () => {
+        if (fallbackFocusTimer.current) clearTimeout(fallbackFocusTimer.current);
+        fallbackFocusTimer.current = setTimeout(async () => {
           try {
             if (!scannerRef.current || scannerState.current !== 'running') return;
             const getTrack = (scannerRef.current as any).getRunningTrack as Function | undefined;
@@ -848,9 +888,13 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
 
       } catch (err: any) {
         scannerState.current = 'idle';
+        if (isDestroyed.current) return;
         setLoading(false);
         if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError' || err === 'NotAllowedError') {
           setPermissionError(true); return;
+        }
+        if (err?.name === 'NotReadableError' || err?.name === 'TrackStartError' || err === 'NotReadableError') {
+          setHardwareError(true); return;
         }
         const msg = typeof err === 'string' ? err : (err?.message ?? JSON.stringify(err));
         // Specific device failed → fall back to environment camera
@@ -869,7 +913,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
     await _fbStopRaw();
     log('FB CLEAR');
     scannerState.current = 'destroyed';
-    try { await scannerRef.current.clear(); } catch (e) { console.error('[QR] fb clear:', e); }
+    try { await scannerRef.current.clear(); } catch (e) { if (process.env.NODE_ENV !== 'production') console.error('[QR] fb clear:', e); }
     scannerRef.current = null;
   }, [_fbStopRaw]);
 
@@ -913,7 +957,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
         if (!scannerRef.current) {
           scannerRef.current = new Html5Qrcode('qr-reader', {
             verbose: false,
-            experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+            experimentalFeatures: { useBarCodeDetectorIfSupported: bd },
           });
           log('Html5Qrcode instance created');
         }
@@ -953,13 +997,17 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
           await startScanner(null);
         }
       } catch (err: any) {
-        if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError' || err === 'NotAllowedError') {
-          setPermissionError(true);
-        } else {
-          setErrorMsg('Camera unavailable: ' + (typeof err === 'string' ? err : (err?.message ?? '')));
+        if (!isDestroyed.current) {
+          if (err?.name === 'NotReadableError' || err?.name === 'TrackStartError') {
+            setHardwareError(true);
+          } else if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError' || err === 'NotAllowedError') {
+            setPermissionError(true);
+          } else {
+            setErrorMsg('Camera unavailable: ' + (typeof err === 'string' ? err : (err?.message ?? '')));
+          }
         }
       } finally {
-        setLoading(false);
+        if (!isDestroyed.current) setLoading(false);
       }
     };
 
@@ -988,14 +1036,8 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
         streamRef.current?.getTracks().forEach(t => t.stop());
         streamRef.current = null; trackRef.current = null;
       } else {
-        // FB path: must be async; serialise through mutex
         currentMutex.run(async () => {
           await destroyFallback();
-          // Remove DOM nodes created by html5-qrcode
-          const qrReader = document.getElementById('qr-reader');
-          if (qrReader) {
-            qrReader.innerHTML = '';
-          }
         });
       }
 
@@ -1047,7 +1089,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
       }
       setTorchOn(next);
       setIsLowLight(false); // user acted on suggestion — dismiss banner
-    } catch (e) { console.error('[QR] Torch failed:', e); }
+    } catch (e) { if (process.env.NODE_ENV !== 'production') console.error('[QR] Torch failed:', e); }
   };
 
   const handleConfirmCheckIn = async () => {
@@ -1131,6 +1173,22 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
             className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded font-bold
                        uppercase tracking-wider transition-colors">
             I fixed it — Reload
+          </button>
+        </div>
+      ) : hardwareError ? (
+        /* ── Hardware error ────────────────────────────────────────────── */
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-black">
+          <span className="material-symbols-outlined text-5xl mb-4 text-orange-500">videocam_off</span>
+          <h3 className="font-headline-md text-xl font-bold uppercase tracking-wide text-white mb-2">
+            Camera in Use or Unavailable
+          </h3>
+          <p className="text-on-surface/70 text-sm mb-6">
+            Another application is using the camera, or it is not readable. Please close other apps and try again.
+          </p>
+          <button onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded font-bold
+                       uppercase tracking-wider transition-colors">
+            Reload
           </button>
         </div>
       ) : (
@@ -1417,8 +1475,6 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
           position:   absolute !important;
           inset:      0 !important;
         }
-        #qr-reader__scan_region { display: none !important; }
-
         /* GPU-accelerated scan-line  (transform: translateY, no layout cost) */
         .scan-frame { --sh: 200px; }
         .scan-line  { animation: scan-move 2.5s ease-in-out infinite; }

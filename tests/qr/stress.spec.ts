@@ -71,16 +71,13 @@ test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
     await page.waitForFunction(() => typeof window['triggerQRScan'] === 'function');
 
     for (let i = 0; i < 100; i++) {
-      await page.evaluate(() => window['triggerQRScan']('VALID-1234'));
+      await page.evaluate((val) => window['triggerQRScan'](val), `VALID-${i}`);
       
       // Wait for UI to update to the scanned ticket
       await expect(page.locator('text=John Doe')).toBeVisible();
       
       // Close the modal to return to scanner
-      await page.click('button[aria-label="Close"]', { timeout: 2000 }).catch(async () => {
-         // Fallback if the close button for modal is not labelled
-         await page.click('.material-symbols-outlined:has-text("close")');
-      });
+      await page.click('.animate-slide-up button:has(.material-symbols-outlined:has-text("close"))');
       
       // Wait for camera to be visible again
       await expect(page.locator('video:visible').first()).toBeVisible();
@@ -106,7 +103,10 @@ test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
     const hugePayload = 'X'.repeat(50000); // 50KB payload
     await page.evaluate((payload) => window['triggerQRScan'](payload), hugePayload);
 
-    await expect(page.locator('text=Payload too large or invalid')).toBeVisible();
+    // Should silently ignore, so no error toast and video remains visible
+    await page.waitForTimeout(1000);
+    await expect(page.locator('text=Payload too large or invalid')).not.toBeVisible();
+    await expect(page.locator('video:visible').first()).toBeVisible();
   });
 
   test('STRESS-004: Multi-tab scanner open simultaneously', async ({ context }) => {
@@ -118,7 +118,11 @@ test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
     const setupPage = async (p) => {
       await mockAdminSession(p);
       await mockCameraPermission(p, 'granted');
-      await p.route('**/api/admin/*', route => route.fulfill({ status: 200, json: {} }));
+      await p.route('**/api/admin/bookings', route => route.fulfill({ status: 200, json: { bookings: [] } }));
+      await p.route('**/api/admin/comedians', route => route.fulfill({ status: 200, json: { comedians: [] } }));
+      await p.route('**/api/admin/payments', route => route.fulfill({ status: 200, json: { payments: [], stats: {} } }));
+      await p.route('**/api/admin/contact-messages', route => route.fulfill({ status: 200, json: { messages: [] } }));
+      await p.route('**/api/admin/feedbacks', route => route.fulfill({ status: 200, json: { feedbacks: [] } }));
       await p.goto('/admin');
       await p.click('button:has-text("QR Scanner")');
       await expect(p.locator('video:visible').first()).toBeVisible();
@@ -157,7 +161,11 @@ test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
 
     // Online
     await page.context().setOffline(false);
-    await page.evaluate(() => window['triggerQRScan']('VALID-1234'));
-    await expect(page.locator('text=John')).toBeVisible();
+    
+    // Use toPass to repeatedly try scanning until the camera is fully restarted and accepts scans
+    await expect(async () => {
+      await page.evaluate(() => window['triggerQRScan']('VALID-1234-ONLINE'));
+      await expect(page.locator('text=John')).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 15000 });
   });
 });

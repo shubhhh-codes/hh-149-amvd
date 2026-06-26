@@ -65,6 +65,6 @@ test.describe('QR Scanner - Valid Scanning Flows', () => {
     await expect(page.locator('text=John Doe')).toBeVisible({ timeout: 10000 });
     
     // Check in button should be visible
-    await expect(page.locator('button:has-text("CHECK IN")')).toBeVisible();
+    await expect(page.locator('button', { hasText: /Confirm Check-In/i })).toBeVisible();
   });
 });

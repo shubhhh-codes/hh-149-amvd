@@ -6,11 +6,11 @@ test.describe('QR Scanner - Fallback Path @camera @integration', () => {
   test.beforeEach(async ({ page }) => {
     await mockAdminSession(page);
     
-    // Force window.BarcodeDetector to undefined to trigger fallback path
     await page.addInitScript(() => {
-      Object.defineProperty(window, 'BarcodeDetector', {
-        get: () => undefined,
-      });
+      delete (window as any).BarcodeDetector;
+      if (typeof (window as any).BarcodeDetector !== 'undefined') {
+        (window as any).BarcodeDetector = undefined;
+      }
     });
 
     // Mock APIs used on dashboard load to prevent errors
