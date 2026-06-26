@@ -24,6 +24,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode, CameraDevice } from 'html5-qrcode';
 import { toast } from 'react-toastify';
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // BarcodeDetector types  (not universally in TS stdlib yet)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -183,6 +184,8 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
   const [torchOn,          setTorchOn]          = useState(false);
   const [isLowLight,       setIsLowLight]       = useState(false);
   const [previewReady,     setPreviewReady]      = useState(false);
+
+
 
   // ── Stable refs (no re-renders) ────────────────────────────────────────────
   // Lifecycle
@@ -370,7 +373,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
       // Lazy-create canvas + cache context once
       if (!luxCanvas.current) {
         luxCanvas.current = new OffscreenCanvas(16, 16);
-        luxCtx.current = luxCanvas.current.getContext('2d');
+        luxCtx.current = luxCanvas.current.getContext('2d', { willReadFrequently: true });
       }
       const ctx = luxCtx.current;
       if (!ctx) return;
@@ -484,7 +487,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
     try {
       if (!prevCanvas.current) {
         prevCanvas.current = new OffscreenCanvas(16, 16);
-        prevCtx.current    = prevCanvas.current.getContext('2d');
+        prevCtx.current    = prevCanvas.current.getContext('2d', { willReadFrequently: true });
         motionBuf.current  = new Uint8Array(16 * 16); // stores previous lum values
       }
       const ctx = prevCtx.current;
@@ -548,11 +551,11 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
     // Ensure ROI canvas is correct size; reuse context
     if (!roiCanvas.current) {
       roiCanvas.current = new OffscreenCanvas(rw, rh);
-      roiCtx.current    = roiCanvas.current.getContext('2d');
+      roiCtx.current    = roiCanvas.current.getContext('2d', { willReadFrequently: true });
     } else if (roiCanvas.current.width !== rw || roiCanvas.current.height !== rh) {
       roiCanvas.current.width  = rw;
       roiCanvas.current.height = rh;
-      roiCtx.current = roiCanvas.current.getContext('2d'); // re-fetch after resize
+      roiCtx.current = roiCanvas.current.getContext('2d', { willReadFrequently: true }); // re-fetch after resize
     }
     const ctx = roiCtx.current;
     if (!ctx) return;
@@ -929,6 +932,9 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
 
     rafId = requestAnimationFrame(init);
 
+    const currentVideo = videoRef.current;
+    const currentMutex = mutex.current;
+
     // ── Cleanup ──────────────────────────────────────────────────────────────
     return () => {
       log('CLEANUP');
@@ -939,7 +945,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
 
       if (bd) {
         // BD path: cancel frame loop and release stream synchronously
-        const video = videoRef.current;
+        const video = currentVideo;
         if (video && 'requestVideoFrameCallback' in video && rvfcHandle.current) {
           try { (video as any).cancelVideoFrameCallback(rvfcHandle.current); } catch (_) {}
         } else if (rvfcHandle.current) {
@@ -950,7 +956,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
         streamRef.current = null; trackRef.current = null;
       } else {
         // FB path: must be async; serialise through mutex
-        mutex.current.run(() => destroyFallback());
+        currentMutex.run(() => destroyFallback());
       }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

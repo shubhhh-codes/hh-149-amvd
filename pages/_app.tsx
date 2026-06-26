@@ -16,6 +16,31 @@ import '@/styles/globals.css';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { useJourneyTracker } from '@/hooks/useJourneyTracker';
 
+// ── Global Canvas Patch ────────────────────────────────────────────────────
+// Suppresses 'willReadFrequently' warnings triggered by internal html5-qrcode canvases
+// Placed in _app.tsx to guarantee it runs before any module (like zxing-js) evaluates
+// and potentially caches or calls getContext on a canvas.
+if (typeof window !== 'undefined') {
+  if (typeof HTMLCanvasElement !== 'undefined') {
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    (HTMLCanvasElement.prototype as any).getContext = function (type: string, attributes?: any) {
+      if (type === '2d') {
+        attributes = { ...(attributes || {}), willReadFrequently: true };
+      }
+      return originalGetContext.call(this, type, attributes);
+    };
+  }
+  if (typeof OffscreenCanvas !== 'undefined') {
+    const originalOffscreenGetContext = OffscreenCanvas.prototype.getContext;
+    (OffscreenCanvas.prototype as any).getContext = function (type: string, attributes?: any) {
+      if (type === '2d') {
+        attributes = { ...(attributes || {}), willReadFrequently: true };
+      }
+      return originalOffscreenGetContext.call(this, type as any, attributes);
+    };
+  }
+}
+
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
   useJourneyTracker();
 
