@@ -184,6 +184,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
   const [torchOn,          setTorchOn]          = useState(false);
   const [isLowLight,       setIsLowLight]       = useState(false);
   const [previewReady,     setPreviewReady]      = useState(false);
+  const [useBDState,       setUseBDState]        = useState(false);
 
 
 
@@ -212,8 +213,8 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
   const detectorRef   = useRef<BDInstance | null>(null);
   const roiCanvas     = useRef<OffscreenCanvas | null>(null);
   const roiCtx        = useRef<OffscreenCanvasRenderingContext2D | null>(null); // cached ctx
-  const luxCanvas     = useRef<OffscreenCanvas | null>(null);
-  const luxCtx        = useRef<OffscreenCanvasRenderingContext2D | null>(null); // cached ctx
+  const luxCanvas     = useRef<OffscreenCanvas | HTMLCanvasElement | null>(null);
+  const luxCtx        = useRef<OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null>(null); // cached ctx
   const prevCanvas    = useRef<OffscreenCanvas | null>(null); // previous frame for motion-blur delta
   const prevCtx       = useRef<OffscreenCanvasRenderingContext2D | null>(null);
   const isDecoding    = useRef(false);
@@ -311,21 +312,34 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
     haptic('detect');
     cancelRetry();
 
+    const abortController = new AbortController();
+    const fetchTimeout = setTimeout(() => abortController.abort(), 8000);
+
     try {
       setLoading(true);
       setErrorMsg('');
       await stopFn();
 
-      const res  = await fetch('/api/admin/bookings/scan', {
+      const res = await fetch('/api/admin/bookings/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qrData: text }),
+        signal: abortController.signal,
       });
-      const data = await res.json();
 
       if (!res.ok) {
+        let errorMsgToSet = 'Server error';
+        try {
+          const data = await res.json();
+          if (data && data.message) {
+            errorMsgToSet = data.message;
+          }
+        } catch (parseError) {
+          // Failed to parse JSON error response
+        }
+
         haptic('warning');
-        setErrorMsg(data.message || 'Invalid Ticket');
+        setErrorMsg(errorMsgToSet);
         cancelRetry();
         retryTimer.current = setTimeout(async () => {
           retryTimer.current = null;
@@ -336,15 +350,23 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
         return;
       }
 
+      const data = await res.json();
       haptic('success');
       const remaining = data.numberOfTickets - (data.checkedInCount ?? 0);
       setScannedBooking(data);
       setCheckInQuantity(remaining > 0 ? remaining : 0);
       if (remaining <= 0) { haptic('warning'); setErrorMsg('Ticket Fully Used (0 Seats Remaining)'); }
 
-    } catch {
+    } catch (error: any) {
       haptic('error');
-      setErrorMsg('Failed to process QR code');
+      if (error?.name === 'AbortError') {
+        setErrorMsg('Request timed out / Poor connection');
+      } else if (error instanceof TypeError) {
+        setErrorMsg('Network error / Offline');
+      } else {
+        setErrorMsg('Unexpected error');
+      }
+      
       cancelRetry();
       retryTimer.current = setTimeout(async () => {
         retryTimer.current = null;
@@ -353,6 +375,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
         await retryFn();
       }, 3000);
     } finally {
+      clearTimeout(fetchTimeout);
       setLoading(false);
     }
   }, [cancelRetry, haptic]);
@@ -372,8 +395,17 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
     try {
       // Lazy-create canvas + cache context once
       if (!luxCanvas.current) {
-        luxCanvas.current = new OffscreenCanvas(16, 16);
-        luxCtx.current = luxCanvas.current.getContext('2d', { willReadFrequently: true });
+        if (typeof OffscreenCanvas !== 'undefined') {
+          luxCanvas.current = new OffscreenCanvas(16, 16);
+        } else {
+          const canvas = document.createElement('canvas');
+          canvas.width = 16;
+          canvas.height = 16;
+          luxCanvas.current = canvas;
+        }
+        if (luxCanvas.current) {
+          luxCtx.current = luxCanvas.current.getContext('2d', { willReadFrequently: true }) as any;
+        }
       }
       const ctx = luxCtx.current;
       if (!ctx) return;
@@ -864,6 +896,7 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
 
     const bd = hasBarcodeDetector();
     useBD.current = bd;
+    setUseBDState(bd);
     log(`BarcodeDetector=${bd}`);
 
     let rafId: number;
@@ -956,8 +989,22 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
         streamRef.current = null; trackRef.current = null;
       } else {
         // FB path: must be async; serialise through mutex
-        currentMutex.run(() => destroyFallback());
+        currentMutex.run(async () => {
+          await destroyFallback();
+          // Remove DOM nodes created by html5-qrcode
+          const qrReader = document.getElementById('qr-reader');
+          if (qrReader) {
+            qrReader.innerHTML = '';
+          }
+        });
       }
+
+      // Aggressively ensure any lingering tracks in our stream ref are stopped
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      trackRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1012,17 +1059,23 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingId: scannedBooking.bookingId, checkInQuantity }),
       });
+      if (isDestroyed.current) return;
       const data = await res.json();
+      if (isDestroyed.current) return;
       if (!res.ok) throw new Error(data.message);
       toast.success(data.message);
       setScannedBooking(null);
       setErrorMsg('');
       lastDecoded.current = { text: '', at: 0 };
       await startScanner(activeCameraIdRef.current);
+      if (isDestroyed.current) return;
     } catch (err: any) {
+      if (isDestroyed.current) return;
       toast.error(err.message || 'Check-in failed');
     } finally {
-      setCheckInLoading(false);
+      if (!isDestroyed.current) {
+        setCheckInLoading(false);
+      }
     }
   };
 
@@ -1037,11 +1090,11 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
   // RENDER
   // ═══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col overflow-hidden select-none">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="absolute top-0 left-0 right-0 z-[60] p-4 flex justify-between items-center
-                      bg-gradient-to-b from-black/80 to-transparent pt-safe">
+      <div className="absolute top-0 left-0 right-0 z-[60] px-6 py-5 flex justify-between items-center
+                      bg-gradient-to-b from-black/90 via-black/50 to-transparent backdrop-blur-[2px] pt-safe border-b border-white/5">
         <h2 className="text-xl font-headline-md font-bold text-white uppercase tracking-wide">
           Scanner
         </h2>
@@ -1085,40 +1138,53 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
         <div className="relative flex-1 bg-black overflow-hidden">
 
           {/* BarcodeDetector path: native <video> element */}
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ display: useBD.current ? 'block' : 'none' }}
-          />
+          {useBDState && (
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )}
 
           {/* html5-qrcode fallback: library owns this div */}
-          <div
-            id="qr-reader"
-            className="absolute inset-0 w-full h-full"
-            style={{ display: useBD.current ? 'none' : 'block' }}
-          />
+          {!useBDState && (
+            <div
+              id="qr-reader"
+              className="absolute inset-0 w-full h-full"
+            />
+          )}
 
           {/* ── Scan frame + corners + GPU scan-line ─────────────────── */}
           {!loading && (
             <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
+              
+              {/* Instructional Text */}
+              <div className="absolute top-[20%] text-white/60 font-mono text-sm tracking-[0.2em] uppercase drop-shadow-md">
+                Align QR Code within frame
+              </div>
+
               <div
                 ref={frameBoxRef}
-                className="scan-frame relative rounded-2xl"
-                style={{ width: '72%', aspectRatio: '1' }}
+                className="scan-frame relative rounded-[2rem]"
+                style={{ width: '75%', aspectRatio: '1' }}
               >
-                {/* Dark mask via box-shadow */}
-                <div className="absolute inset-0 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.60)]" />
-                {/* Corner brackets */}
-                <div className="absolute -top-px -left-px  w-9 h-9 border-t-[3px] border-l-[3px] border-primary-container rounded-tl-2xl" />
-                <div className="absolute -top-px -right-px w-9 h-9 border-t-[3px] border-r-[3px] border-primary-container rounded-tr-2xl" />
-                <div className="absolute -bottom-px -left-px  w-9 h-9 border-b-[3px] border-l-[3px] border-primary-container rounded-bl-2xl" />
-                <div className="absolute -bottom-px -right-px w-9 h-9 border-b-[3px] border-r-[3px] border-primary-container rounded-br-2xl" />
-                {/* GPU-accelerated scan line (transform-based, never layout) */}
+                {/* Dark mask via box-shadow (darker focus) */}
+                <div className="absolute inset-0 rounded-[2rem] shadow-[0_0_0_9999px_rgba(0,0,0,0.75)] transition-opacity duration-1000" />
+                
+                {/* Inner subtle grid */}
+                <div className="absolute inset-0 rounded-[2rem] bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:24px_24px] mix-blend-overlay" />
+
+                {/* Enhanced glowing corner brackets */}
+                <div className="absolute -top-[2px] -left-[2px] w-12 h-12 border-t-[4px] border-l-[4px] border-primary-container rounded-tl-[2rem] drop-shadow-[0_0_12px_rgba(255,107,26,0.8)]" />
+                <div className="absolute -top-[2px] -right-[2px] w-12 h-12 border-t-[4px] border-r-[4px] border-primary-container rounded-tr-[2rem] drop-shadow-[0_0_12px_rgba(255,107,26,0.8)]" />
+                <div className="absolute -bottom-[2px] -left-[2px] w-12 h-12 border-b-[4px] border-l-[4px] border-primary-container rounded-bl-[2rem] drop-shadow-[0_0_12px_rgba(255,107,26,0.8)]" />
+                <div className="absolute -bottom-[2px] -right-[2px] w-12 h-12 border-b-[4px] border-r-[4px] border-primary-container rounded-br-[2rem] drop-shadow-[0_0_12px_rgba(255,107,26,0.8)]" />
+                
+                {/* GPU-accelerated scan line */}
                 {previewReady && (
-                  <div className="scan-line absolute left-0 right-0 h-[2px] bg-primary-container
-                                  shadow-[0_0_12px_4px_rgba(255,107,26,0.65)]" />
+                  <div className="scan-line absolute left-0 right-0 h-[3px] bg-primary-container
+                                  shadow-[0_0_24px_8px_rgba(255,107,26,0.7)] rounded-full" />
                 )}
               </div>
             </div>
@@ -1214,16 +1280,19 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
       )}
 
       {/* ── Error overlay (auto-dismisses after retry) ────────────────── */}
-      {errorMsg && !scannedBooking && !loading && (
-
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center
-                        bg-red-950/95 text-white p-6 text-center">
-          <span className="material-symbols-outlined text-6xl mb-4 text-red-400">error</span>
-          <h3 className="font-headline-md text-2xl font-bold uppercase tracking-wide mb-2">
-            Scan Failed
-          </h3>
-          <p className="font-body-md text-lg text-red-300">{errorMsg}</p>
-          <p className="text-white/40 text-sm mt-4">Retrying in 3 s…</p>
+      {errorMsg && !loading && (
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[80] w-[90%] max-w-sm
+                        flex items-center gap-4 bg-red-950/90 backdrop-blur-md text-white p-4 
+                        rounded-2xl shadow-[0_10px_40px_rgba(255,0,0,0.2)] border border-red-500/30 animate-scale-up">
+          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+            <span className="material-symbols-outlined text-2xl text-red-400">warning</span>
+          </div>
+          <div className="flex-1 text-left">
+            <h3 className="font-headline-md font-bold uppercase tracking-wide text-sm text-red-100">
+              Scan Failed
+            </h3>
+            <p className="font-body-md text-sm text-red-300 leading-snug">{errorMsg}</p>
+          </div>
         </div>
       )}
 

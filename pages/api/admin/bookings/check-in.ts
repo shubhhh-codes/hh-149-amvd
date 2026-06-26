@@ -43,30 +43,59 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const currentCheckedIn = booking.checkedInCount || 0;
     const totalTickets = booking.numberOfTickets;
     
-    const newCheckedInCount = currentCheckedIn + checkInQuantity;
-    
-    if (newCheckedInCount > totalTickets) {
+    // Fast-fail if obviously over capacity before hitting DB again
+    if (currentCheckedIn + checkInQuantity > totalTickets) {
       return res.status(400).json({ 
         message: `Cannot check in ${checkInQuantity} people. Only ${totalTickets - currentCheckedIn} seats remaining.` 
       });
     }
 
-    const isFullyAttended = newCheckedInCount === totalTickets;
-
-    const result = await db.collection('bookings').updateOne(
-      { bookingId },
+    // Atomic update using an aggregation pipeline to strictly verify capacity and update conditionally
+    const result = await db.collection('bookings').findOneAndUpdate(
       { 
-        $set: { 
-          checkedInCount: newCheckedInCount,
-          attended: isFullyAttended,
-          updatedAt: new Date(),
-          ...(isFullyAttended ? { attendedAt: new Date() } : {})
-        } 
-      }
+        bookingId,
+        $expr: { 
+          $gte: [ 
+            "$numberOfTickets", 
+            { $add: [ { $ifNull: ["$checkedInCount", 0] }, checkInQuantity ] } 
+          ] 
+        }
+      },
+      [
+        {
+          $set: {
+            checkedInCount: { $add: [ { $ifNull: ["$checkedInCount", 0] }, checkInQuantity ] },
+            updatedAt: "$$NOW"
+          }
+        },
+        {
+          $set: {
+            attended: { $eq: [ "$checkedInCount", "$numberOfTickets" ] },
+            attendedAt: { 
+              $cond: { 
+                if: { $eq: [ "$checkedInCount", "$numberOfTickets" ] }, 
+                then: { $ifNull: ["$attendedAt", "$$NOW"] }, 
+                else: "$attendedAt" 
+              } 
+            }
+          }
+        }
+      ],
+      { returnDocument: 'after' }
     );
 
-    if (result.modifiedCount === 0) {
-      return res.status(400).json({ message: 'Failed to update attendance' });
+    // MongoDB Node Driver v6 returns the doc directly, v4 wrapped it in `{ value }`. Handle both safely.
+    const updatedBooking = result?.value !== undefined ? result.value : result;
+
+    if (!updatedBooking) {
+      // The atomic update failed, meaning a concurrent request just took the tickets.
+      // Re-fetch to get the exact new remaining count for the error message.
+      const latestBooking = await db.collection('bookings').findOne({ bookingId });
+      const latestCheckedIn = latestBooking?.checkedInCount || 0;
+      const remaining = totalTickets - latestCheckedIn;
+      return res.status(400).json({ 
+        message: `Cannot check in ${checkInQuantity} people. Only ${remaining} seats remaining.` 
+      });
     }
 
     // Fire webhook notification asynchronously
@@ -76,15 +105,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       email: booking.email,
       phone: booking.phone,
       checkInQuantity,
-      totalCheckedIn: newCheckedInCount,
+      totalCheckedIn: updatedBooking.checkedInCount,
       totalTickets,
       bookingType: booking.bookingType
     }).catch(console.error);
 
     return res.status(200).json({
       message: `Successfully checked in ${checkInQuantity} people`,
-      checkedInCount: newCheckedInCount,
-      attended: isFullyAttended
+      checkedInCount: updatedBooking.checkedInCount,
+      attended: updatedBooking.attended
     });
 
   } catch (error) {

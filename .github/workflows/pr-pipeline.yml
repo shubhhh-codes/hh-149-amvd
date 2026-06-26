@@ -44,9 +44,9 @@ jobs:
       if: steps.playwright-cache.outputs.cache-hit == 'true'
       run: npx playwright install-deps chromium
 
-    - name: Run Fast Pipeline (@smoke, @integration, @a11y)
+    - name: Run Fast Pipeline (@smoke, @integration, @camera, @network, @a11y)
       # Specifically excludes @stress and heavy tests
-      run: npx playwright test --grep "@smoke|@integration|@a11y"
+      run: npx playwright test --grep "@smoke|@integration|@camera|@network|@a11y" --grep-invert "@stress"
       env:
         NODE_ENV: test
         CI: true

@@ -13,9 +13,19 @@ const SECRET_KEY_ENV = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET;
 const SECRET_KEY = SECRET_KEY_ENV || 'fallback-secret-key-do-not-use-in-prod';
 
 function verifySignature(compactData: any, signature: string): boolean {
+  if (typeof signature !== 'string' || !signature) return false;
+  
   const payloadString = JSON.stringify(compactData);
   const expectedSig = crypto.createHmac('sha256', SECRET_KEY).update(payloadString).digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig));
+  
+  if (signature.length !== expectedSig.length) return false;
+  if (!/^[0-9a-fA-F]+$/.test(signature)) return false;
+  
+  try {
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig));
+  } catch {
+    return false;
+  }
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
