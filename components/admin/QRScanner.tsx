@@ -77,16 +77,12 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
       await scannerRef.current.start(
         targetConfig,
         {
-          fps: 60, // High FPS for faster decode
+          fps: 30, // 30 FPS is safer across devices than 60
           qrbox: (viewfinderWidth, viewfinderHeight) => {
             const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
             return { width: Math.floor(minEdgeSize * 0.65), height: Math.floor(minEdgeSize * 0.65) };
           },
           aspectRatio: 1.0,
-          videoConstraints: {
-            width: { ideal: 1280 }, // 720p for faster processing
-            height: { ideal: 720 },
-          }
         },
         async (decodedText) => {
           if (stateRefs.current.loading || stateRefs.current.scannedBooking) return;
@@ -193,10 +189,11 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
       }, 1000);
 
     } catch (err: any) {
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError' || err === 'NotAllowedError') {
         setPermissionError(true);
       } else {
-        setErrorMsg('Failed to start camera: ' + err.message);
+        const msg = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
+        setErrorMsg('Failed to start camera: ' + msg);
       }
     }
   };
@@ -210,6 +207,9 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         stream.getTracks().forEach(track => track.stop());
         setPermissionError(false);
+        
+        // Slight delay to ensure camera is fully released by getUserMedia before Html5Qrcode tries to grab it
+        await new Promise(r => setTimeout(r, 200));
 
         const devices = await Html5Qrcode.getCameras();
         if (devices && devices.length > 0) {
@@ -241,10 +241,11 @@ export default function QRScanner({ onClose }: { onClose?: () => void }) {
           await startScanner({ facingMode: "environment" });
         }
       } catch (err: any) {
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError' || err === 'NotAllowedError') {
           setPermissionError(true);
         } else {
-          setErrorMsg('Camera unavailable');
+          const msg = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
+          setErrorMsg('Camera unavailable: ' + msg);
         }
       } finally {
         setLoading(false);
