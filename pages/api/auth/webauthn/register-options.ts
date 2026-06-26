@@ -4,7 +4,9 @@ import { authOptions } from '../[...nextauth]';
 import { generateRegistrationOptions } from '@simplewebauthn/server';
 import clientPromise from '../../../../lib/mongodb';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+import { withErrorHandler } from '../../../../lib/withErrorHandler';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end();
 
   // Must be authenticated as admin to register a passkey
@@ -49,3 +51,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     challengeId: challengeDoc.insertedId.toString(),
   });
 }
+
+export default withErrorHandler(handler);

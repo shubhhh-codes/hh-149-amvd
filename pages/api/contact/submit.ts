@@ -11,7 +11,9 @@ export const config = {
   },
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+import { withErrorHandler } from '../../../lib/withErrorHandler';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
@@ -59,3 +61,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ message: 'Failed to submit message. Please try again later.' });
   }
 }
+
+export default withErrorHandler(handler);

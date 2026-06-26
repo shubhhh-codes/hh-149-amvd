@@ -30,8 +30,20 @@ class ErrorBoundary extends React.Component<Props, State> {
     console.error('Error caught by boundary:', error, errorInfo);
     this.setState({ errorInfo });
     
-    // Optional: Send error to tracking service
-    // this.logErrorToService(error, errorInfo);
+    fetch('/api/dev-errors', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source: 'Frontend',
+        errorMessage: error.message || 'React Component Crash',
+        errorStack: error.stack,
+        url: window.location.href,
+        context: {
+          componentStack: errorInfo.componentStack,
+          userAgent: window.navigator.userAgent
+        }
+      })
+    }).catch(console.error);
   }
 
   // Optional method to log errors to a service

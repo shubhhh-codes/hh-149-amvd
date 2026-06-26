@@ -5,7 +5,9 @@ import clientPromise from '../../../lib/mongodb';
 import { issueDownloadToken } from '../../../lib/download-token';
 import { sendDiscordNotification, sendCapacityAlert } from '../../../lib/discord';
 
-export default async function handler(
+import { withErrorHandler } from '../../../lib/withErrorHandler';
+
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -181,3 +183,4 @@ export default async function handler(
     });
   }
 }
+export default withErrorHandler(handler);

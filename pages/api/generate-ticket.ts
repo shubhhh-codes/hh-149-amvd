@@ -59,7 +59,9 @@ const _pdfCache = new Map<string, { buf: Buffer; at: number }>();
 const PDF_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+import { withErrorHandler } from '../../lib/withErrorHandler';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -290,3 +292,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withErrorHandler(handler);

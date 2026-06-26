@@ -428,3 +428,49 @@ export async function sendSecurityNotification(data: SecurityData) {
     console.error('[Discord] Error sending security notification:', err);
   }
 }
+
+export interface ErrorData {
+  source: 'Frontend' | 'Backend' | 'Database' | 'Payment Gateway';
+  errorMessage: string;
+  errorStack?: string;
+  url?: string;
+  context?: any;
+}
+
+export async function sendErrorNotification(data: ErrorData) {
+  const webhookUrl = process.env.DISCORD_ERROR_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  const payload = {
+    embeds: [{
+      author: { name: "SYSTEM ERROR", icon_url: "https://humourshub.in/favicon.ico" },
+      color: 16711680, // Red
+      description: `### ❌ Critical Error Encountered\n\n**Source:** ${data.source}\n${data.url ? `**URL:** \`${data.url}\`\n` : ''}\n**Error Message:**\n\`\`\`\n${data.errorMessage}\n\`\`\``,
+      fields: [] as any[],
+      timestamp: new Date().toISOString()
+    }]
+  };
+
+  if (data.errorStack) {
+    payload.embeds[0].fields.push({
+      name: 'Stack Trace',
+      value: `\`\`\`\n${data.errorStack.slice(0, 1000)}\n\`\`\``,
+      inline: false
+    });
+  }
+
+  if (data.context) {
+    payload.embeds[0].fields.push({
+      name: 'Context Data',
+      value: `\`\`\`json\n${JSON.stringify(data.context, null, 2).slice(0, 1000)}\n\`\`\``,
+      inline: false
+    });
+  }
+
+  try {
+    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  } catch (err) {
+    console.error('[Discord] Error sending error notification:', err);
+  }
+}
+

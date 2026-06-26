@@ -5,7 +5,9 @@ import { verifyRegistrationResponse } from '@simplewebauthn/server';
 import clientPromise from '../../../../lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+import { withErrorHandler } from '../../../../lib/withErrorHandler';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const session = await getServerSession(req, res, authOptions);
@@ -64,3 +66,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(400).json({ error: 'Verification failed' });
 }
+
+export default withErrorHandler(handler);

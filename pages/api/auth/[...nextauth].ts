@@ -74,8 +74,8 @@ export const authOptions: NextAuthOptions = {
             } catch (e) { }
           }
 
-          // Don't await so it runs in background and doesn't hold up response
-          sendSecurityNotification({
+          // MUST await in Serverless environments so the function doesn't die before the fetch finishes!
+          await sendSecurityNotification({
             event: 'failed_login',
             ip,
             emailTried: credentials.email,

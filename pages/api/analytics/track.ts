@@ -2,7 +2,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { sendTrackingNotification } from '../../../lib/discord';
 import { UAParser } from 'ua-parser-js';
 
-export default async function handler(
+import { withErrorHandler } from '../../../lib/withErrorHandler';
+
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -89,3 +91,5 @@ export default async function handler(
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+export default withErrorHandler(handler);

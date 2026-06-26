@@ -119,7 +119,7 @@ export function useJourneyTracker() {
       }, 1500); // Wait 1.5s of no scrolling to assume they "stopped"
     };
 
-    const handleBeforeUnload = () => {
+    const sendFinalJourney = () => {
       if (!mountTime.current) return;
       const timeSpent = Math.floor((Date.now() - mountTime.current) / 1000);
       
@@ -132,24 +132,56 @@ export function useJourneyTracker() {
 
       const data = JSON.stringify({
         event: 'journey',
-        actionDetails: 'User finished session and closed tab.',
+        actionDetails: 'User left the website or closed the app.',
         timeSpentOnPage: timeSpent,
         timeline: timelineFormatted
       });
       
-      navigator.sendBeacon('/api/analytics/track', new Blob([data], { type: 'application/json' }));
+      // Modern browsers (especially Safari/iOS/Android) block beforeunload. 
+      // fetch with keepalive: true is the modern reliable standard.
+      fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: data,
+        keepalive: true
+      }).catch(() => {
+        // Fallback to beacon if fetch keepalive fails
+        navigator.sendBeacon('/api/analytics/track', new Blob([data], { type: 'application/json' }));
+      });
+      
+      // Reset mount time so we don't send duplicate journeys if they just minimized and came back
+      mountTime.current = null;
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        sendFinalJourney();
+      } else if (document.visibilityState === 'visible' && !mountTime.current) {
+        // They came back to the tab! Start a new session.
+        mountTime.current = Date.now();
+        sessionTimeline.length = 0; // clear old timeline
+        addJourneyEvent(`Resumed session on ${window.location.pathname}`);
+      }
+    };
+
+    const handlePageHide = (event: PageTransitionEvent) => {
+      sendFinalJourney();
     };
 
     window.addEventListener('click', handleClick);
-    window.addEventListener('change', handleChange, true); // Use capture phase to ensure we catch it
+    window.addEventListener('change', handleChange, true);
     window.addEventListener('scroll', handleScroll);
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    // iOS and Android DO NOT fire beforeunload when closing an app. 
+    // They only fire visibilitychange and pagehide.
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
 
     return () => {
       window.removeEventListener('click', handleClick);
       window.removeEventListener('change', handleChange, true);
       window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
     };
   }, []);
 }

@@ -9,7 +9,9 @@ import { getToken } from 'next-auth/jwt';
 import clientPromise from '../../../lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-export default async function handler(
+import { withErrorHandler } from '../../../lib/withErrorHandler';
+
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -56,3 +58,4 @@ export default async function handler(
     res.status(500).json({ message: 'Internal server error' });
   }
 } 
+export default withErrorHandler(handler);

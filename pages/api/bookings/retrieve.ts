@@ -3,7 +3,9 @@ import clientPromise from '../../../lib/mongodb';
 import { issueDownloadToken } from '../../../lib/download-token';
 import { rateLimit } from '../../../lib/rate-limit';
 
-export default async function handler(
+import { withErrorHandler } from '../../../lib/withErrorHandler';
+
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -145,3 +147,5 @@ export default async function handler(
     res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+export default withErrorHandler(handler);

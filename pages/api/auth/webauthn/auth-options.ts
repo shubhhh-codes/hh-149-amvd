@@ -2,7 +2,9 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { generateAuthenticationOptions } from '@simplewebauthn/server';
 import clientPromise from '../../../../lib/mongodb';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+import { withErrorHandler } from '../../../../lib/withErrorHandler';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).end();
 
   const client = await clientPromise;
@@ -38,3 +40,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     challengeId: challengeDoc.insertedId.toString(),
   });
 }
+
+export default withErrorHandler(handler);
