@@ -59,7 +59,9 @@ const _pdfCache = new Map<string, { buf: Buffer; at: number }>();
 const PDF_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+import { withErrorHandler } from '../../lib/withErrorHandler';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -142,6 +144,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return `${item.units}x ${t ? t.name : item.tierKey.replace('-', ' ')}`;
       }).join(', ');
       units = booking.cart.reduce((sum: number, item: any) => sum + item.units, 0);
+      if (!price) {
+        price = booking.cart.reduce((sum: number, item: any) => {
+          const t = tiers.find((t: any) => t.key === item.tierKey);
+          const itemPrice = item.price || (t ? t.price : 0);
+          return sum + (itemPrice * item.units);
+        }, 0);
+      }
     } else {
       const tier = tiers.find((t: any) => t.key === (booking.tierKey || 'solo'));
       tierName = tier ? tier.name : 'Solo Pass';
@@ -270,10 +279,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
   } catch (err: any) {
-    console.error('[generate-ticket] PDF generation failed:', err);
+    // Structured Server Logging
+    console.error('[generate-ticket] PDF generation failed:', {
+      message: err.message,
+      stack: err.stack,
+      bookingId: req.query.bookingId,
+      timestamp: new Date().toISOString(),
+    });
+    // Safe client response (No Information Disclosure)
     return res.status(500).json({
-      message: `Error: ${err.message}`,
-      error: err.stack,
+      message: 'Failed to generate ticket. Please try again later.',
     });
   }
 }
+
+export default withErrorHandler(handler);

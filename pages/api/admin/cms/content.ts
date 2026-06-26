@@ -3,7 +3,9 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import clientPromise from '../../../../lib/mongodb';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+import { withErrorHandler } from '../../../../lib/withErrorHandler';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const session = await getServerSession(req, res, authOptions);
     if (session?.user?.role !== 'admin') {
@@ -85,3 +87,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
+
+export default withErrorHandler(handler);

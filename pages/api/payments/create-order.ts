@@ -2,8 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import Razorpay from 'razorpay';
 
 import clientPromise from '../../../lib/mongodb';
+import { sendErrorNotification } from '../../../lib/discord';
 
-export default async function handler(
+import { withErrorHandler } from '../../../lib/withErrorHandler';
+
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -93,11 +96,18 @@ export default async function handler(
       orderId: order.id,
     });
   } catch (error: any) {
-    console.error('Order creation error:', {
-      message: error.message,
-      details: error.error?.description || error.description,
-      code: error.code,
-      statusCode: error.statusCode,
+    console.error('Create order error:', error);
+
+    // Razorpay wraps errors in a nested 'error' object instead of a standard JS Error
+    const actualErrorMessage = error?.error?.description || error?.description || error?.message || (typeof error === 'string' ? error : JSON.stringify(error));
+    const stackTrace = error?.stack || `Error Code: ${error?.error?.code || error?.statusCode || 'Unknown'}\nReason: ${error?.error?.reason || 'Unknown'}`;
+
+    sendErrorNotification({
+      source: 'Payment Gateway',
+      errorMessage: actualErrorMessage,
+      errorStack: stackTrace,
+      url: '/api/payments/create-order',
+      context: req.body
     });
 
     if (error?.statusCode === 401) {
@@ -113,3 +123,5 @@ export default async function handler(
     });
   }
 }
+
+export default withErrorHandler(handler);

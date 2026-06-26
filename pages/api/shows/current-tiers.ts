@@ -1,7 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import clientPromise from '../../../lib/mongodb';
 
-export default async function handler(
+import { withErrorHandler } from '../../../lib/withErrorHandler';
+
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -25,8 +27,18 @@ export default async function handler(
     // Sort by display order
     tiers.sort((a: any, b: any) => a.displayOrder - b.displayOrder);
 
+    const publicTiers = tiers.map((t: any) => ({
+      key: t.key,
+      name: t.name,
+      label: t.label,
+      price: t.price,
+      seats: t.seats,
+      badge: t.badge,
+      displayOrder: t.displayOrder
+    }));
+
     res.status(200).json({
-      tiers,
+      tiers: publicTiers,
       showId: 'default-show',
       showName: 'The Humours Hub - Live Standup',
       seatsRemaining: 150, 
@@ -38,3 +50,5 @@ export default async function handler(
     res.status(500).json({ message: 'Failed to fetch tiers' });
   }
 }
+
+export default withErrorHandler(handler);

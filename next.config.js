@@ -11,6 +11,7 @@ const nextConfig = {
   compress: true,
 
   experimental: {
+    scrollRestoration: true,
     // ── CRITICAL: Force Vercel NFT to include Chromium binary files ───────────
     // @sparticuz/chromium decompresses its Chromium binary from .br files at
     // runtime using executablePath(). These files are in the package's bin/
@@ -37,7 +38,7 @@ const nextConfig = {
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',
     contentSecurityPolicy:
-      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app *.google.com *.googleapis.com; connect-src 'self' blob: https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app https://api.qrserver.com data: https://fonts.gstatic.com; frame-src 'self' https://*.razorpay.com *.google.com *.youtube.com; img-src 'self' data: blob: https://*.razorpay.com *.googleapis.com https://api.qrserver.com https://fonts.gstatic.com https://images.unsplash.com; style-src 'self' 'unsafe-inline' *.googleapis.com https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com;",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app *.google.com *.googleapis.com; connect-src 'self' blob: https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app https://api.qrserver.com data: https://fonts.gstatic.com; frame-src 'self' https://*.razorpay.com *.google.com *.youtube.com; img-src 'self' data: blob: https://*.razorpay.com *.googleapis.com *.googleusercontent.com https://api.qrserver.com https://fonts.gstatic.com https://images.unsplash.com; style-src 'self' 'unsafe-inline' *.googleapis.com https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com;",
 
     remotePatterns: [
       {
@@ -55,24 +56,15 @@ const nextConfig = {
         hostname: 'fonts.gstatic.com',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        pathname: '/**',
+      },
     ],
   },
 
   webpack: (config) => {
-    config.module.rules.push({
-      test: /\.(woff|woff2|eot|ttf|otf)$/i,
-      use: [
-        {
-          loader: 'file-loader',
-          options: {
-            name: '[name].[ext]',
-            outputPath: 'static/fonts/',
-            publicPath: '/_next/static/fonts/',
-          },
-        },
-      ],
-    });
-
     // ── CRITICAL: Prevent Webpack from bundling Chromium ─────────────────────
     // @sparticuz/chromium is a pure ESM package ("type":"module") that uses
     // import.meta.url inside paths.js to locate its .br binary files on disk.
@@ -105,6 +97,18 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
           },
         ],
       },

@@ -3,7 +3,9 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import clientPromise from '../../../lib/mongodb';
 
-export default async function handler(
+import { withErrorHandler } from '../../../lib/withErrorHandler';
+
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -32,3 +34,5 @@ export default async function handler(
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+export default withErrorHandler(handler);

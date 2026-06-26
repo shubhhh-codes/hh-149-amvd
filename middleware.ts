@@ -12,9 +12,6 @@ export default withAuth(
     const path = req.nextUrl.pathname;
     const session = req.nextauth.token;
 
-    // Force Vercel CLI to print every request live in the terminal
-    console.log(`[Vercel Terminal] ⚡ ${req.method} ${path}`);
-
     if (path.startsWith('/admin')) {
       if (session?.role !== 'admin') {
         return NextResponse.redirect(new URL('/auth/login', req.url));

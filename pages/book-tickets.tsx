@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Script from 'next/script';
@@ -69,6 +69,39 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
   const [error, setError] = useState<string | null>(null);
   const [showSummaryDetails, setShowSummaryDetails] = useState(false);
 
+  const mountTime = useRef(Date.now());
+  const hasBooked = useRef(false);
+  const customerNameRef = useRef('');
+  const customerEmailRef = useRef('');
+  const customerPhoneRef = useRef('');
+
+  useEffect(() => { customerNameRef.current = customerName; }, [customerName]);
+  useEffect(() => { customerEmailRef.current = customerEmail; }, [customerEmail]);
+  useEffect(() => { customerPhoneRef.current = customerPhone; }, [customerPhone]);
+
+  useEffect(() => {
+    mountTime.current = Date.now();
+    const handleBeforeUnload = () => {
+      if (!hasBooked.current) {
+        const timeSpent = Math.floor((Date.now() - mountTime.current) / 1000);
+        const data = JSON.stringify({
+          event: 'abandonment',
+          actionDetails: 'User left checkout page without completing booking.',
+          timeSpentOnPage: timeSpent,
+          userDetails: {
+            name: customerNameRef.current,
+            email: customerEmailRef.current,
+            phone: customerPhoneRef.current
+          }
+        });
+        navigator.sendBeacon('/api/analytics/track', new Blob([data], { type: 'application/json' }));
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   useEffect(() => {
     if (tiersData?.tiers && tiersData.tiers.length > 0) {
       const defaultTier = tiersData.tiers.find((t: any) => t.badge === 'MOST POPULAR') || tiersData.tiers[0];
@@ -120,6 +153,15 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
     setLoading(true);
     setError(null);
 
+    fetch('/api/analytics/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'click',
+        actionDetails: `User clicked 'Pay & Book Ticket' for ₹${totalAmount}`
+      })
+    }).catch(() => {});
+
     try {
       // 1. Create local booking via our API (using cart)
       const bookRes = await fetch('/api/bookings/create', {
@@ -148,8 +190,17 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
       const orderData = await orderRes.json();
       if (!orderRes.ok) throw new Error(orderData.message ?? 'Failed to initiate payment');
 
-      // 3. Open Razorpay checkout
-      if (!window.Razorpay) throw new Error('Razorpay SDK not loaded');
+      // 3. Wait for Razorpay SDK to load (lazyOnload may not be ready yet)
+      const razorpayReady = await new Promise<boolean>((resolve) => {
+        if (window.Razorpay) { resolve(true); return; }
+        let attempts = 0;
+        const interval = setInterval(() => {
+          attempts++;
+          if (window.Razorpay) { clearInterval(interval); resolve(true); }
+          else if (attempts >= 50) { clearInterval(interval); resolve(false); } // 5s timeout
+        }, 100);
+      });
+      if (!razorpayReady) throw new Error('Payment SDK failed to load. Please refresh and try again.');
 
       const rzp = new window.Razorpay({
         key: orderData.keyId,
@@ -163,9 +214,22 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
           email: customerEmail,
           contact: `91${customerPhone}`,
         },
-        theme: { color: '#FF6B1A' },
+        theme: { color: '#141414' },
+        modal: {
+          ondismiss: () => {
+            // Fire request to log in Node/Vercel server terminal
+            fetch('/api/payments/log-dismiss', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bookingId })
+            }).catch(() => {});
+            
+            setLoading(false);
+          }
+        },
         handler: async (response: Record<string, string>) => {
           try {
+            hasBooked.current = true;
             const verifyRes = await fetch('/api/payments/verify', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

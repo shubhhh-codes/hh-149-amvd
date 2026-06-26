@@ -8,10 +8,13 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import clientPromise from '../../../lib/mongodb';
 import { generateBookingId } from '../../../lib/bookingId';
+import { sendDiscordNotification } from '../../../lib/discord';
 
 const VENUE_CAPACITY = 150;
 
-export default async function handler(
+import { withErrorHandler } from '../../../lib/withErrorHandler';
+
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -57,6 +60,15 @@ export default async function handler(
         attendedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+      });
+
+      sendDiscordNotification({
+        bookingId,
+        fullName,
+        email: email.toLowerCase().trim(),
+        phone: phone.trim(),
+        numberOfTickets: Number(numberOfTickets),
+        bookingType: 'complimentary'
       });
 
       return res.status(201).json({ message: 'Complimentary booking created', bookingId });
@@ -147,3 +159,5 @@ export default async function handler(
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+export default withErrorHandler(handler);

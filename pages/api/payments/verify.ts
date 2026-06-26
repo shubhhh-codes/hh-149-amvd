@@ -1,10 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
+import Razorpay from 'razorpay';
 import clientPromise from '../../../lib/mongodb';
 import { issueDownloadToken } from '../../../lib/download-token';
-import { getTicketPrice } from '../../../lib/getTicketPrice';
+import { sendDiscordNotification, sendCapacityAlert } from '../../../lib/discord';
 
-export default async function handler(
+import { withErrorHandler } from '../../../lib/withErrorHandler';
+
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -25,14 +28,16 @@ export default async function handler(
       return res.status(400).json({ message: 'Missing required payment details' });
     }
 
-    console.log('Verifying payment:', {
-      orderId: razorpay_order_id,
-      paymentId: razorpay_payment_id,
-      bookingId
-    });
+    // ── Guard: must check credentials BEFORE using them in HMAC ──────────────
+    // Moving this check here prevents a crash when RAZORPAY_KEY_SECRET is
+    // undefined — the non-null assertion (!) passes TypeScript but throws at
+    // runtime if the env var is missing.
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      return res.status(500).json({ message: 'Missing Razorpay credentials' });
+    }
 
     // Verify Razorpay signature
-    const shasum = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!);
+    const shasum = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
     shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
     const digest = shasum.digest('hex');
 
@@ -42,6 +47,28 @@ export default async function handler(
         received: razorpay_signature
       });
       return res.status(400).json({ message: 'Invalid payment signature' });
+    }
+
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+
+    let order;
+    try {
+      order = await razorpay.orders.fetch(razorpay_order_id);
+    } catch (err: any) {
+      console.error('Failed to fetch Razorpay order:', err.message);
+      return res.status(500).json({ message: 'Failed to verify order details' });
+    }
+
+    // CRITICAL FIX: Verify the order was actually created for THIS booking
+    if (order.receipt !== bookingId) {
+      console.error('Order/Booking mismatch attack detected:', {
+        orderReceipt: order.receipt,
+        requestedBookingId: bookingId
+      });
+      return res.status(400).json({ message: 'Order does not match booking' });
     }
 
     const client = await clientPromise;
@@ -67,16 +94,13 @@ export default async function handler(
       return res.status(200).json({ message: 'Payment already verified', bookingId, downloadToken });
     }
 
-    // Fetch dynamic ticket price from CMS
-    const ticketPrice = await getTicketPrice();
-
     // Create payment record (no userId, guest-only)
     const payment = {
       orderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
       signature: razorpay_signature,
       bookingId: bookingId,
-      amount: booking.numberOfTickets * ticketPrice * 100, // ticket price in paise
+      amount: Number(order.amount), // Use the exact amount from the verified Razorpay order
       status: 'completed',
       type: 'ticket_booking',
       createdAt: new Date(),
@@ -89,8 +113,13 @@ export default async function handler(
       }
     };
 
-    await db.collection('payments').insertOne(payment);
-    console.log('Payment record created:', payment.paymentId);
+    // Use upsert to prevent duplicate payment records during race conditions
+    await db.collection('payments').updateOne(
+      { orderId: razorpay_order_id },
+      { $setOnInsert: payment },
+      { upsert: true }
+    );
+    console.log('Payment record processed:', payment.paymentId);
 
     // Update booking status to approved
     await db.collection('bookings').updateOne(
@@ -105,6 +134,38 @@ export default async function handler(
       }
     );
     console.log('Booking updated:', bookingId);
+
+    // Calculate Time-to-Convert
+    const timeToConvertMs = Date.now() - new Date(booking.createdAt).getTime();
+    const timeToConvertSeconds = Math.floor(timeToConvertMs / 1000);
+
+    // Dispatch Discord Notification in the background (fire and forget)
+    sendDiscordNotification({
+      bookingId,
+      fullName: booking.fullName,
+      email: booking.email,
+      phone: booking.phone,
+      numberOfTickets: booking.numberOfTickets,
+      bookingType: 'paid',
+      cart: booking.cart,
+      amountPaid: payment.amount / 100, // Razorpay amount is in paise
+      timeToConvertSeconds
+    });
+
+    // Check Capacity for "Almost Sold Out" alert
+    const VENUE_CAPACITY = 150;
+    const allApproved = await db.collection('bookings').find({ status: 'approved' }).toArray();
+    const totalConfirmedSeats = allApproved.reduce((sum, b) => sum + (b.numberOfTickets || 0), 0);
+    const prevConfirmedSeats = totalConfirmedSeats - booking.numberOfTickets;
+    
+    const currentPercent = (totalConfirmedSeats / VENUE_CAPACITY) * 100;
+    const prevPercent = (prevConfirmedSeats / VENUE_CAPACITY) * 100;
+
+    // Alert triggers exactly when crossing the thresholds
+    if (prevPercent < 80 && currentPercent >= 80) await sendCapacityAlert(80, totalConfirmedSeats, VENUE_CAPACITY);
+    else if (prevPercent < 90 && currentPercent >= 90) await sendCapacityAlert(90, totalConfirmedSeats, VENUE_CAPACITY);
+    else if (prevPercent < 95 && currentPercent >= 95) await sendCapacityAlert(95, totalConfirmedSeats, VENUE_CAPACITY);
+    else if (prevPercent < 100 && currentPercent >= 100) await sendCapacityAlert(100, totalConfirmedSeats, VENUE_CAPACITY);
 
     // Issue a signed 30-minute download token so booking-success can fetch the PDF
     // without requiring the user to go through the retrieve page first.
@@ -122,3 +183,4 @@ export default async function handler(
     });
   }
 }
+export default withErrorHandler(handler);

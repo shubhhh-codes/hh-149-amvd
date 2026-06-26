@@ -5,7 +5,9 @@ import clientPromise from '../../../../../lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { getGridFSBucket } from '../../../../../lib/gridfs';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+import { withErrorHandler } from '../../../../../lib/withErrorHandler';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const session = await getServerSession(req, res, authOptions);
     if (session?.user?.role !== 'admin') {
@@ -134,3 +136,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+export default withErrorHandler(handler);

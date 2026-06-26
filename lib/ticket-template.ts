@@ -327,7 +327,7 @@ export function generateTicketHtml(data: TicketTemplateData): string {
         <div class="cell">
           <p class="cell-label">Amount Paid</p>
           <p class="cell-value">${data.price ? `₹${data.price}` : (isComplimentary ? 'FREE' : 'N/A')}</p>
-          <p class="cell-sub">${data.bookingType.toUpperCase()} via Online</p>
+          <p class="cell-sub">${data.bookingType.toUpperCase()} via Razorpay</p>
         </div>
       </div>
 

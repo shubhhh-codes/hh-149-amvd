@@ -9,7 +9,9 @@ import clientPromise from '../../../lib/mongodb';
 
 const VENUE_CAPACITY = 150;
 
-export default async function handler(
+import { withErrorHandler } from '../../../lib/withErrorHandler';
+
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -44,3 +46,5 @@ export default async function handler(
     res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+export default withErrorHandler(handler);

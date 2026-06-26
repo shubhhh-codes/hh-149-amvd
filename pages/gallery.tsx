@@ -1,6 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
-import { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
@@ -9,6 +8,18 @@ import clientPromise from '@/lib/mongodb';
 
 export default function GalleryPage({ galleryItems }: { galleryItems: any[] }) {
   const [activeFilter, setActiveFilter] = useState('All');
+  const [instagramUrl, setInstagramUrl] = useState('');
+
+  useEffect(() => {
+    fetch('/api/cms/footer')
+      .then(res => res.json())
+      .then(data => {
+        if (data.content) {
+          setInstagramUrl(data.content.metadata?.instagramUrl || '');
+        }
+      })
+      .catch(err => console.error('Failed to load footer settings:', err));
+  }, []);
 
   // Dynamically extract filters from items or use static list
   const availableCategories = ['All', ...Array.from(new Set(galleryItems.map(item => item.category).filter(Boolean)))];
@@ -115,6 +126,7 @@ export default function GalleryPage({ galleryItems }: { galleryItems: any[] }) {
                 <Image
                   width={800}
                   height={600}
+                  loading="lazy"
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
                   src={item.imageUrl}
                   alt={item.title || "Gallery image"}
@@ -141,12 +153,12 @@ export default function GalleryPage({ galleryItems }: { galleryItems: any[] }) {
               Were you there? Tag us on Instagram.
             </h2>
             <Link
-              href="https://instagram.com/thehumourshub"
+              href={instagramUrl || 'https://instagram.com/the.humourshub'}
               target="_blank"
               rel="noopener noreferrer"
               className="font-display-lg-mobile md:text-headline-md text-primary-container font-bold hover:scale-105 transition-transform"
             >
-              @thehumourshub
+              {instagramUrl ? `@${instagramUrl.replace(/.*instagram\.com\//, '').replace(/\/+$/, '')}` : '@the.humourshub'}
             </Link>
           </div>
         </section>

@@ -4,7 +4,9 @@ import { authOptions } from '../auth/[...nextauth]';
 import clientPromise from '../../../lib/mongodb';
 import { Document } from 'mongodb';
 
-export default async function handler(
+import { withErrorHandler } from '../../../lib/withErrorHandler';
+
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -54,3 +56,5 @@ export default async function handler(
     });
   }
 }
+
+export default withErrorHandler(handler);
