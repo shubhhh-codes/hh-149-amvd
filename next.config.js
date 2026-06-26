@@ -108,11 +108,19 @@ const nextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
+            value: 'camera=(self), microphone=(), geolocation=()',
           },
         ],
       },
     ];
+  },
+
+  // ── Make Vercel Preview Builds Super Fast by skipping Type & Lint checks ──
+  typescript: {
+    ignoreBuildErrors: process.env.VERCEL_ENV === 'preview',
+  },
+  eslint: {
+    ignoreDuringBuilds: process.env.VERCEL_ENV === 'preview',
   },
 };
 

@@ -26,6 +26,7 @@ export default function QRScanner() {
   const [loading, setLoading] = useState(false);
   const [checkInQuantity, setCheckInQuantity] = useState(1);
   const [scannerReady, setScannerReady] = useState(false);
+  const [permissionError, setPermissionError] = useState(false);
 
   // Use refs for the callback to avoid re-initializing the scanner
   const loadingRef = React.useRef(loading);
@@ -37,63 +38,78 @@ export default function QRScanner() {
   }, [loading, scannedBooking]);
 
   useEffect(() => {
-    // Initialize Scanner
-    const scanner = new Html5QrcodeScanner(
-      "qr-reader",
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      /* verbose= */ false
-    );
+    // 1. Manually request camera permission FIRST to catch the exact error
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then((stream) => {
+        // Permission was granted! Stop the stream so the scanner can take over.
+        stream.getTracks().forEach(track => track.stop());
+        setPermissionError(false);
 
-    scanner.render(
-      async (decodedText) => {
-        // Pauses scanning implicitly while we process
-        if (loadingRef.current || scannedBookingRef.current) return;
-        
-        try {
-          setLoading(true);
-          setErrorMsg('');
-          
-          const res = await fetch('/api/admin/bookings/scan', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ qrData: decodedText })
-          });
-          
-          const data = await res.json();
-          
-          if (!res.ok) {
-            setErrorMsg(data.message || 'Invalid Ticket');
-            // Auto clear error after 3s so they can scan next
-            setTimeout(() => { setErrorMsg(''); }, 3000);
-            return;
-          }
-          
-          const remaining = data.numberOfTickets - (data.checkedInCount || 0);
-          
-          setScannedBooking(data);
-          setCheckInQuantity(remaining > 0 ? remaining : 0);
-          
-          if (remaining <= 0) {
-            setErrorMsg('Ticket Fully Used (0 Seats Remaining)');
-          }
+        // 2. Initialize Scanner safely
+        const scanner = new Html5QrcodeScanner(
+          "qr-reader",
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          /* verbose= */ false
+        );
 
-        } catch (err: any) {
-          setErrorMsg('Failed to process QR code');
-          setTimeout(() => { setErrorMsg(''); }, 3000);
-        } finally {
-          setLoading(false);
+        scanner.render(
+          async (decodedText) => {
+            // Pauses scanning implicitly while we process
+            if (loadingRef.current || scannedBookingRef.current) return;
+            
+            try {
+              setLoading(true);
+              setErrorMsg('');
+              
+              const res = await fetch('/api/admin/bookings/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ qrData: decodedText })
+              });
+              
+              const data = await res.json();
+              
+              if (!res.ok) {
+                setErrorMsg(data.message || 'Invalid Ticket');
+                setTimeout(() => { setErrorMsg(''); }, 3000);
+                return;
+              }
+              
+              const remaining = data.numberOfTickets - (data.checkedInCount || 0);
+              
+              setScannedBooking(data);
+              setCheckInQuantity(remaining > 0 ? remaining : 0);
+              
+              if (remaining <= 0) {
+                setErrorMsg('Ticket Fully Used (0 Seats Remaining)');
+              }
+
+            } catch (err: any) {
+              setErrorMsg('Failed to process QR code');
+              setTimeout(() => { setErrorMsg(''); }, 3000);
+            } finally {
+              setLoading(false);
+            }
+          },
+          (error) => {
+            // Ignore regular scan failures (no QR code found)
+          }
+        );
+
+        setScannerReady(true);
+
+        return () => {
+          scanner.clear().catch(console.error);
+        };
+      })
+      .catch((err) => {
+        // Catch permission denial specifically
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setPermissionError(true);
+        } else {
+          setErrorMsg('Camera not found or unavailable');
         }
-      },
-      (error) => {
-        // Ignore regular scan failures (no QR code found)
-      }
-    );
-
-    setScannerReady(true);
-
-    return () => {
-      scanner.clear().catch(console.error);
-    };
+      });
   }, []); // Run once on mount
 
   const handleConfirmCheckIn = async () => {
@@ -132,8 +148,34 @@ export default function QRScanner() {
   return (
     <div className="relative w-full max-w-lg mx-auto bg-[#131313] rounded-xl brutalist-border overflow-hidden">
       
-      {/* Scanner Viewport */}
-      <div id="qr-reader" className="w-full bg-black min-h-[300px]"></div>
+      {/* Camera Permission Error Overlay */}
+      {permissionError ? (
+        <div className="w-full bg-black min-h-[300px] flex flex-col items-center justify-center p-6 text-center text-red-400">
+          <span className="material-symbols-outlined text-5xl mb-4 text-red-500">videocam_off</span>
+          <h3 className="font-headline-md text-xl font-bold uppercase tracking-wide text-white mb-2">Camera Blocked</h3>
+          <p className="text-on-surface/70 text-sm mb-4">
+            Your browser has blocked camera access for this site.
+          </p>
+          <div className="bg-[#1c1b1b] border border-white/10 p-3 rounded text-left text-sm text-on-surface/80 w-full max-w-xs">
+            <strong className="block text-white mb-1">How to fix it:</strong>
+            <ol className="list-decimal pl-4 space-y-1">
+              <li>Click the <b>Padlock / Settings icon</b> in your browser address bar.</li>
+              <li>Go to <b>Site Settings</b>.</li>
+              <li>Change <b>Camera</b> to <b>Allow</b>.</li>
+              <li>Refresh this page.</li>
+            </ol>
+          </div>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-6 px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded font-bold uppercase tracking-wider transition-colors"
+          >
+            I fixed it, Refresh
+          </button>
+        </div>
+      ) : (
+        /* Scanner Viewport */
+        <div id="qr-reader" className="w-full bg-black min-h-[300px]"></div>
+      )}
 
       {/* Loading Overlay */}
       {loading && (
