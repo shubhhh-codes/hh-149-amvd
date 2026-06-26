@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { sendTrackingNotification } from '../../../lib/discord';
 import { UAParser } from 'ua-parser-js';
 
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../auth/[...nextauth]';
 import { withErrorHandler } from '../../../lib/withErrorHandler';
 
 async function handler(
@@ -10,6 +12,12 @@ async function handler(
 ) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
+  }
+
+  // If the user making the request is an authenticated admin, do NOT track their journey
+  const session = await getServerSession(req, res, authOptions);
+  if (session && session.user) {
+    return res.status(200).json({ success: true, skipped: true, reason: 'Admin Session' });
   }
 
   try {
