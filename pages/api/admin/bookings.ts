@@ -58,6 +58,7 @@ async function handler(
         status: 'approved',
         attended: false,
         attendedAt: null,
+        checkedInCount: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -130,6 +131,11 @@ async function handler(
         return res.status(400).json({ message: 'Missing bookingId or attended field' });
       }
 
+      const booking = await db.collection('bookings').findOne({ bookingId });
+      if (!booking) {
+        return res.status(404).json({ message: 'Booking not found' });
+      }
+
       const updateFields: any = {
         attended,
         updatedAt: new Date(),
@@ -137,8 +143,10 @@ async function handler(
 
       if (attended) {
         updateFields.attendedAt = new Date();
+        updateFields.checkedInCount = booking.numberOfTickets;
       } else {
         updateFields.attendedAt = null;
+        updateFields.checkedInCount = 0;
       }
 
       const result = await db.collection('bookings').updateOne(

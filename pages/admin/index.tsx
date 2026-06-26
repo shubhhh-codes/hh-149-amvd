@@ -9,6 +9,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import { formatCurrency } from '@/utils/format';
 import DownloadPaymentsButton from '@/components/UserDownloadPDF';
 import Image from 'next/image';
+import QRScanner from '@/components/admin/QRScanner';
 
 interface Booking {
   _id: string;
@@ -19,6 +20,7 @@ interface Booking {
   status: 'pending' | 'approved' | 'cancelled';
   bookingType: 'paid' | 'complimentary';
   numberOfTickets?: number;
+  checkedInCount?: number;
   attended?: boolean;
   attendedAt?: string;
   createdAt: string;
@@ -90,7 +92,7 @@ interface Feedback {
 export default function AdminPanel() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'comedians' | 'payments' | 'messages' | 'cms' | 'feedbacks'>('bookings');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'scanner' | 'bookings' | 'comedians' | 'payments' | 'messages' | 'cms' | 'feedbacks'>('scanner');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [comedians, setComedians] = useState<ComedianProfile[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -468,7 +470,8 @@ export default function AdminPanel() {
   }
 
   const navLinks = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'qr_code_2', short: 'DASH' },
+    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', short: 'DASH' },
+    { id: 'scanner', label: 'QR Scanner', icon: 'document_scanner', short: 'SCAN' },
     { id: 'bookings', label: 'Bookings', icon: 'calendar_today', short: 'BOOK' },
     { id: 'cms', label: 'CMS', icon: 'widgets', short: 'CMS' },
     { id: 'messages', label: 'Messages', icon: 'mail', short: 'MSG' },
@@ -619,6 +622,17 @@ export default function AdminPanel() {
             </section>
           )}
 
+          {/* SCANNER TAB */}
+          {activeTab === 'scanner' && (
+            <section className="space-y-6 animate-enter min-h-[60vh] flex flex-col justify-center">
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-headline-md font-bold uppercase tracking-wide">Ticket Scanner</h2>
+                <p className="text-on-surface/50 text-sm mt-2">Point the camera at the customer's QR code to verify and check-in.</p>
+              </div>
+              <QRScanner />
+            </section>
+          )}
+
           {/* BOOKINGS TAB */}
           {activeTab === 'bookings' && (
             <>
@@ -725,7 +739,9 @@ export default function AdminPanel() {
                         <div>
                           <div className="font-label-caps text-on-surface/40 text-[10px] mb-1">ATTENDANCE</div>
                           <div className="text-sm font-headline-sm">
-                            {booking.attended ? <span className="text-green-400">Present</span> : <span className="text-on-surface/50">Pending</span>}
+                            <span className={booking.attended ? "text-green-400" : (booking.checkedInCount && booking.checkedInCount > 0) ? "text-primary-container" : "text-on-surface/50"}>
+                              {booking.checkedInCount || 0} / {booking.numberOfTickets} Checked In
+                            </span>
                           </div>
                         </div>
                       </div>
