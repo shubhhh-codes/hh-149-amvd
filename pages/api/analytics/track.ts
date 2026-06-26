@@ -13,7 +13,7 @@ async function handler(
   }
 
   try {
-    const { event, actionDetails, timeSpentOnPage, userDetails, timeline } = req.body;
+    const { event, actionDetails, timeSpentOnPage, userDetails, timeline, sessionId, isLiveUpdate } = req.body;
 
     if (!event || !actionDetails) {
       return res.status(400).json({ message: 'Missing required fields' });
@@ -60,8 +60,10 @@ async function handler(
           location = `${geoData.city}, ${geoData.regionName}, ${geoData.country}`;
           isp = geoData.org || geoData.isp || 'Unknown ISP';
         }
-      } catch (err) {
-        console.error('[Track API] Failed to fetch GeoIP:', err);
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error('[Track API] Failed to fetch GeoIP:', err);
+        }
       }
     }
 
@@ -82,7 +84,9 @@ async function handler(
       visitorData,
       timeSpentOnPage,
       userDetails,
-      timeline
+      timeline,
+      sessionId,
+      isLiveUpdate
     });
 
     return res.status(200).json({ success: true });

@@ -18,8 +18,14 @@ export function addJourneyEvent(action: string) {
 
 export function useJourneyTracker() {
   const mountTime = useRef<number | null>(null);
+  const sessionId = useRef<string>('');
+  const lastSentLength = useRef<number>(0);
 
   useEffect(() => {
+    if (!sessionId.current) {
+      sessionId.current = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+    }
+
     if (!mountTime.current) {
       mountTime.current = Date.now();
       addJourneyEvent(`Started session on ${window.location.pathname}`);
@@ -119,8 +125,13 @@ export function useJourneyTracker() {
       }, 1500); // Wait 1.5s of no scrolling to assume they "stopped"
     };
 
-    const sendFinalJourney = () => {
+    const sendJourney = (isFinal = false) => {
       if (!mountTime.current) return;
+      
+      // If it's a heartbeat and nothing changed, don't spam
+      if (!isFinal && sessionTimeline.length === lastSentLength.current) return;
+      lastSentLength.current = sessionTimeline.length;
+
       const timeSpent = Math.floor((Date.now() - mountTime.current) / 1000);
       
       const timelineFormatted = sessionTimeline.map(t => {
@@ -132,40 +143,37 @@ export function useJourneyTracker() {
 
       const data = JSON.stringify({
         event: 'journey',
-        actionDetails: 'User left the website or closed the app.',
+        sessionId: sessionId.current,
+        isLiveUpdate: !isFinal,
+        actionDetails: isFinal ? 'User left the website or closed the app.' : 'Live session in progress...',
         timeSpentOnPage: timeSpent,
         timeline: timelineFormatted
       });
       
-      // Modern browsers (especially Safari/iOS/Android) block beforeunload. 
-      // fetch with keepalive: true is the modern reliable standard.
       fetch('/api/analytics/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: data,
         keepalive: true
       }).catch(() => {
-        // Fallback to beacon if fetch keepalive fails
-        navigator.sendBeacon('/api/analytics/track', new Blob([data], { type: 'application/json' }));
+        if (isFinal) navigator.sendBeacon('/api/analytics/track', new Blob([data], { type: 'application/json' }));
       });
-      
-      // Reset mount time so we don't send duplicate journeys if they just minimized and came back
-      mountTime.current = null;
     };
+
+    const heartbeat = setInterval(() => sendJourney(false), 10000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        sendFinalJourney();
-      } else if (document.visibilityState === 'visible' && !mountTime.current) {
-        // They came back to the tab! Start a new session.
-        mountTime.current = Date.now();
-        sessionTimeline.length = 0; // clear old timeline
-        addJourneyEvent(`Resumed session on ${window.location.pathname}`);
+        sendJourney(true);
+      } else if (document.visibilityState === 'visible') {
+        addJourneyEvent(`Resumed session`);
+        // Immediately trigger a heartbeat to turn the Discord message back to 'Live' status
+        sendJourney(false);
       }
     };
 
     const handlePageHide = (event: PageTransitionEvent) => {
-      sendFinalJourney();
+      sendJourney(true);
     };
 
     window.addEventListener('click', handleClick);
@@ -177,6 +185,7 @@ export function useJourneyTracker() {
     window.addEventListener('pagehide', handlePageHide);
 
     return () => {
+      clearInterval(heartbeat);
       window.removeEventListener('click', handleClick);
       window.removeEventListener('change', handleChange, true);
       window.removeEventListener('scroll', handleScroll);

@@ -171,6 +171,8 @@ export interface TrackingData {
   timeSpentOnPage?: number;
   userDetails?: { name: string; email: string; phone: string; };
   timeline?: string[];
+  sessionId?: string;
+  isLiveUpdate?: boolean;
 }
 
 export async function sendTrackingNotification(data: TrackingData) {
@@ -182,7 +184,10 @@ export async function sendTrackingNotification(data: TrackingData) {
   let color = 16739098; // Default Orange #FF6B1A
   let title = '📍 User Journey Event';
   if (data.event === 'abandonment') { color = 16711680; title = '🚨 Cart Abandonment'; }
-  if (data.event === 'journey') { color = 9807270; title = '🏁 Session Completed'; }
+  if (data.event === 'journey') { 
+    color = data.isLiveUpdate ? 3447003 : 9807270; // Blue for live, Grey for completed
+    title = data.isLiveUpdate ? '📡 Live Session in Progress...' : '🏁 Session Completed'; 
+  }
 
   const timeText = data.timeSpentOnPage ? `${Math.floor(data.timeSpentOnPage / 60)}m ${data.timeSpentOnPage % 60}s` : `N/A`;
 
@@ -222,7 +227,56 @@ export async function sendTrackingNotification(data: TrackingData) {
   };
 
   try {
-    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (data.event === 'journey' && data.sessionId) {
+      const client = await clientPromise;
+      const db = client.db();
+      const sessionDoc = await db.collection('discord_live_sessions').findOne({ _id: data.sessionId as any });
+
+      if (sessionDoc) {
+        // PATCH existing message
+        await fetch(`${webhookUrl}/messages/${sessionDoc.messageId}`, { 
+          method: 'PATCH', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify(payload) 
+        });
+        
+        // We intentionally DO NOT delete the session from DB here.
+        // If the user minimizes the app (hidden), it marks it as final,
+        // but if they reopen the app 10 minutes later, we want to PATCH
+        // the exact same Discord message back to "Live" instead of spamming new messages!
+      } else {
+        // POST new message and wait for ID
+        const res = await fetch(`${webhookUrl}?wait=true`, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify(payload) 
+        });
+        
+        if (res.ok) {
+          const msg = await res.json();
+          if (msg && msg.id) {
+            try {
+              await db.collection('discord_live_sessions').insertOne({ 
+                _id: data.sessionId as any, 
+                messageId: msg.id, 
+                createdAt: new Date() 
+              });
+            } catch (insertErr: any) {
+              if (insertErr.code !== 11000) {
+                throw insertErr; // Rethrow if it's not a duplicate key error
+              }
+            }
+          }
+        }
+      }
+    } else {
+      // Standard POST without wait
+      await fetch(webhookUrl, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(payload) 
+      });
+    }
   } catch (err) {
     console.error('[Discord] Error sending tracking notification:', err);
   }

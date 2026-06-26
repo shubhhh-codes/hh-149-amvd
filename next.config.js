@@ -11,6 +11,7 @@ const nextConfig = {
   compress: true,
 
   experimental: {
+    scrollRestoration: true,
     // ── CRITICAL: Force Vercel NFT to include Chromium binary files ───────────
     // @sparticuz/chromium decompresses its Chromium binary from .br files at
     // runtime using executablePath(). These files are in the package's bin/
