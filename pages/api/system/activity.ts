@@ -21,7 +21,11 @@ async function handler(
   }
 
   try {
-    const { event, actionDetails, timeSpentOnPage, userDetails, timeline, sessionId, isLiveUpdate } = req.body;
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch (e) {}
+    }
+    const { event, actionDetails, timeSpentOnPage, userDetails, timeline, sessionId, isLiveUpdate } = body;
 
     if (!event || !actionDetails) {
       return res.status(400).json({ message: 'Missing required fields' });

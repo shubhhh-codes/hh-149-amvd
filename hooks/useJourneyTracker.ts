@@ -150,13 +150,13 @@ export function useJourneyTracker() {
         timeline: timelineFormatted
       });
       
-      fetch('/api/analytics/track', {
+      fetch('/api/system/activity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: data,
         keepalive: true
       }).catch(() => {
-        if (isFinal) navigator.sendBeacon('/api/analytics/track', new Blob([data], { type: 'application/json' }));
+        if (isFinal) navigator.sendBeacon('/api/system/activity', new Blob([data], { type: 'application/json' }));
       });
     };
 

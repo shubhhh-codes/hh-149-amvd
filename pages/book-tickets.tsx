@@ -108,7 +108,12 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
           },
         });
 
-        navigator.sendBeacon('/api/analytics/track', new Blob([data], { type: 'application/json' }));
+        fetch('/api/system/activity', {
+          method: 'POST',
+          body: data,
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(() => {});
       }
     };
 
@@ -184,7 +189,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
     setLoading(true);
     setError(null);
 
-    fetch('/api/analytics/track', {
+    fetch('/api/system/activity', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -262,7 +267,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
         theme: { color: '#141414' },
         modal: {
           ondismiss: () => {
-            fetch('/api/payments/log-dismiss', {
+            fetch('/api/payments/dismiss', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ bookingId }),
