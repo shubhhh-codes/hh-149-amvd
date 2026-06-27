@@ -10,7 +10,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const client = await clientPromise;
-    const db = client.db('humourshub');
+    const db = client.db();
 
     // Fetch profile page wrapper content
     const content = await db
