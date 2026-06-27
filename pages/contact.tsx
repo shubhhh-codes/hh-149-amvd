@@ -89,7 +89,7 @@ export default function ContactPage() {
       <Navbar />
 
       <div className="bg-[#0A0A0A] text-[#e5e2e1] font-body min-h-screen flex flex-col pt-20">
-        <style jsx>{`
+        <style dangerouslySetInnerHTML={{ __html: `
             .text-secondary-opacity {
                 color: rgba(229, 226, 225, 0.45); /* Secondary metadata 45% */
             }
@@ -143,7 +143,7 @@ export default function ContactPage() {
             .hover-card:hover {
                 transform: translateY(-4px);
             }
-        `}</style>
+        `}} />
 
         {/* Main Content */}
         <main className="flex-grow w-full px-6 md:px-16 py-16 md:py-24 max-w-[1280px] mx-auto">

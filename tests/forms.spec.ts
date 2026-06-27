@@ -29,7 +29,11 @@ test.describe('Forms - UAT @integration', () => {
 
   test('FORM-002: Admin Add Comedian - Should validate required fields', async ({ page }) => {
     await mockAdminSession(page);
-    await page.route('**/api/admin/*', route => route.fulfill({ status: 200, json: {} }));
+    await page.route('**/api/admin/bookings', route => route.fulfill({ status: 200, json: { bookings: [] } }));
+    await page.route('**/api/admin/comedians', route => route.fulfill({ status: 200, json: { comedians: [] } }));
+    await page.route('**/api/admin/payments', route => route.fulfill({ status: 200, json: { payments: [], stats: {} } }));
+    await page.route('**/api/admin/contact-messages', route => route.fulfill({ status: 200, json: { messages: [] } }));
+    await page.route('**/api/admin/feedbacks', route => route.fulfill({ status: 200, json: { feedbacks: [] } }));
     await page.goto('/admin');
     
     // Open CMS

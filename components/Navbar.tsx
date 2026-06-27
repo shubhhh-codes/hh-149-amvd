@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -7,9 +7,16 @@ export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNavHidden, setIsNavHidden] = useState(false);
   const [lastScrollTop, setLastScrollTop] = useState(0);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
+      if (isMenuOpen) {
+        setIsNavHidden(false);
+        return;
+      }
+
       let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       if (scrollTop > lastScrollTop && scrollTop > 100) {
         setIsNavHidden(true);
@@ -21,7 +28,37 @@ export default function Navbar() {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollTop]);
+  }, [isMenuOpen, lastScrollTop]);
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target) || menuButtonRef.current?.contains(target)) {
+        return;
+      }
+      setIsMenuOpen(false);
+    };
+
+    const handleSwipeOrWheel = () => {
+      setIsMenuOpen(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown, { passive: true });
+    window.addEventListener('wheel', handleSwipeOrWheel, { passive: true });
+    window.addEventListener('touchmove', handleSwipeOrWheel, { passive: true });
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      window.removeEventListener('wheel', handleSwipeOrWheel);
+      window.removeEventListener('touchmove', handleSwipeOrWheel);
+    };
+  }, [isMenuOpen]);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
@@ -70,7 +107,14 @@ export default function Navbar() {
             Book Tickets →
           </Link>
           
-          <button className="md:hidden text-on-surface" onClick={toggleMenu}>
+          <button
+            type="button"
+            aria-label="Toggle menu"
+            aria-expanded={isMenuOpen}
+            ref={menuButtonRef}
+            className="md:hidden text-on-surface"
+            onClick={toggleMenu}
+          >
             <span className="material-symbols-outlined" style={{fontVariationSettings: "'FILL' 0"}}>
               {isMenuOpen ? 'close' : 'menu'}
             </span>
@@ -82,10 +126,11 @@ export default function Navbar() {
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div
+            ref={menuRef}
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-[#0A0A0A]/95 backdrop-blur-md border-b border-white/10 fixed top-[57px] w-full z-40 px-margin-mobile py-5 shadow-xl font-label-caps text-label-caps tracking-widest text-xs uppercase"
+            className="md:hidden bg-[#0A0A0A]/95 backdrop-blur-md border-b border-white/10 fixed top-[57px] inset-x-0 z-40 px-margin-mobile py-5 shadow-xl font-label-caps text-label-caps tracking-widest text-xs uppercase max-h-[calc(100vh-57px)] overflow-y-auto"
           >
             <div className="flex flex-col space-y-4">
                {navLinks.map((link) => (

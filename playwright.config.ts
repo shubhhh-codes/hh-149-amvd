@@ -1,52 +1,68 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
+import dotenv from 'dotenv';
 
-const isCI = !!process.env.CI;
+// Load test environment variables
+dotenv.config({ path: path.resolve(__dirname, '.env.test') });
+dotenv.config({ path: path.resolve(__dirname, '.env.local') });
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 export default defineConfig({
   testDir: './tests',
-  
-  // Global timeout for standard tests
-  timeout: 30 * 1000,
-  
-  /* Run tests in files in parallel */
   fullyParallel: true,
-  forbidOnly: isCI,
+  
+  /* Fail the build on CI if you accidentally left test.only in the source code. */
+  forbidOnly: !!process.env.CI,
   
   /* Retries: 1 for CI to track and handle flaky tests, 0 for local */
-  retries: isCI ? 1 : 0,
+  retries: process.env.CI ? 1 : 0,
   
-  /* Parallelism limits */
-  workers: isCI ? (process.env.STRESS_RUN ? 1 : 2) : undefined,
+  /* Opt out of parallel tests on CI. */
+  workers: 1,
   
   /* Reporter to use. Adds custom Failure Intelligence Reporter and GitHub step summary */
   reporter: [
-    ['html', { outputFolder: 'test-artifacts/html-report', open: 'never' }],
-    ['json', { outputFile: 'test-artifacts/results.json' }],
-    ['./tests/utils/FailureIntelligenceReporter.ts'],
-    ...(isCI ? [['github'] as const] : [['list'] as const])
+    ['html', { open: 'never' }],
+    ['list']
   ],
   
-  outputDir: 'test-artifacts/artifacts',
-  
-  /* Shared settings */
+  /* Shared settings for all the projects below. */
   use: {
+    // ── CRITICAL: Camera Mocks for QR Scanner tests ────────
+    launchOptions: {
+      args: [
+        '--use-fake-ui-for-media-stream',
+        '--use-fake-device-for-media-stream',
+      ],
+    },
+    contextOptions: {
+      permissions: ['camera'],
+    },
+    // ───────────────────────────────────────────────────────
+    
     baseURL: 'http://localhost:3000',
-    trace: 'retain-on-failure',
+    trace: 'on-first-retry',
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    contextOptions: {
-      permissions: ['camera']
-    },
-    launchOptions: {
-      args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']
-    }
+    testIdAttribute: 'data-testid',
   },
 
-  /* Run your local dev server before starting the tests */
+  /* Configure projects for major browsers */
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
+
+  /* Run your local production server before starting the tests */
   webServer: {
-    command: 'npm run dev',
+    command: 'npm run start',
     url: 'http://localhost:3000',
-    reuseExistingServer: !isCI,
+    reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
+    env: {
+      NODE_ENV: 'production',
+    },
   },
 });

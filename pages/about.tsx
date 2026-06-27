@@ -38,14 +38,14 @@ export default function AboutPage() {
       <Navbar />
 
       <div className="bg-[#0A0A0A] text-[#e5e2e1] font-body-md overflow-x-hidden min-h-screen pt-20">
-        <style jsx>{`
+        <style dangerouslySetInnerHTML={{ __html: `
           .spotlight-glow {
               background: radial-gradient(circle at center, rgba(255, 107, 26, 0.08) 0%, transparent 70%);
           }
           .border-7-white {
               border: 1px solid rgba(255, 255, 255, 0.07);
           }
-        `}</style>
+        `}} />
         
         {/* Hero Section */}
         <section className="px-margin-mobile md:px-margin-desktop py-24 md:py-32 max-w-container-max mx-auto relative overflow-hidden">
