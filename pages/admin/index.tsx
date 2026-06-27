@@ -92,7 +92,7 @@ interface Feedback {
 export default function AdminPanel() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'scanner' | 'bookings' | 'comedians' | 'payments' | 'messages' | 'cms' | 'feedbacks'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'scanner' | 'bookings' | 'comedians' | 'payments' | 'messages' | 'cms' | 'feedbacks' | 'distribution'>('dashboard');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [comedians, setComedians] = useState<ComedianProfile[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -693,6 +693,8 @@ export default function AdminPanel() {
               </div>
             </section>
           )}
+
+          {/* DISTRIBUTION TAB REMOVED (Moved to CMS) */}
 
           {/* SCANNER TAB — handled by the fullscreen overlay below; no inline instance here */}
 

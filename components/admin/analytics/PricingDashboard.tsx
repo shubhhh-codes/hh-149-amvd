@@ -87,7 +87,7 @@ export default function PricingDashboard({ bookings, venueCapacity }: { bookings
             <div className="flex justify-between py-2 border-b border-white/5">
               <span className="text-on-surface/50">Highest Revenue Tier</span>
               <span className="font-bold text-primary-container">
-                {tierSalesChart.length > 0 ? tierSalesChart.sort((a,b)=>b.value-a.value)[0].name : 'N/A'}
+                {tierSalesChart.length > 0 ? [...tierSalesChart].sort((a,b)=>b.value-a.value)[0].name : 'N/A'}
               </span>
             </div>
             <div className="flex justify-between py-2 border-b border-white/5">
