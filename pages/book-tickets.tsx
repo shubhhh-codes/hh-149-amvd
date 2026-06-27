@@ -89,8 +89,13 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
   useEffect(() => {
     mountTime.current = Date.now();
 
-    const handleBeforeUnload = () => {
-      if (!hasBooked.current) {
+    const handleAbandonment = () => {
+      const hasFilledForm = (customerNameRef.current && customerNameRef.current.trim().length > 0) || 
+                            (customerEmailRef.current && customerEmailRef.current.trim().length > 0) || 
+                            (customerPhoneRef.current && customerPhoneRef.current.trim().length > 0);
+                            
+      if (!hasBooked.current && hasFilledForm) {
+        hasBooked.current = true; // Prevent multiple fires
         const timeSpent = Math.floor((Date.now() - mountTime.current) / 1000);
         const data = JSON.stringify({
           event: 'abandonment',
@@ -107,9 +112,26 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // We only want to track if they are really leaving.
+        // For mobile, this is often the best indicator of app close.
+        handleAbandonment();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleAbandonment);
+    window.addEventListener('pagehide', handleAbandonment);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    router.events.on('routeChangeStart', handleAbandonment);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleAbandonment);
+      window.removeEventListener('pagehide', handleAbandonment);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      router.events.off('routeChangeStart', handleAbandonment);
+    };
+  }, [router]);
 
   useEffect(() => {
     if (tiersData?.tiers && tiersData.tiers.length > 0) {
