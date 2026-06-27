@@ -126,6 +126,10 @@ export default function TicketTiersManager() {
                 <label className="text-xs text-white/60">Badge (Optional)</label>
                 <input type="text" value={tier.badge || ''} onChange={(e) => handleUpdate(idx, 'badge', e.target.value || null)} className="w-full bg-[#080808] p-2 rounded border border-white/10 mt-1" placeholder="e.g. MOST POPULAR" />
               </div>
+              <div className="col-span-2">
+                <label className="text-xs text-white/60">Description (Popup Text)</label>
+                <textarea value={tier.description || ''} onChange={(e) => handleUpdate(idx, 'description', e.target.value)} className="w-full bg-[#080808] p-2 rounded border border-white/10 mt-1 h-20 resize-y" placeholder="e.g. This ticket admits 1 person of any gender..." />
+              </div>
             </div>
           </div>
         ))}

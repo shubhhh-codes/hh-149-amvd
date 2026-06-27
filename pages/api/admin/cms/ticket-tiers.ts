@@ -23,6 +23,7 @@ interface TierInput {
   seats: number;
   badge: string | null;
   displayOrder: number;
+  description: string;
 }
 
 // ─── Validation helpers ───────────────────────────────────────────────────────
@@ -68,6 +69,10 @@ function validateTier(tier: unknown, index: number): string | null {
     return `Tier[${index}].badge must be null or a non-empty string (max 100 chars)`;
   }
 
+  if (t.description !== undefined && t.description !== null && typeof t.description !== 'string') {
+    return `Tier[${index}].description must be a string`;
+  }
+
   return null;
 }
 
@@ -84,6 +89,7 @@ function sanitizeTier(tier: Record<string, unknown>): TierInput {
     seats:        Number(tier.seats),
     displayOrder: Number(tier.displayOrder),
     badge:        tier.badge === null ? null : String(tier.badge).trim(),
+    description:  tier.description ? String(tier.description).trim() : '',
   };
 }
 
@@ -122,9 +128,9 @@ async function handler(
       const settings = await db.collection('settings').findOne({ type: 'ticket-tiers' });
 
       const tiers: TierInput[] = settings?.tiers ?? [
-        { key: 'solo',  name: 'Solo Pass',  label: 'SOLO',  price: 499,  seats: 1, badge: null,           displayOrder: 1 },
-        { key: 'duo',   name: 'Duo Pass',   label: 'DUO',   price: 899,  seats: 2, badge: 'MOST POPULAR', displayOrder: 2 },
-        { key: 'squad', name: 'Squad Pass', label: 'SQUAD', price: 1599, seats: 4, badge: null,           displayOrder: 3 },
+        { key: 'solo',  name: 'Solo Pass',  label: 'SOLO PASS',  price: 149,  seats: 1, badge: null,           displayOrder: 1, description: 'This ticket admits 1 person of any gender.' },
+        { key: 'duo',   name: 'Love Birds Special',   label: 'LOVE BIRDS SPECIAL',   price: 279,  seats: 2, badge: 'MOST POPULAR', displayOrder: 2, description: 'Love Birds Special admits exactly 1 man and 1 woman (total 2 people).' },
+        { key: 'squad', name: 'Squad Pass', label: 'SQUAD PASS', price: 499, seats: 4, badge: 'BEST VALUE',           displayOrder: 3, description: 'Group of 4 admits any 4 people. This is our best value package, coming out to less than a movie ticket per person!' },
       ];
 
       return res.status(200).json({

@@ -19,12 +19,13 @@ interface TicketTier {
   price: number;
   seats: number;
   badge: string | null;
+  description?: string;
 }
 
 const DEFAULT_TIERS = [
-  { key: 'solo', name: 'Solo Pass', label: 'SOLO', price: 499, seats: 1, badge: null, displayOrder: 1 },
-  { key: 'duo', name: 'Duo Pass', label: 'DUO', price: 899, seats: 2, badge: 'MOST POPULAR', displayOrder: 2 },
-  { key: 'squad', name: 'Squad Pass', label: 'SQUAD', price: 1599, seats: 4, badge: null, displayOrder: 3 },
+  { key: 'solo', name: 'Solo Pass', label: 'SOLO PASS', price: 149, seats: 1, badge: null, displayOrder: 1, description: 'This ticket admits 1 person of any gender.' },
+  { key: 'duo', name: 'Love Birds Special', label: 'LOVE BIRDS SPECIAL', price: 279, seats: 2, badge: 'MOST POPULAR', displayOrder: 2, description: 'Love Birds Special admits exactly 1 man and 1 woman (total 2 people).' },
+  { key: 'squad', name: 'Squad Pass', label: 'SQUAD PASS', price: 499, seats: 4, badge: 'BEST VALUE', displayOrder: 3, description: 'Group of 4 admits any 4 people. This is our best value package, coming out to less than a movie ticket per person!' },
 ];
 
 export async function getServerSideProps() {
@@ -65,6 +66,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
   const [mode, setMode] = useState<'loading' | 'active' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [showSummaryDetails, setShowSummaryDetails] = useState(false);
+  const [infoPopup, setInfoPopup] = useState<string | null>(null);
 
   const mountTime = useRef(Date.now());
   const hasBooked = useRef(false);
@@ -374,32 +376,43 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
                   return (
                     <div
                       key={tier.key}
-                      className={`bg-[#141414] rounded-xl p-3 md:p-4 transition-all flex flex-col items-center justify-between relative ${
+                      className={`bg-[#141414] rounded-xl p-1.5 md:p-3 transition-all flex flex-col items-center justify-between relative h-[130px] md:h-[180px] w-full ${
                         isActive
-                          ? 'border-[#FF6B1A] border shadow-[0_0_15px_rgba(255,107,26,0.2)] bg-[rgba(255,107,26,0.08)] scale-[1.02] z-10'
+                          ? 'border-[#FF6B1A] border shadow-[0_0_15px_rgba(255,107,26,0.2)] bg-[rgba(255,107,26,0.08)] z-10'
                           : 'border-white/10 border'
-                      } h-[140px] md:h-44`}
+                      }`}
                     >
                       {tier.badge && (
-                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#FF6B1A] px-2 py-0.5 rounded text-[8px] md:text-[10px] font-bold text-white shadow-lg uppercase whitespace-nowrap z-20">
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#FF6B1A] px-1.5 py-0.5 rounded text-[7px] md:text-[10px] font-bold text-white shadow-lg uppercase whitespace-nowrap z-20">
                           {tier.badge}
                         </div>
                       )}
+                      
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                           e.stopPropagation();
+                           setInfoPopup(tier.key);
+                        }}
+                        className="absolute top-1.5 right-1.5 w-[18px] h-[18px] md:w-[22px] md:h-[22px] rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[#a3a3a3] hover:bg-white/10 hover:text-white transition-colors z-20"
+                      >
+                        <span className="material-symbols-outlined text-[12px] md:text-[14px]">help</span>
+                      </button>
 
-                      <div className="flex flex-col items-center w-full flex-1 pt-1">
-                        <div className="h-8 md:h-10 flex items-end justify-center w-full mb-1 md:mb-2">
-                          <span className={`font-['Hind',sans-serif] text-[10px] md:text-sm font-bold tracking-wider uppercase text-center leading-tight line-clamp-2 ${isActive ? 'text-[#FF6B1A]' : 'text-[#a3a3a3]'}`}>
+                      <div className="flex flex-col items-center w-full flex-1 pt-4 md:pt-6 pb-1">
+                        <div className="w-full flex items-end justify-center min-h-[22px] md:min-h-[32px] px-1 md:px-0">
+                          <span className={`font-['Hind',sans-serif] text-[7.5px] md:text-xs font-bold tracking-wide uppercase text-center leading-[1.1] line-clamp-3 block ${isActive ? 'text-[#FF6B1A]' : 'text-[#a3a3a3]'}`}>
                             {tier.label}
                           </span>
                         </div>
-                        <div className="flex-1 flex items-start justify-center">
-                          <h3 className="font-['Hind',sans-serif] text-xl md:text-3xl font-black text-white leading-none tracking-tight">
+                        <div className="flex flex-col items-center justify-center flex-1 w-full text-center mt-0.5">
+                          <h3 className="font-['Hind',sans-serif] text-[17px] md:text-3xl font-black text-white leading-none tracking-tight">
                             ₹{tier.price}
                           </h3>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between bg-[#080808] border border-white/10 rounded-md w-full overflow-hidden mt-1 h-8 md:h-10 shrink-0">
+                      <div className="flex items-center justify-between bg-[#080808] border border-white/10 rounded w-full overflow-hidden shrink-0 h-6 md:h-10 mt-auto">
                         <button
                           type="button"
                           onClick={() => setCart((previousState) => ({ ...previousState, [tier.key]: Math.max(0, (previousState[tier.key] || 0) - 1) }))}
@@ -407,9 +420,9 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
                           aria-label={`Decrease ${tier.name} quantity`}
                           className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <span className="material-symbols-outlined text-[16px] md:text-[18px]">remove</span>
+                          <span className="material-symbols-outlined text-[14px] md:text-[18px]">remove</span>
                         </button>
-                        <span className="font-['Hind',sans-serif] text-[13px] md:text-base font-bold text-white w-1/3 text-center">{quantity}</span>
+                        <span className="font-['Hind',sans-serif] text-xs md:text-base font-bold text-white w-1/3 text-center leading-none">{quantity}</span>
                         <button
                           type="button"
                           onClick={() => setCart((previousState) => ({ ...previousState, [tier.key]: Math.min(10, (previousState[tier.key] || 0) + 1) }))}
@@ -417,7 +430,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
                           aria-label={`Increase ${tier.name} quantity`}
                           className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <span className="material-symbols-outlined text-[16px] md:text-[18px]">add</span>
+                          <span className="material-symbols-outlined text-[14px] md:text-[18px]">add</span>
                         </button>
                       </div>
                     </div>
@@ -607,6 +620,39 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
       </div>
 
       <Footer />
+
+      {infoPopup && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={() => setInfoPopup(null)}
+        >
+          <div 
+            className="bg-[#141414] border border-white/10 rounded-xl p-5 max-w-[280px] w-full shadow-2xl relative animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button 
+               onClick={() => setInfoPopup(null)} 
+               className="absolute top-3 right-3 text-white/50 hover:text-white transition-colors p-1"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+            <div className="flex flex-col items-center mb-3 mt-1">
+               <h3 className="text-white font-bold text-lg font-['Hind',sans-serif] uppercase tracking-wide text-center">
+                 {tiers.find((t: TicketTier) => t.key === infoPopup)?.name || 'Ticket Details'}
+               </h3>
+            </div>
+            <p className="text-[#a3a3a3] text-sm leading-relaxed mb-5 text-center px-2">
+              {tiers.find((t: TicketTier) => t.key === infoPopup)?.description || 'No description available for this ticket.'}
+            </p>
+            <button
+              onClick={() => setInfoPopup(null)}
+              className="w-full bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white font-bold py-2.5 rounded-lg transition-colors text-xs uppercase tracking-wider"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
