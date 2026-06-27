@@ -14,10 +14,11 @@ async function handler(
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  // If the user making the request is an authenticated admin, do NOT track their journey
+  let isAdmin = false;
+  // If the user making the request is an authenticated admin, flag them
   const session = await getServerSession(req, res, authOptions);
   if (session && session.user) {
-    return res.status(200).json({ success: true, skipped: true, reason: 'Admin Session' });
+    isAdmin = true;
   }
 
   try {
@@ -25,7 +26,11 @@ async function handler(
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch (e) {}
     }
-    const { event, actionDetails, timeSpentOnPage, userDetails, timeline, sessionId, isLiveUpdate } = body;
+    let { event, actionDetails, timeSpentOnPage, userDetails, timeline, sessionId, isLiveUpdate } = body;
+    
+    if (isAdmin) {
+      actionDetails = `[ADMIN TESTING] ${actionDetails}`;
+    }
 
     if (!event || !actionDetails) {
       return res.status(400).json({ message: 'Missing required fields' });

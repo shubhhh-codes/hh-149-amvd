@@ -150,14 +150,17 @@ export function useJourneyTracker() {
         timeline: timelineFormatted
       });
       
-      fetch('/api/system/activity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: data,
-        keepalive: true
-      }).catch(() => {
-        if (isFinal) navigator.sendBeacon('/api/system/activity', new Blob([data], { type: 'application/json' }));
-      });
+      // Use sendBeacon with text/plain to guarantee delivery on tab close
+      if (isFinal) {
+        navigator.sendBeacon('/api/system/activity', new Blob([data], { type: 'text/plain' }));
+      } else {
+        fetch('/api/system/activity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: data,
+          keepalive: true
+        }).catch(() => {});
+      }
     };
 
     const heartbeat = setInterval(() => sendJourney(false), 10000);

@@ -108,12 +108,8 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
           },
         });
 
-        fetch('/api/system/activity', {
-          method: 'POST',
-          body: data,
-          keepalive: true,
-          headers: { 'Content-Type': 'application/json' }
-        }).catch(() => {});
+        // Use sendBeacon with text/plain to guarantee delivery on tab close without CORS/keepalive issues
+        navigator.sendBeacon('/api/system/activity', new Blob([data], { type: 'text/plain' }));
       }
     };
 
