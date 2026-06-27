@@ -10,7 +10,7 @@ import { formatCurrency } from '@/utils/format';
 import DownloadPaymentsButton from '@/components/UserDownloadPDF';
 import Image from 'next/image';
 import QRScanner from '@/components/admin/QRScanner';
-
+import PricingDashboard from '@/components/admin/analytics/PricingDashboard';
 interface Booking {
   _id: string;
   bookingId: string;
@@ -614,7 +614,12 @@ export default function AdminPanel() {
           {/* DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
             <section className="space-y-6 animate-enter">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Pricing Analytics Module - Moved to top per user request */}
+              <div>
+                 <PricingDashboard bookings={bookings as any} venueCapacity={venueCapacity || 150} />
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
                 <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
                   <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Total Revenue</span>
                   <div className="flex items-end justify-between mt-2">
