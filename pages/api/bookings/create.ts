@@ -8,8 +8,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import clientPromise from '../../../lib/mongodb';
 import { generateBookingId } from '../../../lib/bookingId';
 
-const VENUE_CAPACITY = 150;
-
 import { withErrorHandler } from '../../../lib/withErrorHandler';
 
 async function handler(
@@ -52,6 +50,7 @@ async function handler(
     );
 
     const bookedSeats = inventoryResult?.bookedSeats || numberOfTickets;
+    const VENUE_CAPACITY = inventoryResult?.maxCapacity || 150;
     const capacityWarning = bookedSeats > VENUE_CAPACITY;
 
     // Generate human-friendly booking ID

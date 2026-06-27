@@ -137,6 +137,11 @@ export default function AdminPanel() {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'CANCELLED'>('ALL');
+  
+  // Venue Capacity
+  const [venueCapacity, setVenueCapacity] = useState<number | null>(null);
+  const [isUpdatingCapacity, setIsUpdatingCapacity] = useState(false);
+  const [newCapacity, setNewCapacity] = useState<string>('');
 
   const fetchBookings = useCallback(async () => {
     const res = await fetch('/api/admin/bookings');
@@ -191,10 +196,23 @@ export default function AdminPanel() {
     }
   }, []);
 
+  const fetchVenueCapacity = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/venue-capacity');
+      if (res.ok) {
+        const data = await res.json();
+        setVenueCapacity(data.maxCapacity);
+        setNewCapacity(data.maxCapacity.toString());
+      }
+    } catch (err) {
+      console.error('Fetch capacity error:', err);
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       if (activeTab === 'dashboard') {
-        await Promise.all([fetchBookings(), fetchComedians(), fetchPayments(), fetchMessages(), fetchFeedbacks()]);
+        await Promise.all([fetchBookings(), fetchComedians(), fetchPayments(), fetchMessages(), fetchFeedbacks(), fetchVenueCapacity()]);
       } else if (activeTab === 'bookings') {
         await fetchBookings();
       } else if (activeTab === 'comedians') {
@@ -212,7 +230,7 @@ export default function AdminPanel() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, fetchBookings, fetchComedians, fetchPayments, fetchMessages, fetchFeedbacks]);
+  }, [activeTab, fetchBookings, fetchComedians, fetchPayments, fetchMessages, fetchFeedbacks, fetchVenueCapacity]);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -397,6 +415,29 @@ export default function AdminPanel() {
       fetchMessages();
     } catch (err: any) {
       toast.error(err.message);
+    }
+  };
+
+  const handleUpdateCapacity = async () => {
+    if (!newCapacity || isNaN(Number(newCapacity))) return;
+    setIsUpdatingCapacity(true);
+    try {
+      const res = await fetch('/api/admin/venue-capacity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maxCapacity: Number(newCapacity) })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setVenueCapacity(data.maxCapacity);
+        alert('Venue capacity updated successfully!');
+      } else {
+        alert('Failed to update capacity');
+      }
+    } catch (err) {
+      console.error('Update capacity error:', err);
+    } finally {
+      setIsUpdatingCapacity(false);
     }
   };
 
@@ -605,6 +646,33 @@ export default function AdminPanel() {
                   </div>
                 </div>
               </div>
+
+              {/* Settings Block */}
+              <div className="bg-[#131313] p-6 rounded brutalist-border mt-4 flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <h3 className="text-sm font-label-caps tracking-widest uppercase text-on-surface/70 mb-2">Venue Capacity Limit</h3>
+                  <div className="flex gap-2 items-center">
+                    <input 
+                      type="number"
+                      value={newCapacity}
+                      onChange={(e) => setNewCapacity(e.target.value)}
+                      className="bg-black border border-white/20 p-2 rounded text-white text-sm w-32"
+                      placeholder="e.g. 150"
+                    />
+                    <button 
+                      onClick={handleUpdateCapacity}
+                      disabled={isUpdatingCapacity || !newCapacity}
+                      className="bg-[#FF6B1A] text-white px-4 py-2 rounded font-bold text-sm disabled:opacity-50 hover:bg-[#FF6B1A]/80 transition-colors"
+                    >
+                      {isUpdatingCapacity ? 'Saving...' : 'Update'}
+                    </button>
+                  </div>
+                  {venueCapacity !== null && (
+                    <p className="text-xs text-on-surface/50 mt-2">Currently set to: <span className="text-white font-bold">{venueCapacity}</span></p>
+                  )}
+                </div>
+              </div>
+
               <div className="bg-[#131313] p-6 rounded brutalist-border mt-4 flex justify-between items-center">
                  <div>
                    <h2 className="text-xl font-headline-md font-bold mb-2 uppercase tracking-wide">Welcome to Admin Portal</h2>

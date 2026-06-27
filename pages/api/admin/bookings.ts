@@ -10,8 +10,6 @@ import clientPromise from '../../../lib/mongodb';
 import { generateBookingId } from '../../../lib/bookingId';
 import { sendDiscordNotification } from '../../../lib/discord';
 
-const VENUE_CAPACITY = 150;
-
 import { withErrorHandler } from '../../../lib/withErrorHandler';
 
 async function handler(
@@ -99,6 +97,9 @@ async function handler(
           .toArray();
 
         const bookedSeats = totalBookings[0]?.total || 0;
+
+        const inventoryDoc = await db.collection('inventory').findOne({ type: 'venue_capacity' });
+        const VENUE_CAPACITY = inventoryDoc?.maxCapacity || 150;
 
         if (bookedSeats + booking.numberOfTickets > VENUE_CAPACITY) {
           // Warning only — admin can still override

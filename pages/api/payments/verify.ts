@@ -153,7 +153,8 @@ async function handler(
     });
 
     // Check Capacity for "Almost Sold Out" alert
-    const VENUE_CAPACITY = 150;
+    const inventoryDoc = await db.collection('inventory').findOne({ type: 'venue_capacity' });
+    const VENUE_CAPACITY = inventoryDoc?.maxCapacity || 150;
     const allApproved = await db.collection('bookings').find({ status: 'approved' }).toArray();
     const totalConfirmedSeats = allApproved.reduce((sum, b) => sum + (b.numberOfTickets || 0), 0);
     const prevConfirmedSeats = totalConfirmedSeats - booking.numberOfTickets;
