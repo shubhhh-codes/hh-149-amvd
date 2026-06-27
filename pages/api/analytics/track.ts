@@ -85,8 +85,8 @@ async function handler(
       browser: browserStr
     };
 
-    // 4. Fire the slack notification in the background
-    sendTrackingNotification({
+    // 4. Fire the discord notification
+    await sendTrackingNotification({
       event,
       actionDetails,
       visitorData,

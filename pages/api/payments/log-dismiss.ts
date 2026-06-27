@@ -48,8 +48,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         { $set: { status: 'cancelled', updatedAt: new Date() } }
       );
 
-      // Fire the Slack webhook
-      sendPaymentCancelledNotification({
+      // Fire the Discord webhook
+      await sendPaymentCancelledNotification({
         bookingId: booking.bookingId,
         fullName: booking.fullName,
         email: booking.email,
