@@ -10,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!id || !eventContext) return res.status(400).json({ error: 'Missing parameters' });
 
     const client = await clientPromise;
-    const db = client.db('humourshub');
+    const db = client.db();
 
     // Simulate AI generation with robust dynamic templates
     const dateStr = new Date(eventContext.showDate).toLocaleDateString();

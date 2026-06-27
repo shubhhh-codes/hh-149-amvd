@@ -56,7 +56,19 @@ async function handler(
       tiers = DEFAULT_TIERS;
     }
 
+    const inventoryDoc = await db.collection('inventory').findOne({ type: 'venue_capacity' });
+    const VENUE_CAPACITY = inventoryDoc?.maxCapacity || 150;
+    const totalBookings = await db.collection('bookings')
+      .aggregate([
+        { $match: { status: 'approved' } },
+        { $group: { _id: null, total: { $sum: '$numberOfTickets' } } }
+      ])
+      .toArray();
+    const totalApproved = totalBookings[0]?.total || 0;
+    const seatsRemaining = Math.max(0, VENUE_CAPACITY - totalApproved);
+
     let calculatedTotal = 0;
+    let requestedSeats = 0;
     for (const item of cart) {
       const tier = tiers.find((t: any) => t.key === item.tierKey);
       if (!tier) {
@@ -64,6 +76,15 @@ async function handler(
       }
       const itemUnits = Number(item.units) || 1;
       calculatedTotal += itemUnits * tier.price;
+      requestedSeats += itemUnits * tier.seats;
+
+      if (itemUnits * tier.seats > seatsRemaining) {
+        return res.status(400).json({ error: `Not enough seats available. Only ${seatsRemaining} seats remaining.` });
+      }
+    }
+
+    if (requestedSeats > seatsRemaining) {
+      return res.status(400).json({ error: `Not enough seats available. Only ${seatsRemaining} seats remaining.` });
     }
 
     const amount = calculatedTotal * 100; // total price in paise
