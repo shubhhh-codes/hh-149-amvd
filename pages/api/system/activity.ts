@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { sendTrackingNotification } from '../../../lib/discord';
 import { UAParser } from 'ua-parser-js';
 
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../auth/[...nextauth]';
 import { withErrorHandler } from '../../../lib/withErrorHandler';
 
 async function handler(
@@ -12,8 +14,23 @@ async function handler(
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  let isAdmin = false;
+  // If the user making the request is an authenticated admin, flag them
+  const session = await getServerSession(req, res, authOptions);
+  if (session && session.user) {
+    isAdmin = true;
+  }
+
   try {
-    const { event, actionDetails, timeSpentOnPage, userDetails, timeline, sessionId, isLiveUpdate } = req.body;
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch (e) {}
+    }
+    let { event, actionDetails, timeSpentOnPage, userDetails, timeline, sessionId, isLiveUpdate } = body;
+    
+    if (isAdmin) {
+      actionDetails = `[ADMIN TESTING] ${actionDetails}`;
+    }
 
     if (!event || !actionDetails) {
       return res.status(400).json({ message: 'Missing required fields' });
@@ -77,8 +94,8 @@ async function handler(
       browser: browserStr
     };
 
-    // 4. Fire the slack notification in the background
-    sendTrackingNotification({
+    // 4. Fire the discord notification
+    await sendTrackingNotification({
       event,
       actionDetails,
       visitorData,

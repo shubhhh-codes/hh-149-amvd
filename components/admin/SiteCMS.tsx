@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import TicketTiersManager from './cms/TicketTiersManager';
+import DistributionHub from '@/components/admin/distribution/DistributionHub';
 interface Comedian {
   _id: string;
   username: string;
@@ -37,10 +38,11 @@ interface CMSItem {
 interface SiteCMSProps {
   onNavigateToApps?: () => void;
   onNavigateToFeedbacks?: () => void;
+  onNavigateToMessages?: () => void;
 }
 
-export default function SiteCMS({ onNavigateToApps, onNavigateToFeedbacks }: SiteCMSProps = {}) {
-  const [cmsTab, setCmsTab] = useState<'hub' | 'homepage' | 'gallery' | 'shows' | 'ticketTiers' | 'perform' | 'policies' | 'page404' | 'profile' | 'footer' | 'faq'>('hub');
+export default function SiteCMS({ onNavigateToApps, onNavigateToFeedbacks, onNavigateToMessages }: SiteCMSProps = {}) {
+  const [cmsTab, setCmsTab] = useState<'hub' | 'distribution' | 'homepage' | 'gallery' | 'shows' | 'ticketTiers' | 'perform' | 'policies' | 'page404' | 'profile' | 'footer' | 'faq'>('hub');
   
   // Intercept hardware/browser back button to return to Hub
   useEffect(() => {
@@ -701,7 +703,19 @@ export default function SiteCMS({ onNavigateToApps, onNavigateToFeedbacks }: Sit
               <p className="text-body-md text-on-surface/60 max-w-[280px]">Configure the digital presence of Ahmedabad's premier comedy scene.</p>
            </section>
 
-           <div className="grid grid-cols-2 gap-4">
+           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {/* Card 0: Distribution Hub */}
+              <div onClick={() => setCmsTab('distribution')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">campaign</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Distribution</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Marketing Ops</p>
+                 </div>
+              </div>
+
               {/* Card 1: Homepage */}
               <div onClick={() => setCmsTab('homepage')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
                  <div className="flex justify-between items-start">
@@ -771,6 +785,18 @@ export default function SiteCMS({ onNavigateToApps, onNavigateToFeedbacks }: Sit
                  <div>
                     <h3 className="font-headline font-bold text-lg leading-tight uppercase">Comedian Apps</h3>
                     <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Review & Manage</p>
+                 </div>
+              </div>
+
+              {/* Card Messages Inbox */}
+              <div onClick={() => { if(onNavigateToMessages) onNavigateToMessages(); }} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
+                 <div className="flex justify-between items-start">
+                    <span className="material-symbols-outlined text-primary-container text-3xl">inbox</span>
+                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
+                 </div>
+                 <div>
+                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Messages</h3>
+                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Contact Forms</p>
                  </div>
               </div>
 
@@ -900,6 +926,13 @@ export default function SiteCMS({ onNavigateToApps, onNavigateToFeedbacks }: Sit
             <div className="flex justify-center p-12"><LoadingSpinner /></div>
           ) : (
             <>
+          {/* DISTRIBUTION TAB */}
+          {cmsTab === 'distribution' && (
+            <div className="h-[85vh]">
+              <DistributionHub />
+            </div>
+          )}
+
           {/* HOMEPAGE PERFORMERS TAB */}
           {cmsTab === 'homepage' && (
             <div className="space-y-4">

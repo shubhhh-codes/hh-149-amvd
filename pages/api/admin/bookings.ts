@@ -10,8 +10,6 @@ import clientPromise from '../../../lib/mongodb';
 import { generateBookingId } from '../../../lib/bookingId';
 import { sendDiscordNotification } from '../../../lib/discord';
 
-const VENUE_CAPACITY = 150;
-
 import { withErrorHandler } from '../../../lib/withErrorHandler';
 
 async function handler(
@@ -58,6 +56,7 @@ async function handler(
         status: 'approved',
         attended: false,
         attendedAt: null,
+        checkedInCount: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -99,6 +98,9 @@ async function handler(
 
         const bookedSeats = totalBookings[0]?.total || 0;
 
+        const inventoryDoc = await db.collection('inventory').findOne({ type: 'venue_capacity' });
+        const VENUE_CAPACITY = inventoryDoc?.maxCapacity || 150;
+
         if (bookedSeats + booking.numberOfTickets > VENUE_CAPACITY) {
           // Warning only — admin can still override
           console.warn('Capacity warning: approving would exceed venue capacity');
@@ -130,6 +132,11 @@ async function handler(
         return res.status(400).json({ message: 'Missing bookingId or attended field' });
       }
 
+      const booking = await db.collection('bookings').findOne({ bookingId });
+      if (!booking) {
+        return res.status(404).json({ message: 'Booking not found' });
+      }
+
       const updateFields: any = {
         attended,
         updatedAt: new Date(),
@@ -137,8 +144,10 @@ async function handler(
 
       if (attended) {
         updateFields.attendedAt = new Date();
+        updateFields.checkedInCount = booking.numberOfTickets;
       } else {
         updateFields.attendedAt = null;
+        updateFields.checkedInCount = 0;
       }
 
       const result = await db.collection('bookings').updateOne(

@@ -53,7 +53,7 @@ export default function Login() {
       if (result?.error) {
         setError('Invalid email or password. Please try again.');
       } else {
-        router.push('/admin');
+        window.location.href = '/admin';
       }
     } catch {
       setError('An error occurred. Please try again.');
@@ -80,7 +80,7 @@ export default function Login() {
       if (result?.error) {
         setError('Passkey login failed.');
       } else {
-        router.push('/admin');
+        window.location.href = '/admin';
       }
     } catch (err: any) {
       console.error(err);

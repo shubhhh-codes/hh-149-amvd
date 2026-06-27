@@ -138,3 +138,17 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vercel
+
+# Playwright & Testing Artifacts
+test-artifacts/
+playwright-report/
+test-results/
+*.png
+*.webm
+*.zip
+page-dump.html
+results.json
+*.md
+!README.md
+!docs/**/*.md
+!docs/*.md

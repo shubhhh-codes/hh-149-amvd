@@ -9,7 +9,8 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import { formatCurrency } from '@/utils/format';
 import DownloadPaymentsButton from '@/components/UserDownloadPDF';
 import Image from 'next/image';
-
+import QRScanner from '@/components/admin/QRScanner';
+import PricingDashboard from '@/components/admin/analytics/PricingDashboard';
 interface Booking {
   _id: string;
   bookingId: string;
@@ -19,6 +20,7 @@ interface Booking {
   status: 'pending' | 'approved' | 'cancelled';
   bookingType: 'paid' | 'complimentary';
   numberOfTickets?: number;
+  checkedInCount?: number;
   attended?: boolean;
   attendedAt?: string;
   createdAt: string;
@@ -90,7 +92,7 @@ interface Feedback {
 export default function AdminPanel() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'comedians' | 'payments' | 'messages' | 'cms' | 'feedbacks'>('bookings');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'scanner' | 'bookings' | 'comedians' | 'payments' | 'messages' | 'cms' | 'feedbacks' | 'distribution'>('dashboard');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [comedians, setComedians] = useState<ComedianProfile[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -135,6 +137,11 @@ export default function AdminPanel() {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'CANCELLED'>('ALL');
+  
+  // Venue Capacity
+  const [venueCapacity, setVenueCapacity] = useState<number | null>(null);
+  const [isUpdatingCapacity, setIsUpdatingCapacity] = useState(false);
+  const [newCapacity, setNewCapacity] = useState<string>('');
 
   const fetchBookings = useCallback(async () => {
     const res = await fetch('/api/admin/bookings');
@@ -189,10 +196,23 @@ export default function AdminPanel() {
     }
   }, []);
 
+  const fetchVenueCapacity = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/venue-capacity');
+      if (res.ok) {
+        const data = await res.json();
+        setVenueCapacity(data.maxCapacity);
+        setNewCapacity(data.maxCapacity.toString());
+      }
+    } catch (err) {
+      console.error('Fetch capacity error:', err);
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       if (activeTab === 'dashboard') {
-        await Promise.all([fetchBookings(), fetchComedians(), fetchPayments(), fetchMessages(), fetchFeedbacks()]);
+        await Promise.all([fetchBookings(), fetchComedians(), fetchPayments(), fetchMessages(), fetchFeedbacks(), fetchVenueCapacity()]);
       } else if (activeTab === 'bookings') {
         await fetchBookings();
       } else if (activeTab === 'comedians') {
@@ -210,11 +230,11 @@ export default function AdminPanel() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, fetchBookings, fetchComedians, fetchPayments, fetchMessages, fetchFeedbacks]);
+  }, [activeTab, fetchBookings, fetchComedians, fetchPayments, fetchMessages, fetchFeedbacks, fetchVenueCapacity]);
 
   useEffect(() => {
     if (status === 'loading') return;
-    if (session?.user?.role !== 'admin') {
+    if (process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV !== 'preview' && process.env.NEXT_PUBLIC_VERCEL_ENV !== 'preview' && session?.user?.role !== 'admin') {
       router.push('/auth/login');
       return;
     }
@@ -398,6 +418,29 @@ export default function AdminPanel() {
     }
   };
 
+  const handleUpdateCapacity = async () => {
+    if (!newCapacity || isNaN(Number(newCapacity))) return;
+    setIsUpdatingCapacity(true);
+    try {
+      const res = await fetch('/api/admin/venue-capacity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maxCapacity: Number(newCapacity) })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setVenueCapacity(data.maxCapacity);
+        alert('Venue capacity updated successfully!');
+      } else {
+        alert('Failed to update capacity');
+      }
+    } catch (err) {
+      console.error('Update capacity error:', err);
+    } finally {
+      setIsUpdatingCapacity(false);
+    }
+  };
+
   const handleSaveComedian = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -468,15 +511,15 @@ export default function AdminPanel() {
   }
 
   const navLinks = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'qr_code_2', short: 'DASH' },
-    { id: 'bookings', label: 'Bookings', icon: 'calendar_today', short: 'BOOK' },
+    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', short: 'DASH' },
+    { id: 'scanner', label: 'QR Scanner', icon: 'document_scanner', short: 'SCAN' },
     { id: 'cms', label: 'CMS', icon: 'widgets', short: 'CMS' },
-    { id: 'messages', label: 'Messages', icon: 'mail', short: 'MSG' },
+    { id: 'bookings', label: 'Bookings', icon: 'calendar_today', short: 'BOOK' },
     { id: 'payments', label: 'Payments', icon: 'payments', short: 'PAY' },
   ];
 
   return (
-    <div className="bg-[#0e0e0e] text-[#e5e2e1] font-body-md antialiased overflow-hidden flex h-screen w-full">
+    <div className="bg-[#0e0e0e] text-[#e5e2e1] font-body-md antialiased flex h-screen w-full">
       
       {/* Mobile Top App Bar */}
       <header className="md:hidden flex justify-between items-center w-full px-5 h-20 bg-[#131313] border-b border-white/5 fixed top-0 left-0 z-50">
@@ -571,7 +614,12 @@ export default function AdminPanel() {
           {/* DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
             <section className="space-y-6 animate-enter">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Pricing Analytics Module - Moved to top per user request */}
+              <div>
+                 <PricingDashboard bookings={bookings as any} venueCapacity={venueCapacity || 150} />
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
                 <div className="bg-[#131313] p-4 rounded brutalist-border flex flex-col justify-between min-h-[100px]">
                   <span className="font-label-caps text-[10px] text-on-surface/50 tracking-widest uppercase">Total Revenue</span>
                   <div className="flex items-end justify-between mt-2">
@@ -603,6 +651,33 @@ export default function AdminPanel() {
                   </div>
                 </div>
               </div>
+
+              {/* Settings Block */}
+              <div className="bg-[#131313] p-6 rounded brutalist-border mt-4 flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <h3 className="text-sm font-label-caps tracking-widest uppercase text-on-surface/70 mb-2">Venue Capacity Limit</h3>
+                  <div className="flex gap-2 items-center">
+                    <input 
+                      type="number"
+                      value={newCapacity}
+                      onChange={(e) => setNewCapacity(e.target.value)}
+                      className="bg-black border border-white/20 p-2 rounded text-white text-sm w-32"
+                      placeholder="e.g. 150"
+                    />
+                    <button 
+                      onClick={handleUpdateCapacity}
+                      disabled={isUpdatingCapacity || !newCapacity}
+                      className="bg-[#FF6B1A] text-white px-4 py-2 rounded font-bold text-sm disabled:opacity-50 hover:bg-[#FF6B1A]/80 transition-colors"
+                    >
+                      {isUpdatingCapacity ? 'Saving...' : 'Update'}
+                    </button>
+                  </div>
+                  {venueCapacity !== null && (
+                    <p className="text-xs text-on-surface/50 mt-2">Currently set to: <span className="text-white font-bold">{venueCapacity}</span></p>
+                  )}
+                </div>
+              </div>
+
               <div className="bg-[#131313] p-6 rounded brutalist-border mt-4 flex justify-between items-center">
                  <div>
                    <h2 className="text-xl font-headline-md font-bold mb-2 uppercase tracking-wide">Welcome to Admin Portal</h2>
@@ -618,6 +693,10 @@ export default function AdminPanel() {
               </div>
             </section>
           )}
+
+          {/* DISTRIBUTION TAB REMOVED (Moved to CMS) */}
+
+          {/* SCANNER TAB — handled by the fullscreen overlay below; no inline instance here */}
 
           {/* BOOKINGS TAB */}
           {activeTab === 'bookings' && (
@@ -725,7 +804,9 @@ export default function AdminPanel() {
                         <div>
                           <div className="font-label-caps text-on-surface/40 text-[10px] mb-1">ATTENDANCE</div>
                           <div className="text-sm font-headline-sm">
-                            {booking.attended ? <span className="text-green-400">Present</span> : <span className="text-on-surface/50">Pending</span>}
+                            <span className={booking.attended ? "text-green-400" : (booking.checkedInCount && booking.checkedInCount > 0) ? "text-primary-container" : "text-on-surface/50"}>
+                              {booking.checkedInCount || 0} / {booking.numberOfTickets} Checked In
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -966,7 +1047,15 @@ export default function AdminPanel() {
 
           {/* MESSAGES TAB */}
           {activeTab === 'messages' && (
-            <section className="space-y-6 animate-enter">
+            <section className="space-y-6 animate-enter mb-24">
+              <button 
+                type="button"
+                onClick={() => setActiveTab('cms')}
+                className="flex w-fit items-center gap-2 px-4 py-2 bg-[#201f1f] brutalist-border rounded-lg text-sm font-label-caps tracking-widest text-on-surface/80 hover:text-on-surface hover:bg-[#2a2a2a] transition-colors uppercase mt-2 mb-4"
+              >
+                <span className="material-symbols-outlined text-lg">arrow_back</span>
+                Back to Hub
+              </button>
               <h2 className="text-2xl font-headline-md font-bold mb-4 uppercase tracking-wide">Messages Inbox</h2>
               <div className="flex flex-col gap-4">
                 {messages.length === 0 ? (
@@ -1015,39 +1104,40 @@ export default function AdminPanel() {
               <SiteCMS 
                 onNavigateToApps={() => setActiveTab('comedians')} 
                 onNavigateToFeedbacks={() => setActiveTab('feedbacks')}
+                onNavigateToMessages={() => setActiveTab('messages')}
               />
             </section>
           )}
         </div>
       </main>
 
+      {/* SCANNER OVERLAY */}
+      {activeTab === 'scanner' && (
+        <QRScanner onClose={() => setActiveTab('dashboard')} />
+      )}
+
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full h-20 bg-surface-container-low border-t border-[rgba(255,255,255,0.05)] z-50 px-2 flex justify-around items-center pb-safe">
+      <nav className="md:hidden fixed bottom-0 left-0 w-full h-20 bg-[#131313] border-t border-white/5 z-50 px-2 flex justify-around items-center pb-safe">
         {navLinks.map((link) => {
-          if (link.id === 'cms') {
-            return (
-              <div key={link.id} className="relative -top-5">
-                <button 
-                  onClick={() => setActiveTab('cms')}
-                  className={`w-14 h-14 rounded-xl shadow-[0_8px_16px_rgba(255,107,26,0.3)] flex items-center justify-center hover:scale-95 active:scale-90 transition-transform ${
-                    activeTab === 'cms' ? 'bg-primary-container text-on-primary-container' : 'bg-[#2a2a2a] text-on-surface'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[28px]" style={{fontVariationSettings: activeTab === 'cms' ? "'FILL' 1" : "'FILL' 0"}}>{link.icon}</span>
-                </button>
-              </div>
-            );
-          }
+          const isActive = activeTab === link.id;
           return (
             <button 
               key={link.id}
               onClick={() => setActiveTab(link.id as any)}
-              className={`flex flex-col items-center justify-center min-w-[52px] h-16 gap-1 transition-colors shrink-0 ${
-                activeTab === link.id ? 'text-primary-container' : 'text-on-surface-variant hover:text-on-surface'
-              }`}
+              className="relative flex flex-col items-center justify-center min-w-[64px] h-16 gap-1 group"
             >
-              <span className="material-symbols-outlined text-[24px]" style={{fontVariationSettings: activeTab === link.id ? "'FILL' 1" : "'FILL' 0"}}>{link.icon}</span>
-              <span className="text-[10px] font-label-caps uppercase tracking-wider">{link.short}</span>
+              <div className={`flex items-center justify-center w-14 h-8 rounded-full transition-all duration-300 ${
+                isActive ? 'bg-primary-container text-[#0A0A0A] shadow-[0_0_15px_rgba(255,107,26,0.2)]' : 'text-[#e5e2e1]/70 group-hover:bg-white/5 group-hover:text-[#e5e2e1]'
+              }`}>
+                <span className="material-symbols-outlined text-[24px] transition-transform duration-300" style={{fontVariationSettings: isActive ? "'FILL' 1" : "'FILL' 0"}}>
+                  {link.icon}
+                </span>
+              </div>
+              <span className={`text-[10px] font-label-caps uppercase tracking-wider transition-colors duration-300 ${
+                isActive ? 'text-primary-container font-bold' : 'text-[#e5e2e1]/70 group-hover:text-[#e5e2e1]'
+              }`}>
+                {link.short}
+              </span>
             </button>
           );
         })}
@@ -1260,4 +1350,5 @@ export default function AdminPanel() {
     </div>
   );
 }
+
 

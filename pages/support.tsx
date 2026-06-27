@@ -73,7 +73,7 @@ export default function SupportPage() {
       <Navbar />
 
       <div className="bg-[#0A0A0A] text-[#e5e2e1] font-body min-h-screen flex flex-col pt-20 overflow-x-hidden w-full">
-        <style jsx>{`
+        <style dangerouslySetInnerHTML={{ __html: `
           .surface-card {
               background-color: #141414;
           }
@@ -116,7 +116,7 @@ export default function SupportPage() {
           .animate-slow-pulse {
               animation: slowPulse 8s ease-in-out infinite;
           }
-        `}</style>
+        `}} />
 
         <main className="flex-grow relative">
           {/* Smooth Ambient Background Glow */}

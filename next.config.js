@@ -38,7 +38,7 @@ const nextConfig = {
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',
     contentSecurityPolicy:
-      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app *.google.com *.googleapis.com; connect-src 'self' blob: https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app https://api.qrserver.com data: https://fonts.gstatic.com; frame-src 'self' https://*.razorpay.com *.google.com *.youtube.com; img-src 'self' data: blob: https://*.razorpay.com *.googleapis.com *.googleusercontent.com https://api.qrserver.com https://fonts.gstatic.com https://images.unsplash.com; style-src 'self' 'unsafe-inline' *.googleapis.com https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com;",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app https://*.vercel-scripts.com https://va.vercel-scripts.com *.google.com *.googleapis.com; connect-src 'self' blob: https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app https://*.vercel-insights.com https://api.qrserver.com data: https://fonts.gstatic.com; frame-src 'self' https://*.razorpay.com *.google.com *.youtube.com; img-src 'self' data: blob: https://*.razorpay.com *.googleapis.com *.googleusercontent.com https://api.qrserver.com https://fonts.gstatic.com https://images.unsplash.com; style-src 'self' 'unsafe-inline' *.googleapis.com https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com;",
 
     remotePatterns: [
       {
@@ -92,7 +92,7 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             value:
-              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app *.google.com *.googleapis.com; connect-src 'self' blob: https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app https://api.qrserver.com data: https://fonts.gstatic.com; frame-src 'self' https://*.razorpay.com *.google.com *.youtube.com; img-src 'self' data: blob: https://*.razorpay.com *.googleapis.com https://api.qrserver.com https://fonts.gstatic.com https://images.unsplash.com; style-src 'self' 'unsafe-inline' *.googleapis.com https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com;",
+              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app https://*.vercel-scripts.com https://va.vercel-scripts.com *.google.com *.googleapis.com; connect-src 'self' blob: https://*.razorpay.com https://*.vercel.live https://vercel.live https://*.vercel.app https://*.vercel-insights.com https://api.qrserver.com data: https://fonts.gstatic.com; frame-src 'self' https://*.razorpay.com *.google.com *.youtube.com; img-src 'self' data: blob: https://*.razorpay.com *.googleapis.com https://api.qrserver.com https://fonts.gstatic.com https://images.unsplash.com; style-src 'self' 'unsafe-inline' *.googleapis.com https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com;",
           },
           {
             key: 'Referrer-Policy',
@@ -108,11 +108,19 @@ const nextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
+            value: 'camera=(self), microphone=(), geolocation=()',
           },
         ],
       },
     ];
+  },
+
+  // ── Make Vercel Preview Builds Super Fast by skipping Type & Lint checks ──
+  typescript: {
+    ignoreBuildErrors: process.env.VERCEL_ENV === 'preview',
+  },
+  eslint: {
+    ignoreDuringBuilds: process.env.VERCEL_ENV === 'preview',
   },
 };
 

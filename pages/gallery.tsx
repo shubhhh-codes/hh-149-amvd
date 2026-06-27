@@ -39,7 +39,7 @@ export default function GalleryPage({ galleryItems }: { galleryItems: any[] }) {
 
       <main className="bg-[#0A0A0A] min-h-screen text-[#e5e2e1] overflow-x-hidden font-body-md">
         
-        <style jsx>{`
+        <style dangerouslySetInnerHTML={{ __html: `
           .masonry-grid {
             display: grid;
             grid-template-columns: repeat(1, 1fr);
@@ -84,7 +84,7 @@ export default function GalleryPage({ galleryItems }: { galleryItems: any[] }) {
           .spotlight-glow {
             background: radial-gradient(circle at center, rgba(255, 107, 26, 0.08) 0%, transparent 70%);
           }
-        `}</style>
+        `}} />
 
         {/* Hero Section */}
         <section className="relative pt-32 pb-12 px-margin-mobile md:px-margin-desktop bg-[#0A0A0A] overflow-hidden">

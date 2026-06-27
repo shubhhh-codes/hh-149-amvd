@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Script from 'next/script';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-// Define the Razorpay interface extending Window
+import clientPromise from '@/lib/mongodb';
+
 declare global {
   interface Window {
-    Razorpay: new (options: Record<string, unknown>) => { open(): void; };
+    Razorpay: new (options: Record<string, unknown>) => { open(): void };
   }
 }
 
@@ -18,14 +19,13 @@ interface TicketTier {
   price: number;
   seats: number;
   badge: string | null;
+  description?: string;
 }
 
-import clientPromise from '@/lib/mongodb';
-
 const DEFAULT_TIERS = [
-  { key: 'solo', name: 'Solo Pass', label: 'SOLO', price: 499, seats: 1, badge: null, displayOrder: 1 },
-  { key: 'duo', name: 'Duo Pass', label: 'DUO', price: 899, seats: 2, badge: 'MOST POPULAR', displayOrder: 2 },
-  { key: 'squad', name: 'Squad Pass', label: 'SQUAD', price: 1599, seats: 4, badge: null, displayOrder: 3 },
+  { key: 'solo', name: 'Solo Pass', label: 'SOLO PASS', price: 149, seats: 1, badge: null, displayOrder: 1, description: 'This ticket admits 1 person of any gender.' },
+  { key: 'duo', name: 'Love Birds Special', label: 'LOVE BIRDS SPECIAL', price: 279, seats: 2, badge: 'MOST POPULAR', displayOrder: 2, description: 'Love Birds Special admits exactly 1 man and 1 woman (total 2 people).' },
+  { key: 'squad', name: 'Squad Pass', label: 'SQUAD PASS', price: 499, seats: 4, badge: 'BEST VALUE', displayOrder: 3, description: 'Group of 4 admits any 4 people. This is our best value package, coming out to less than a movie ticket per person!' },
 ];
 
 export async function getServerSideProps() {
@@ -33,11 +33,9 @@ export async function getServerSideProps() {
     const client = await clientPromise;
     const db = client.db();
     const settings = await db.collection('settings').findOne({ type: 'ticket-tiers' });
-    
-    // We must stringify and parse the object to safely pass it as JSON props (removes ObjectIds etc)
-    let tiersData = settings ? JSON.parse(JSON.stringify(settings)) : { tiers: [] };
 
-    // Fallback if DB is empty
+    const tiersData = settings ? JSON.parse(JSON.stringify(settings)) : { tiers: [] as typeof DEFAULT_TIERS };
+
     if (!tiersData.tiers || tiersData.tiers.length === 0) {
       tiersData.tiers = DEFAULT_TIERS;
     }
@@ -45,14 +43,14 @@ export async function getServerSideProps() {
     return {
       props: {
         tiersData,
-      }
+      },
     };
   } catch (error) {
     console.error('Failed to fetch tiers data for booking page', error);
     return {
       props: {
         tiersData: { tiers: DEFAULT_TIERS },
-      }
+      },
     };
   }
 }
@@ -68,6 +66,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
   const [mode, setMode] = useState<'loading' | 'active' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [showSummaryDetails, setShowSummaryDetails] = useState(false);
+  const [infoPopup, setInfoPopup] = useState<string | null>(null);
 
   const mountTime = useRef(Date.now());
   const hasBooked = useRef(false);
@@ -75,14 +74,28 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
   const customerEmailRef = useRef('');
   const customerPhoneRef = useRef('');
 
-  useEffect(() => { customerNameRef.current = customerName; }, [customerName]);
-  useEffect(() => { customerEmailRef.current = customerEmail; }, [customerEmail]);
-  useEffect(() => { customerPhoneRef.current = customerPhone; }, [customerPhone]);
+  useEffect(() => {
+    customerNameRef.current = customerName;
+  }, [customerName]);
+
+  useEffect(() => {
+    customerEmailRef.current = customerEmail;
+  }, [customerEmail]);
+
+  useEffect(() => {
+    customerPhoneRef.current = customerPhone;
+  }, [customerPhone]);
 
   useEffect(() => {
     mountTime.current = Date.now();
-    const handleBeforeUnload = () => {
-      if (!hasBooked.current) {
+
+    const handleAbandonment = () => {
+      const hasFilledForm = (customerNameRef.current && customerNameRef.current.trim().length > 0) || 
+                            (customerEmailRef.current && customerEmailRef.current.trim().length > 0) || 
+                            (customerPhoneRef.current && customerPhoneRef.current.trim().length > 0);
+                            
+      if (!hasBooked.current && hasFilledForm) {
+        hasBooked.current = true; // Prevent multiple fires
         const timeSpent = Math.floor((Date.now() - mountTime.current) / 1000);
         const data = JSON.stringify({
           event: 'abandonment',
@@ -91,20 +104,39 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
           userDetails: {
             name: customerNameRef.current,
             email: customerEmailRef.current,
-            phone: customerPhoneRef.current
-          }
+            phone: customerPhoneRef.current,
+          },
         });
-        navigator.sendBeacon('/api/analytics/track', new Blob([data], { type: 'application/json' }));
+
+        // Use sendBeacon with text/plain to guarantee delivery on tab close without CORS/keepalive issues
+        navigator.sendBeacon('/api/system/activity', new Blob([data], { type: 'text/plain' }));
       }
     };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // We only want to track if they are really leaving.
+        // For mobile, this is often the best indicator of app close.
+        handleAbandonment();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleAbandonment);
+    window.addEventListener('pagehide', handleAbandonment);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    router.events.on('routeChangeStart', handleAbandonment);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleAbandonment);
+      window.removeEventListener('pagehide', handleAbandonment);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      router.events.off('routeChangeStart', handleAbandonment);
+    };
+  }, [router]);
 
   useEffect(() => {
     if (tiersData?.tiers && tiersData.tiers.length > 0) {
-      const defaultTier = tiersData.tiers.find((t: any) => t.badge === 'MOST POPULAR') || tiersData.tiers[0];
+      const defaultTier = tiersData.tiers.find((tier: any) => tier.badge === 'MOST POPULAR') || tiersData.tiers[0];
       setCart({ [defaultTier.key]: 1 });
     }
     setMode('active');
@@ -113,30 +145,29 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
   const tiers = tiersData?.tiers ?? [];
 
   const totalAmount = tiers.reduce((acc: number, tier: TicketTier) => {
-    return acc + (tier.price * (cart[tier.key] || 0));
+    return acc + tier.price * (cart[tier.key] || 0);
   }, 0);
 
   const totalSeats = tiers.reduce((acc: number, tier: TicketTier) => {
-    return acc + (tier.seats * (cart[tier.key] || 0));
+    return acc + tier.seats * (cart[tier.key] || 0);
   }, 0);
 
   const totalTickets = tiers.reduce((acc: number, tier: TicketTier) => {
     return acc + (cart[tier.key] || 0);
   }, 0);
+
   const venueDisplay = tiersData?.venue || 'The Humours Hub, Ahmedabad';
-  
-  // Format the date/time string from the CMS
   const cmsDate = tiersData?.date || 'Saturday';
   const cmsTime = tiersData?.time || '8:30 PM';
   const dateDisplay = `${cmsDate}, ${cmsTime}`;
 
-  const handleAction = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    
+  const handleAction = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+
     const cartArray = Object.entries(cart)
-      .filter(([_, qty]) => qty > 0)
+      .filter(([_, quantity]) => quantity > 0)
       .map(([tierKey, units]) => {
-        const tier = tiers.find((t: any) => t.key === tierKey);
+        const tier = tiers.find((item: any) => item.key === tierKey);
         return { tierKey, units, price: tier?.price || 0, seats: tier?.seats || 1 };
       });
 
@@ -144,6 +175,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
       setError('Please select at least one ticket.');
       return;
     }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!customerName.trim() || !emailRegex.test(customerEmail.trim()) || customerPhone.trim().length !== 10) {
       setError('Please provide a valid name, email, and 10-digit phone number.');
@@ -153,17 +185,16 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
     setLoading(true);
     setError(null);
 
-    fetch('/api/analytics/track', {
+    fetch('/api/system/activity', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         event: 'click',
-        actionDetails: `User clicked 'Pay & Book Ticket' for ₹${totalAmount}`
-      })
+        actionDetails: `User clicked 'Pay & Book Ticket' for ₹${totalAmount}`,
+      }),
     }).catch(() => {});
 
     try {
-      // 1. Create local booking via our API (using cart)
       const bookRes = await fetch('/api/bookings/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -177,10 +208,12 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
       });
 
       const bookData = await bookRes.json();
-      if (!bookRes.ok) throw new Error(bookData.message ?? 'Booking failed');
+      if (!bookRes.ok) {
+        throw new Error(bookData.message ?? 'Booking failed');
+      }
+
       const { bookingId } = bookData;
 
-      // 2. Create Razorpay order
       const orderRes = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -188,19 +221,32 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
       });
 
       const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.message ?? 'Failed to initiate payment');
+      if (!orderRes.ok) {
+        throw new Error(orderData.message ?? 'Failed to initiate payment');
+      }
 
-      // 3. Wait for Razorpay SDK to load (lazyOnload may not be ready yet)
       const razorpayReady = await new Promise<boolean>((resolve) => {
-        if (window.Razorpay) { resolve(true); return; }
+        if (window.Razorpay) {
+          resolve(true);
+          return;
+        }
+
         let attempts = 0;
         const interval = setInterval(() => {
-          attempts++;
-          if (window.Razorpay) { clearInterval(interval); resolve(true); }
-          else if (attempts >= 50) { clearInterval(interval); resolve(false); } // 5s timeout
+          attempts += 1;
+          if (window.Razorpay) {
+            clearInterval(interval);
+            resolve(true);
+          } else if (attempts >= 50) {
+            clearInterval(interval);
+            resolve(false);
+          }
         }, 100);
       });
-      if (!razorpayReady) throw new Error('Payment SDK failed to load. Please refresh and try again.');
+
+      if (!razorpayReady) {
+        throw new Error('Payment SDK failed to load. Please refresh and try again.');
+      }
 
       const rzp = new window.Razorpay({
         key: orderData.keyId,
@@ -217,15 +263,14 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
         theme: { color: '#141414' },
         modal: {
           ondismiss: () => {
-            // Fire request to log in Node/Vercel server terminal
-            fetch('/api/payments/log-dismiss', {
+            fetch('/api/payments/dismiss', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ bookingId })
+              body: JSON.stringify({ bookingId }),
             }).catch(() => {});
-            
+
             setLoading(false);
-          }
+          },
         },
         handler: async (response: Record<string, string>) => {
           try {
@@ -242,7 +287,9 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
             });
 
             const verifyData = await verifyRes.json();
-            if (!verifyRes.ok) throw new Error(verifyData.message ?? 'Verification failed');
+            if (!verifyRes.ok) {
+              throw new Error(verifyData.message ?? 'Verification failed');
+            }
 
             const dlToken = verifyData.downloadToken ? `&token=${encodeURIComponent(verifyData.downloadToken)}` : '';
             router.push(`/booking-success?id=${bookingId}${dlToken}`);
@@ -276,6 +323,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
           <h1 className="text-white text-2xl font-bold mb-2">Something went wrong</h1>
           <p className="text-white/50 mb-6">Could not load booking details. Please try again.</p>
           <button
+            type="button"
             onClick={() => window.location.reload()}
             className="bg-[#FF6B1A] text-[#0A0A0A] font-bold px-6 py-3 rounded-full text-sm"
           >
@@ -286,50 +334,52 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
     );
   }
 
-
   return (
     <div className="antialiased min-h-screen flex flex-col bg-[#0A0A0A] font-['DM_Sans',sans-serif] text-white">
       <Head>
         <title>The Humours Hub</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, interactive-widget=overlays-content" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=overlays-content" />
       </Head>
 
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
 
       <style>{`
         body {
-            background-color: #0A0A0A;
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
+          background-color: #0a0a0a;
+          margin: 0;
+          padding: 0;
+          overflow-x: hidden;
         }
         .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
         }
       `}</style>
 
-      {/* TopNavBar */}
       <Navbar />
 
-      <main 
+      <main
         className="flex-1 pb-24 md:pb-12"
         onClick={() => {
-          if (showSummaryDetails) setShowSummaryDetails(false);
+          if (showSummaryDetails) {
+            setShowSummaryDetails(false);
+          }
         }}
         onTouchMove={() => {
-          if (showSummaryDetails) setShowSummaryDetails(false);
+          if (showSummaryDetails) {
+            setShowSummaryDetails(false);
+          }
         }}
         onWheel={() => {
-          if (showSummaryDetails) setShowSummaryDetails(false);
+          if (showSummaryDetails) {
+            setShowSummaryDetails(false);
+          }
         }}
       >
         <div className="md:max-w-5xl lg:max-w-6xl md:mx-auto md:px-6 md:py-10 md:grid md:grid-cols-12 md:gap-8 lg:gap-12 md:items-start">
           <div className="max-w-md mx-auto px-4 pt-4 md:max-w-none md:p-0 md:col-span-7 lg:col-span-8">
-            
-            {/* Header & Info */}
             <header className="text-center md:text-left mb-6">
               <h1 className="font-['Hind',sans-serif] text-2xl md:text-4xl font-bold text-white mb-4 md:mb-8 leading-tight">Secure Your Spot</h1>
-              
+
               <div className="flex flex-col gap-2 mb-6 text-sm font-['DM_Sans',sans-serif] md:hidden">
                 <div className="flex items-center justify-center gap-2 bg-[#141414] rounded-md py-2 border border-white/5">
                   <span className="material-symbols-outlined text-[#FF6B1A] text-sm">location_on</span>
@@ -343,107 +393,125 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
 
               <div className="grid grid-cols-3 gap-2 md:gap-4 mb-8 md:mt-0 px-1 md:px-0">
                 {tiers.map((tier: TicketTier) => {
-                  const qty = cart[tier.key] || 0;
-                  const isActive = qty > 0;
+                  const quantity = cart[tier.key] || 0;
+                  const isActive = quantity > 0;
+
                   return (
                     <div
                       key={tier.key}
-                      className={`bg-[#141414] rounded-xl p-3 md:p-4 transition-all flex flex-col items-center justify-between relative 
-                        ${isActive ? 'border-[#FF6B1A] border shadow-[0_0_15px_rgba(255,107,26,0.2)] bg-[rgba(255,107,26,0.08)] scale-[1.02] z-10' : 'border-white/10 border'} 
-                        h-[140px] md:h-44`}
+                      className={`bg-[#141414] rounded-xl p-1.5 md:p-3 transition-all flex flex-col items-center justify-between relative h-[130px] md:h-[180px] w-full ${
+                        isActive
+                          ? 'border-[#FF6B1A] border shadow-[0_0_15px_rgba(255,107,26,0.2)] bg-[rgba(255,107,26,0.08)] z-10'
+                          : 'border-white/10 border'
+                      }`}
                     >
                       {tier.badge && (
-                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#FF6B1A] px-2 py-0.5 rounded text-[8px] md:text-[10px] font-bold text-white shadow-lg uppercase whitespace-nowrap z-20">
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#FF6B1A] px-1.5 py-0.5 rounded text-[7px] md:text-[10px] font-bold text-white shadow-lg uppercase whitespace-nowrap z-20">
                           {tier.badge}
                         </div>
                       )}
                       
-                      <div className="flex flex-col items-center w-full flex-1 pt-1">
-                        {/* Fixed height container for label to force price alignment */}
-                        <div className="h-8 md:h-10 flex items-end justify-center w-full mb-1 md:mb-2">
-                          <span className={`font-['Hind',sans-serif] text-[10px] md:text-sm font-bold tracking-wider uppercase text-center leading-tight line-clamp-2 ${isActive ? 'text-[#FF6B1A]' : 'text-[#a3a3a3]'}`}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                           e.stopPropagation();
+                           setInfoPopup(tier.key);
+                        }}
+                        className="absolute top-1.5 right-1.5 w-[18px] h-[18px] md:w-[22px] md:h-[22px] rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[#a3a3a3] hover:bg-white/10 hover:text-white transition-colors z-20"
+                      >
+                        <span className="material-symbols-outlined text-[12px] md:text-[14px]">help</span>
+                      </button>
+
+                      <div className="flex flex-col items-center w-full flex-1 pt-4 md:pt-6 pb-1">
+                        <div className="w-full flex items-end justify-center min-h-[22px] md:min-h-[32px] px-1 md:px-0">
+                          <span className={`font-['Hind',sans-serif] text-[7.5px] md:text-xs font-bold tracking-wide uppercase text-center leading-[1.1] line-clamp-3 block ${isActive ? 'text-[#FF6B1A]' : 'text-[#a3a3a3]'}`}>
                             {tier.label}
                           </span>
                         </div>
-                        <div className="flex-1 flex items-start justify-center">
-                          <h3 className="font-['Hind',sans-serif] text-xl md:text-3xl font-black text-white leading-none tracking-tight">
+                        <div className="flex flex-col items-center justify-center flex-1 w-full text-center mt-0.5">
+                          <h3 className="font-['Hind',sans-serif] text-[17px] md:text-3xl font-black text-white leading-none tracking-tight">
                             ₹{tier.price}
                           </h3>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between bg-[#080808] border border-white/10 rounded-md w-full overflow-hidden mt-1 h-8 md:h-10 shrink-0">
-                        <button 
-                          onClick={() => setCart(prev => ({ ...prev, [tier.key]: Math.max(0, (prev[tier.key] || 0) - 1) }))} 
-                          disabled={qty === 0}
+                      <div className="flex items-center justify-between bg-[#080808] border border-white/10 rounded w-full overflow-hidden shrink-0 h-6 md:h-10 mt-auto">
+                        <button
+                          type="button"
+                          onClick={() => setCart((previousState) => ({ ...previousState, [tier.key]: Math.max(0, (previousState[tier.key] || 0) - 1) }))}
+                          disabled={quantity === 0}
+                          aria-label={`Decrease ${tier.name} quantity`}
                           className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <span className="material-symbols-outlined text-[16px] md:text-[18px]">remove</span>
+                          <span className="material-symbols-outlined text-[14px] md:text-[18px]">remove</span>
                         </button>
-                        <span className="font-['Hind',sans-serif] text-[13px] md:text-base font-bold text-white w-1/3 text-center">{qty}</span>
-                        <button 
-                          onClick={() => setCart(prev => ({ ...prev, [tier.key]: Math.min(10, (prev[tier.key] || 0) + 1) }))} 
-                          disabled={qty >= 10}
+                        <span className="font-['Hind',sans-serif] text-xs md:text-base font-bold text-white w-1/3 text-center leading-none">{quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => setCart((previousState) => ({ ...previousState, [tier.key]: Math.min(10, (previousState[tier.key] || 0) + 1) }))}
+                          disabled={quantity >= 10}
+                          aria-label={`Increase ${tier.name} quantity`}
                           className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <span className="material-symbols-outlined text-[16px] md:text-[18px]">add</span>
+                          <span className="material-symbols-outlined text-[14px] md:text-[18px]">add</span>
                         </button>
                       </div>
                     </div>
                   );
                 })}
               </div>
-
             </header>
 
-            {/* View 2: Form & Summary */}
             <div className="block">
-
-              {/* Compact Form */}
               <div className="bg-[#141414] border border-white/10 rounded-xl p-4 md:p-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF6B1A]/5 blur-[50px] rounded-full pointer-events-none"></div>
-                
+
                 <h3 className="font-['Hind',sans-serif] text-base md:text-xl font-bold mb-4 md:mb-6 text-white uppercase tracking-wide">Guest Details</h3>
-                
+
                 {error && (
-                  <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-3 rounded-lg mb-4 text-sm font-bold">
+                  <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-3 rounded-lg mb-4 text-sm font-bold" role="alert" aria-live="polite">
                     {error}
                   </div>
                 )}
 
                 <div className="flex flex-col gap-3 md:gap-5 relative z-10">
-                  <input 
+                  <input
                     aria-label="Full Name"
                     autoComplete="name"
-                    className="w-full bg-[#080808] border border-white/10 rounded-md md:rounded-lg py-2 md:py-3 px-3 md:px-4 text-white focus:border-[#FF6B1A] outline-none text-sm md:text-base font-['DM_Sans',sans-serif] transition-colors" 
-                    placeholder="Full Name" 
-                    type="text" 
+                    name="fullName"
+                    className="w-full bg-[#080808] border border-white/10 rounded-md md:rounded-lg py-2 md:py-3 px-3 md:px-4 text-white focus:border-[#FF6B1A] outline-none text-sm md:text-base font-['DM_Sans',sans-serif] transition-colors"
+                    placeholder="Full Name"
+                    type="text"
                     value={customerName}
-                    onChange={e => setName(e.target.value)}
+                    onChange={(e) => setName(e.target.value)}
                   />
-                  <input 
+                  <input
                     aria-label="Email Address"
                     autoComplete="email"
-                    className="w-full bg-[#080808] border border-white/10 rounded-md md:rounded-lg py-2 md:py-3 px-3 md:px-4 text-white focus:border-[#FF6B1A] outline-none text-sm md:text-base font-['DM_Sans',sans-serif] transition-colors" 
-                    placeholder="Email Address" 
-                    type="email" 
+                    name="email"
+                    className="w-full bg-[#080808] border border-white/10 rounded-md md:rounded-lg py-2 md:py-3 px-3 md:px-4 text-white focus:border-[#FF6B1A] outline-none text-sm md:text-base font-['DM_Sans',sans-serif] transition-colors"
+                    placeholder="Email Address"
+                    type="email"
                     value={customerEmail}
-                    onChange={e => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                   <div className="flex items-stretch bg-[#080808] border border-white/10 rounded-md md:rounded-lg focus-within:border-[#FF6B1A] focus-within:shadow-[0_0_0_1px_#FF6B1A] transition-all duration-300 overflow-hidden">
                     <div className="flex items-center gap-2 pl-4 pr-3 border-r border-white/5 bg-white/[0.02] text-[#a3a3a3] select-none">
                       <span className="material-symbols-outlined text-[20px]">phone</span>
                       <span className="font-['DM_Sans',sans-serif] font-bold text-white/40 pt-[1px]">+91</span>
                     </div>
-                    <input 
+                    <input
                       aria-label="Phone Number"
                       autoComplete="tel"
-                      className="w-full bg-transparent border-none py-2 md:py-3 pl-3 pr-4 font-['DM_Sans',sans-serif] text-sm md:text-base text-white placeholder-white/20 focus:outline-none focus:ring-0" 
-                      placeholder="XXXXXXXXXX" 
+                      inputMode="numeric"
+                      name="phone"
+                      pattern="[0-9]{10}"
+                      className="w-full bg-transparent border-none py-2 md:py-3 pl-3 pr-4 font-['DM_Sans',sans-serif] text-sm md:text-base text-white placeholder-white/20 focus:outline-none focus:ring-0"
+                      placeholder="XXXXXXXXXX"
                       type="tel"
                       maxLength={10}
                       value={customerPhone}
-                      onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                     />
                   </div>
                 </div>
@@ -451,9 +519,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
             </div>
           </div>
 
-          {/* Desktop Right Sidebar */}
           <aside className="hidden md:block md:col-span-5 lg:col-span-4 md:sticky md:top-24 bg-[#141414] border border-white/10 rounded-xl p-8 shadow-2xl">
-            {/* Desktop Venue & Date */}
             <div className="flex flex-col gap-6 mb-8 pb-8 border-b border-white/10">
               <div className="flex items-start gap-4">
                 <span className="material-symbols-outlined text-[#FF6B1A] text-2xl">location_on</span>
@@ -471,10 +537,9 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
               </div>
             </div>
 
-            {/* Desktop Summary */}
             <h3 className="font-['Hind',sans-serif] text-xl font-bold mb-6 text-white uppercase tracking-wide">Order Summary</h3>
             <div className="flex flex-col gap-4 mb-8">
-              {tiers.filter((t: TicketTier) => cart[t.key] > 0).map((tier: TicketTier) => (
+              {tiers.filter((tier: TicketTier) => cart[tier.key] > 0).map((tier: TicketTier) => (
                 <div key={tier.key} className="flex justify-between items-center">
                   <div className="flex flex-col">
                     <span className="font-['Hind',sans-serif] text-xs font-bold tracking-wider text-[#a3a3a3] uppercase mb-1">{tier.name}</span>
@@ -496,7 +561,8 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
               </div>
             </div>
 
-            <button 
+            <button
+              type="button"
               onClick={handleAction}
               disabled={isLoading || totalTickets === 0}
               className="w-full bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white font-['Hind',sans-serif] font-bold py-4 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-all text-lg disabled:opacity-50 uppercase tracking-wide"
@@ -505,7 +571,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <span className="material-symbols-outlined">lock</span> 
+                  <span className="material-symbols-outlined">lock</span>
                   <span>PAY ₹{totalAmount} SECURELY</span>
                 </>
               )}
@@ -514,12 +580,11 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
         </div>
       </main>
 
-      {/* Sticky Checkout Bar (Mobile) */}
       <div className="fixed bottom-0 w-full bg-[#111] border-t border-white/10 px-4 py-3 pb-safe z-50 md:hidden">
         <div className="max-w-md mx-auto">
           {showSummaryDetails && (
-            <div className="mb-4 px-4 py-3 bg-[#141414] rounded-xl border border-white/10 text-xs text-[#a3a3a3] flex flex-col gap-2.5 shadow-2xl">
-              {tiers.filter((t: TicketTier) => cart[t.key] > 0).map((tier: TicketTier) => (
+            <div id="mobile-order-summary" className="mb-4 px-4 py-3 bg-[#141414] rounded-xl border border-white/10 text-xs text-[#a3a3a3] flex flex-col gap-2.5 shadow-2xl">
+              {tiers.filter((tier: TicketTier) => cart[tier.key] > 0).map((tier: TicketTier) => (
                 <div key={tier.key} className="flex justify-between items-center">
                   <span>{tier.name} <span className="text-white/50">× {cart[tier.key]}</span></span>
                   <span className="text-white font-bold">₹{tier.price * cart[tier.key]}</span>
@@ -546,18 +611,22 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
               <div className="text-right flex flex-col items-end gap-1.5">
                 <span className="font-['Hind',sans-serif] text-[10px] font-bold tracking-wider text-[#a3a3a3] uppercase block">Total Amount</span>
                 <div className="font-['Hind',sans-serif] text-xl font-bold text-[#FF6B1A] leading-none">₹{totalAmount}</div>
-                <button 
+                <button
+                  type="button"
                   onClick={() => setShowSummaryDetails(!showSummaryDetails)}
+                  aria-expanded={showSummaryDetails}
+                  aria-controls="mobile-order-summary"
                   className="text-[10px] text-[#a3a3a3] hover:text-white transition-colors flex items-center gap-0.5"
                 >
-                  View Details <span className="material-symbols-outlined text-[12px]">{showSummaryDetails ? 'arrow_drop_down' : 'arrow_drop_up'}</span>
+                  View Details <span className="material-symbols-outlined text-[12px]">{showSummaryDetails ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
                 </button>
               </div>
             </div>
             <div className="mt-2 border-t border-white/5"></div>
           </div>
-          
-          <button 
+
+          <button
+            type="button"
             onClick={handleAction}
             disabled={isLoading || totalTickets === 0}
             className="w-full bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white font-['Hind',sans-serif] font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wide"
@@ -574,6 +643,39 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
       </div>
 
       <Footer />
+
+      {infoPopup && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={() => setInfoPopup(null)}
+        >
+          <div 
+            className="bg-[#141414] border border-white/10 rounded-xl p-5 max-w-[280px] w-full shadow-2xl relative animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button 
+               onClick={() => setInfoPopup(null)} 
+               className="absolute top-3 right-3 text-white/50 hover:text-white transition-colors p-1"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+            <div className="flex flex-col items-center mb-3 mt-1">
+               <h3 className="text-white font-bold text-lg font-['Hind',sans-serif] uppercase tracking-wide text-center">
+                 {tiers.find((t: TicketTier) => t.key === infoPopup)?.name || 'Ticket Details'}
+               </h3>
+            </div>
+            <p className="text-[#a3a3a3] text-sm leading-relaxed mb-5 text-center px-2">
+              {tiers.find((t: TicketTier) => t.key === infoPopup)?.description || 'No description available for this ticket.'}
+            </p>
+            <button
+              onClick={() => setInfoPopup(null)}
+              className="w-full bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white font-bold py-2.5 rounded-lg transition-colors text-xs uppercase tracking-wider"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

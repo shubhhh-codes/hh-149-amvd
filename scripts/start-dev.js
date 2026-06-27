@@ -30,6 +30,18 @@ child.stdout.on('data', (data) => {
   process.stdout.write(output);
 });
 
+// Automatically forward port 3000 to connected USB devices for local testing
+const { exec } = require('child_process');
+const adbPath = require('fs').existsSync('C:\\adb\\platform-tools\\adb.exe') 
+  ? 'C:\\adb\\platform-tools\\adb.exe' 
+  : 'adb';
+
+exec(`${adbPath} reverse tcp:3000 tcp:3000`, (error, stdout, stderr) => {
+  if (!error) {
+    console.log('\n📱 USB Debugging: Port 3000 successfully forwarded to Android device! (http://localhost:3000)\n');
+  }
+});
+
 child.on('close', (code) => {
   process.exit(code);
 });

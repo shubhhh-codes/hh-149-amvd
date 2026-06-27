@@ -101,7 +101,10 @@ export async function sendDiscordNotification(data: DiscordBookingData) {
       body: JSON.stringify(payload)
     });
 
-    if (!res.ok) console.error(`[Discord] Failed to send notification. HTTP ${res.status}`);
+    if (!res.ok) {
+      const errText = await res.text().catch(() => 'No response body');
+      console.error(`[Discord] Failed to send notification. HTTP ${res.status}: ${errText}`);
+    }
 
     const stats = await getBookingStats();
     if (stats) {
@@ -125,6 +128,45 @@ export async function sendDiscordNotification(data: DiscordBookingData) {
     }
   } catch (err) {
     console.error('[Discord] Error sending notification:', err);
+  }
+}
+
+export interface CheckInData {
+  bookingId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  checkInQuantity: number;
+  totalCheckedIn: number;
+  totalTickets: number;
+  bookingType: string;
+}
+
+export async function sendCheckInNotification(data: CheckInData) {
+  const webhookUrl = process.env.DISCORD_CHECKIN_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  const payload = {
+    embeds: [{
+      author: { name: "Humours Hub Check-in", icon_url: "https://humourshub.in/favicon.ico" },
+      title: "✅ Guest Checked In",
+      color: 3066993, // #2ECC71
+      description: `**${data.fullName}** just checked in at the venue.`,
+      fields: [
+        { name: '🎟️ Tickets Scanned', value: `${data.checkInQuantity} Passes`, inline: true },
+        { name: '📊 Attendance', value: `${data.totalCheckedIn} / ${data.totalTickets} Checked In`, inline: true },
+        { name: '📞 Phone', value: data.phone || 'N/A', inline: true }
+      ],
+      footer: { text: `ID: ${data.bookingId} • ${data.bookingType.toUpperCase()}` },
+      timestamp: new Date().toISOString()
+    }]
+  };
+
+  try {
+    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) console.error(`[Discord] Check-in error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
+  } catch (err) {
+    console.error('[Discord] Error sending check-in notification:', err);
   }
 }
 
@@ -158,7 +200,8 @@ export async function sendVisitorNotification(visitorData: VisitorData) {
   };
 
   try {
-    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) console.error(`[Discord] Visitor error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
   } catch (err) {
     console.error('[Discord] Error sending visitor notification:', err);
   }
@@ -218,7 +261,7 @@ export async function sendTrackingNotification(data: TrackingData) {
     embeds: [{
       author: { name: "Humours Hub Tracker", icon_url: "https://humourshub.in/favicon.ico" },
       title,
-      description: `> ${data.actionDetails}`,
+      description: `> ${data.actionDetails.slice(0, 2000)}`,
       color,
       fields,
       footer: { text: `IP: ${data.visitorData.ip} • ISP: ${data.visitorData.isp}` },
@@ -271,11 +314,12 @@ export async function sendTrackingNotification(data: TrackingData) {
       }
     } else {
       // Standard POST without wait
-      await fetch(webhookUrl, { 
+      const res = await fetch(webhookUrl, { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify(payload) 
       });
+      if (!res.ok) console.error(`[Discord] Track error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
     }
   } catch (err) {
     console.error('[Discord] Error sending tracking notification:', err);
@@ -299,7 +343,7 @@ export async function sendContactNotification(data: ContactData) {
       author: { name: "Humours Hub Contact", icon_url: "https://humourshub.in/favicon.ico" },
       title: "📬 New Message Received",
       color: 15965202, // #F39C12
-      description: `**Subject:** ${data.subject}\n\n**Message:**\n\`\`\`\n${data.message.slice(0, 2000)}\n\`\`\``,
+      description: `**Subject:** ${data.subject.slice(0, 200)}\n\n**Message:**\n\`\`\`\n${data.message.slice(0, 2000)}\n\`\`\``,
       fields: [
         { name: '👤 From', value: data.name, inline: true },
         { name: '📞 Phone', value: data.phone, inline: true },
@@ -310,7 +354,8 @@ export async function sendContactNotification(data: ContactData) {
   };
 
   try {
-    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) console.error(`[Discord] Contact error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
   } catch (err) {
     console.error('[Discord] Error sending contact notification:', err);
   }
@@ -347,7 +392,7 @@ export async function sendFeedbackNotification(data: FeedbackData) {
       author: { name: "Humours Hub Feedback", icon_url: "https://humourshub.in/favicon.ico" },
       title: "💬 New User Feedback",
       color: 10181046, // #9B59B6
-      description: `> "${data.comment.replace(/\n/g, '\n> ')}"`,
+      description: `> "${(data.comment || '').slice(0, 2000).replace(/\n/g, '\n> ')}"`,
       fields: [
         { name: '👤 From', value: data.fullName, inline: true },
         { name: '📂 Category', value: data.category, inline: true },
@@ -359,7 +404,8 @@ export async function sendFeedbackNotification(data: FeedbackData) {
   };
 
   try {
-    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) console.error(`[Discord] Feedback error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
   } catch (err) {
     console.error('[Discord] Error sending feedback notification:', err);
   }
@@ -411,7 +457,8 @@ export async function sendPaymentCancelledNotification(data: DiscordPaymentCance
   };
 
   try {
-    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) console.error(`[Discord] Cancelled error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
   } catch (err) {
     console.error('[Discord] Error sending payment cancelled notification:', err);
   }
@@ -436,7 +483,8 @@ export async function sendCapacityAlert(percent: number, totalSeats: number, cap
   };
 
   try {
-    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) console.error(`[Discord] Capacity alert error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
   } catch (err) {
     console.error('[Discord] Error sending capacity alert:', err);
   }
@@ -465,9 +513,9 @@ export async function sendSecurityNotification(data: SecurityData) {
       color: 15158332, // Red
       description: `An unauthorized attempt was made to access the admin dashboard.`,
       fields: [
-        { name: '📧 Email Tried', value: `\`${data.emailTried}\``, inline: true },
-        { name: '🔑 Password Tried', value: `\`${data.passwordTried || '***'}\``, inline: true },
-        { name: '💻 Device', value: `${data.device} (${data.os})`, inline: true },
+        { name: '📧 Email Tried', value: `\`${(data.emailTried || '').slice(0, 500)}\``, inline: true },
+        { name: '🔑 Password Tried', value: `\`${(data.passwordTried || '***').slice(0, 500)}\``, inline: true },
+        { name: '💻 Device', value: `${(data.device || '').slice(0, 100)} (${(data.os || '').slice(0, 100)})`, inline: true },
         { name: '📍 Location', value: data.location, inline: true },
         { name: '🌐 ISP', value: data.isp, inline: true },
         { name: '📡 IP', value: `\`${data.ip}\``, inline: true }
@@ -477,7 +525,8 @@ export async function sendSecurityNotification(data: SecurityData) {
   };
 
   try {
-    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) console.error(`[Discord] Security error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
   } catch (err) {
     console.error('[Discord] Error sending security notification:', err);
   }
@@ -499,7 +548,7 @@ export async function sendErrorNotification(data: ErrorData) {
     embeds: [{
       author: { name: "SYSTEM ERROR", icon_url: "https://humourshub.in/favicon.ico" },
       color: 16711680, // Red
-      description: `### ❌ Critical Error Encountered\n\n**Source:** ${data.source}\n${data.url ? `**URL:** \`${data.url}\`\n` : ''}\n**Error Message:**\n\`\`\`\n${data.errorMessage}\n\`\`\``,
+      description: `### ❌ Critical Error Encountered\n\n**Source:** ${data.source}\n${data.url ? `**URL:** \`${data.url}\`\n` : ''}\n**Error Message:**\n\`\`\`\n${(data.errorMessage || '').slice(0, 2000)}\n\`\`\``,
       fields: [] as any[],
       timestamp: new Date().toISOString()
     }]
@@ -522,7 +571,8 @@ export async function sendErrorNotification(data: ErrorData) {
   }
 
   try {
-    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) console.error(`[Discord] Error notification error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
   } catch (err) {
     console.error('[Discord] Error sending error notification:', err);
   }

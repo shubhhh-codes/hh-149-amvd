@@ -17,7 +17,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  let { bookingId } = req.body;
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (e) {}
+  }
+  let { bookingId } = body;
   
   // Sanitize the bookingId
   if (typeof bookingId !== 'string') {
@@ -48,8 +52,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         { $set: { status: 'cancelled', updatedAt: new Date() } }
       );
 
-      // Fire the Slack webhook
-      sendPaymentCancelledNotification({
+      // Fire the Discord webhook
+      await sendPaymentCancelledNotification({
         bookingId: booking.bookingId,
         fullName: booking.fullName,
         email: booking.email,

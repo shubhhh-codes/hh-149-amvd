@@ -73,11 +73,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }]
     };
 
-    await fetch(webhookUrl, {
+    const discordRes = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+
+    if (!discordRes.ok) {
+      const errText = await discordRes.text().catch(() => '');
+      console.error(`[Discord] Digest error: HTTP ${discordRes.status} ${errText}`);
+    }
 
     return res.status(200).json({ success: true, message: 'Digest sent to Discord' });
   } catch (error: any) {

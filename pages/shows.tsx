@@ -47,7 +47,7 @@ export default function ShowsPage({ showsData }: { showsData: any }) {
       <Navbar />
 
       <div className="bg-[#131313] text-[#e5e2e1] font-body-md overflow-x-hidden min-h-screen pt-20">
-        <style jsx>{`
+        <style dangerouslySetInnerHTML={{ __html: `
           .headline-font { font-family: 'Hind', sans-serif; }
           .reveal-on-scroll {
               opacity: 0;
@@ -80,7 +80,7 @@ export default function ShowsPage({ showsData }: { showsData: any }) {
               70% { box-shadow: 0 0 0 10px rgba(255, 107, 26, 0); }
               100% { box-shadow: 0 0 0 0 rgba(255, 107, 26, 0); }
           }
-        `}</style>
+        `}} />
 
         <div className="grain-overlay"></div>
 

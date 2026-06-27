@@ -7,8 +7,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import clientPromise from '../../../lib/mongodb';
 
-const VENUE_CAPACITY = 150;
-
 import { withErrorHandler } from '../../../lib/withErrorHandler';
 
 async function handler(
@@ -22,6 +20,9 @@ async function handler(
   try {
     const client = await clientPromise;
     const db = client.db();
+
+    const inventoryDoc = await db.collection('inventory').findOne({ type: 'venue_capacity' });
+    const VENUE_CAPACITY = inventoryDoc?.maxCapacity || 150;
 
     const totalBookings = await db.collection('bookings')
       .aggregate([
