@@ -43,6 +43,215 @@ interface SiteCMSProps {
 
 export default function SiteCMS({ onNavigateToApps, onNavigateToFeedbacks, onNavigateToMessages }: SiteCMSProps = {}) {
   const [cmsTab, setCmsTab] = useState<'hub' | 'distribution' | 'homepage' | 'gallery' | 'shows' | 'ticketTiers' | 'perform' | 'policies' | 'page404' | 'profile' | 'footer' | 'faq'>('hub');
+
+  // Sorting & Search States
+  const [sortBy, setSortBy] = useState<'default' | 'az' | 'za' | 'mostUsed'>('mostUsed');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [animatingCardId, setAnimatingCardId] = useState<string | null>(null);
+
+  const handleCardClick = (cardId: string, action: () => void) => {
+    if (typeof window !== 'undefined') {
+      const key = 'cms_card_clicks';
+      const clicks = JSON.parse(localStorage.getItem(key) || '{}');
+      clicks[cardId] = (clicks[cardId] || 0) + 1;
+      localStorage.setItem(key, JSON.stringify(clicks));
+    }
+    action();
+  };
+
+  const getClickCounts = (): Record<string, number> => {
+    if (typeof window !== 'undefined') {
+      return JSON.parse(localStorage.getItem('cms_card_clicks') || '{}');
+    }
+    return {};
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const query = searchQuery.trim().toLowerCase();
+      if (!query) return;
+
+      const queryTokens = query.split(/\s+/).filter(Boolean);
+
+      const matchedCard = cardDefs.find(card => {
+        if (card.title.toLowerCase().includes(query) || card.subtitle.toLowerCase().includes(query)) {
+          return true;
+        }
+        return queryTokens.every(token => {
+          return (
+            card.title.toLowerCase().includes(token) ||
+            card.subtitle.toLowerCase().includes(token) ||
+            card.keywords.some(kw => kw.toLowerCase().includes(token) || token.includes(kw.toLowerCase()))
+          );
+        });
+      });
+
+      if (matchedCard) {
+        setAnimatingCardId(matchedCard.id);
+        toast.info(`Smart-navigating to ${matchedCard.title}...`, { autoClose: 1000 });
+        setTimeout(() => {
+          handleCardClick(matchedCard.id, matchedCard.action);
+          setAnimatingCardId(null);
+        }, 1200);
+      } else {
+        toast.warn(`No CMS setting matches "${query}"`);
+      }
+    }
+  };
+
+  const cardDefs = [
+    {
+      id: 'distribution',
+      title: 'Distribution',
+      subtitle: 'Marketing Ops',
+      icon: 'campaign',
+      action: () => setCmsTab('distribution'),
+      keywords: ['distribution', 'marketing ops', 'marketing', 'distribute', 'ops']
+    },
+    {
+      id: 'homepage',
+      title: 'Homepage',
+      subtitle: 'Hero, Sliders, CTAs',
+      icon: 'home',
+      action: () => setCmsTab('homepage'),
+      keywords: ['homepage', 'hero', 'sliders', 'ctas', 'slider', 'cta']
+    },
+    {
+      id: 'performers',
+      title: 'Performers',
+      subtitle: 'Bios, Roster, Tags',
+      icon: 'theater_comedy',
+      action: () => setCmsTab('homepage'),
+      keywords: ['performers', 'bios', 'roster', 'tags', 'comedians', 'comedian', 'bio']
+    },
+    {
+      id: 'ticketTiers',
+      title: 'Ticket Tiers',
+      subtitle: 'Pricing, Packages, Seats',
+      icon: 'confirmation_number',
+      action: () => setCmsTab('ticketTiers'),
+      keywords: ['ticket tiers', 'pricing', 'packages', 'seats', 'change price', 'ticket price', 'price', 'early bird', 'seat scarcity']
+    },
+    {
+      id: 'gallery',
+      title: 'Gallery',
+      subtitle: 'Live shots, Venue',
+      icon: 'gallery_thumbnail',
+      action: () => setCmsTab('gallery'),
+      keywords: ['gallery', 'live shots', 'venue', 'photos', 'images', 'image', 'photo']
+    },
+    {
+      id: 'shows',
+      title: 'Shows',
+      subtitle: 'Listings, Ticketing',
+      icon: 'event',
+      action: () => setCmsTab('shows'),
+      keywords: ['shows', 'listings', 'ticketing', 'list shows', 'show']
+    },
+    {
+      id: 'comedians',
+      title: 'Comedian Apps',
+      subtitle: 'Review & Manage',
+      icon: 'theater_comedy',
+      action: () => { if (onNavigateToApps) onNavigateToApps(); },
+      keywords: ['comedian apps', 'review & manage', 'review', 'manage apps', 'applications']
+    },
+    {
+      id: 'messages',
+      title: 'Messages',
+      subtitle: 'Contact Forms',
+      icon: 'inbox',
+      action: () => { if (onNavigateToMessages) onNavigateToMessages(); },
+      keywords: ['messages', 'contact forms', 'inbox', 'form', 'contact']
+    },
+    {
+      id: 'perform',
+      title: 'Perform CMS',
+      subtitle: 'Page Content',
+      icon: 'person_add',
+      action: () => setCmsTab('perform'),
+      keywords: ['perform cms', 'page content', 'perform page', 'apply content']
+    },
+    {
+      id: 'profile',
+      title: 'Profile',
+      subtitle: 'Admin Metadata',
+      icon: 'account_circle',
+      action: () => setCmsTab('profile'),
+      keywords: ['profile', 'admin metadata', 'metadata', 'my profile']
+    },
+    {
+      id: 'policies',
+      title: 'Policies',
+      subtitle: 'Legal, Privacy, TOS',
+      icon: 'policy',
+      action: () => setCmsTab('policies'),
+      keywords: ['policies', 'legal', 'privacy', 'tos', 'terms', 'agreement']
+    },
+    {
+      id: 'page404',
+      title: '404 Page',
+      subtitle: 'Custom Error UX',
+      icon: 'error',
+      action: () => setCmsTab('page404'),
+      keywords: ['404 page', 'custom error ux', 'error', '404']
+    },
+    {
+      id: 'footer',
+      title: 'Footer',
+      subtitle: 'Links, Socials, SEO',
+      icon: 'settings_applications',
+      action: () => setCmsTab('footer'),
+      keywords: ['footer', 'links', 'socials', 'seo', 'footer settings']
+    },
+    {
+      id: 'faq',
+      title: 'FAQ Hub',
+      subtitle: 'Help desk, Q&A',
+      icon: 'quiz',
+      action: () => setCmsTab('faq'),
+      keywords: ['faq hub', 'help desk', 'q&a', 'faq', 'qna', 'questions']
+    },
+    {
+      id: 'feedbacks',
+      title: 'Feedbacks',
+      subtitle: 'User Reviews',
+      icon: 'reviews',
+      action: () => { if (onNavigateToFeedbacks) onNavigateToFeedbacks(); },
+      keywords: ['feedbacks', 'user reviews', 'reviews', 'feedback']
+    }
+  ];
+
+  const processedCards = (() => {
+    let filtered = cardDefs;
+    const query = searchQuery.trim().toLowerCase();
+    if (query) {
+      const queryTokens = query.split(/\s+/).filter(Boolean);
+      filtered = cardDefs.filter(card => {
+        if (card.title.toLowerCase().includes(query) || card.subtitle.toLowerCase().includes(query)) {
+          return true;
+        }
+        return queryTokens.every(token => {
+          return (
+            card.title.toLowerCase().includes(token) ||
+            card.subtitle.toLowerCase().includes(token) ||
+            card.keywords.some(kw => kw.toLowerCase().includes(token) || token.includes(kw.toLowerCase()))
+          );
+        });
+      });
+    }
+
+    if (sortBy === 'az') {
+      filtered = [...filtered].sort((a, b) => a.title.localeCompare(b.title));
+    } else if (sortBy === 'za') {
+      filtered = [...filtered].sort((a, b) => b.title.localeCompare(a.title));
+    } else if (sortBy === 'mostUsed') {
+      const clickCounts = getClickCounts();
+      filtered = [...filtered].sort((a, b) => (clickCounts[b.id] || 0) - (clickCounts[a.id] || 0));
+    }
+
+    return filtered;
+  })();
   
   // Intercept hardware/browser back button to return to Hub
   useEffect(() => {
@@ -703,186 +912,126 @@ export default function SiteCMS({ onNavigateToApps, onNavigateToFeedbacks, onNav
               <p className="text-body-md text-on-surface/60 max-w-[280px]">Configure the digital presence of Ahmedabad's premier comedy scene.</p>
            </section>
 
+           {/* Custom Redirect Animation Styles */}
+           <style dangerouslySetInnerHTML={{ __html: `
+             @keyframes card-redirect-glow {
+               0% {
+                 transform: scale(1);
+                 box-shadow: 0 0 0 0 rgba(253, 224, 71, 0.4);
+                 border-color: rgba(253, 224, 71, 0.2);
+               }
+               50% {
+                 transform: scale(1.06);
+                 box-shadow: 0 0 30px 10px rgba(253, 224, 71, 0.7);
+                 border-color: rgba(253, 224, 71, 1);
+                 background-color: #1e1d1d !important;
+               }
+               100% {
+                 transform: scale(1.05);
+                 box-shadow: 0 0 15px 5px rgba(253, 224, 71, 0.4);
+                 border-color: rgba(253, 224, 71, 0.8);
+                 background-color: #1e1d1d !important;
+               }
+             }
+             .animate-redirect-card {
+               animation: card-redirect-glow 1.2s cubic-bezier(0.25, 0.8, 0.25, 1) infinite !important;
+               border-width: 2px !important;
+             }
+           `}} />
+
+           {/* Search & Sort Panel */}
+           <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-[#141414]/80 backdrop-blur-md p-4 rounded-xl border border-white/5 mb-6">
+             {/* Smart Search Input */}
+             <div className="relative flex-1 max-w-md group">
+               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-primary-container transition-colors">
+                 search
+               </span>
+               <input
+                 type="text"
+                 value={searchQuery}
+                 onChange={(e) => setSearchQuery(e.target.value)}
+                 onKeyDown={handleSearchKeyDown}
+                 placeholder="Search or smart action (e.g. 'change ticket price')..."
+                 className="w-full pl-10 pr-10 py-2.5 bg-black border border-white/10 rounded-lg text-white placeholder-white/40 focus:border-primary-container focus:outline-none transition-all text-sm"
+               />
+               {searchQuery && (
+                 <button
+                   type="button"
+                   onClick={() => setSearchQuery('')}
+                   className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                 >
+                   <span className="material-symbols-outlined text-lg">close</span>
+                 </button>
+               )}
+             </div>
+
+             {/* Sorting Selector */}
+             <div className="flex items-center gap-2">
+               <span className="text-xs text-white/40 font-label-caps tracking-wider uppercase">Sort:</span>
+               <div className="flex bg-black p-0.5 rounded-lg border border-white/10">
+                 {(
+                   [
+                     { id: 'default', label: 'Default' },
+                     { id: 'az', label: 'A-Z' },
+                     { id: 'za', label: 'Z-A' },
+                     { id: 'mostUsed', label: 'Most Used' }
+                   ] as const
+                 ).map((opt) => (
+                   <button
+                     key={opt.id}
+                     type="button"
+                     onClick={() => setSortBy(opt.id)}
+                     className={`px-3 py-1.5 text-xs font-label-caps tracking-wider rounded-md uppercase transition-all ${
+                       sortBy === opt.id
+                         ? 'bg-primary-container text-black font-bold'
+                         : 'text-white/60 hover:text-white'
+                     }`}
+                   >
+                     {opt.label}
+                   </button>
+                 ))}
+               </div>
+             </div>
+           </div>
+
            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {/* Card 0: Distribution Hub */}
-              <div onClick={() => setCmsTab('distribution')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">campaign</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Distribution</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Marketing Ops</p>
-                 </div>
-              </div>
-
-              {/* Card 1: Homepage */}
-              <div onClick={() => setCmsTab('homepage')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">home</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Homepage</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Hero, Sliders, CTAs</p>
-                 </div>
-                 <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-primary-container/10 rounded-full blur-xl"></div>
-              </div>
-
-              {/* Card 2: Performers */}
-              <div onClick={() => setCmsTab('homepage')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">theater_comedy</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Performers</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Bios, Roster, Tags</p>
-                 </div>
-              </div>
-              {/* Card 2.5: Ticket Tiers */}
-              <div onClick={() => setCmsTab('ticketTiers')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">confirmation_number</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Ticket Tiers</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Pricing, Packages, Seats</p>
-                 </div>
-              </div>
-
-              {/* Card 3: Gallery */}
-              <div onClick={() => setCmsTab('gallery')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">gallery_thumbnail</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Gallery</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Live shots, Venue</p>
-                 </div>
-              </div>
-
-              {/* Card 4: Shows */}
-              <div onClick={() => setCmsTab('shows')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">event</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Shows</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Listings, Ticketing</p>
-                 </div>
-              </div>
-
-              {/* Card 5: Comedian Apps */}
-              <div onClick={() => { if(onNavigateToApps) onNavigateToApps(); }} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">theater_comedy</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Comedian Apps</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Review & Manage</p>
-                 </div>
-              </div>
-
-              {/* Card Messages Inbox */}
-              <div onClick={() => { if(onNavigateToMessages) onNavigateToMessages(); }} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">inbox</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Messages</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Contact Forms</p>
-                 </div>
-              </div>
-
-              {/* Card 6: Perform With Us */}
-              <div onClick={() => setCmsTab('perform')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">person_add</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Perform CMS</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Page Content</p>
-                 </div>
-              </div>
-
-              {/* Card 6: Profile */}
-              <div onClick={() => setCmsTab('profile')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">account_circle</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Profile</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Admin Metadata</p>
-                 </div>
-              </div>
-
-              {/* Card 7: Policies */}
-              <div onClick={() => setCmsTab('policies')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">policy</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Policies</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Legal, Privacy, TOS</p>
-                 </div>
-              </div>
-
-              {/* Card 8: 404 Page */}
-              <div onClick={() => setCmsTab('page404')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">error</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">404 Page</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Custom Error UX</p>
-                 </div>
-              </div>
-
-              {/* Card 9: Footer Settings */}
-              <div onClick={() => setCmsTab('footer')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">settings_applications</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Footer</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Links, Socials, SEO</p>
-                 </div>
-              </div>
-
-              {/* Card 10: FAQ Hub */}
-              <div onClick={() => setCmsTab('faq')} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">quiz</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">FAQ Hub</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">Help desk, Q&amp;A</p>
-                 </div>
-              </div>
-
-              {/* Card 11: User Feedbacks */}
-              <div onClick={onNavigateToFeedbacks} className="bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group">
-                 <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-primary-container text-3xl">reviews</span>
-                    <span className="material-symbols-outlined text-white/30 text-lg group-active:text-primary-container transition-colors">chevron_right</span>
-                 </div>
-                 <div>
-                    <h3 className="font-headline font-bold text-lg leading-tight uppercase">Feedbacks</h3>
-                    <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">User Reviews</p>
-                 </div>
-              </div>
+              {processedCards.map((card) => {
+                const isAnimating = animatingCardId === card.id;
+                return (
+                  <div
+                    key={card.id}
+                    onClick={() => handleCardClick(card.id, card.action)}
+                    className={`bg-[#141414] border border-white/5 active:scale-95 active:bg-[#1c1b1b] active:border-primary-container cursor-pointer transition-all p-5 flex flex-col justify-between h-40 rounded-xl relative overflow-hidden group ${
+                      isAnimating ? 'animate-redirect-card' : ''
+                    }`}
+                  >
+                     <div className="flex justify-between items-start">
+                        <span className="material-symbols-outlined text-primary-container text-3xl">
+                          {card.icon}
+                        </span>
+                        <span className="material-symbols-outlined text-white/30 text-lg group-hover:text-primary-container transition-colors">
+                          chevron_right
+                        </span>
+                     </div>
+                     <div>
+                        <h3 className="font-headline font-bold text-lg leading-tight uppercase">
+                          {card.title}
+                        </h3>
+                        <p className="text-[10px] text-white/40 font-label tracking-wider uppercase mt-1">
+                          {card.subtitle}
+                        </p>
+                     </div>
+                     {/* Decorative background glow */}
+                     <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-primary-container/5 rounded-full blur-xl group-hover:bg-primary-container/10 transition-colors"></div>
+                  </div>
+                );
+              })}
+              {processedCards.length === 0 && (
+                <div className="col-span-full py-12 text-center border border-dashed border-white/10 rounded-xl bg-[#141414]">
+                  <span className="material-symbols-outlined text-white/20 text-4xl mb-2">search_off</span>
+                  <p className="text-sm text-white/40">No settings matched your query. Try searching something else!</p>
+                </div>
+              )}
            </div>
 
            {/* System Health Section */}

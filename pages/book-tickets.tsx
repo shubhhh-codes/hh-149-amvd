@@ -20,6 +20,7 @@ interface TicketTier {
   seats: number;
   badge: string | null;
   description?: string;
+  originalPrice?: number;
 }
 
 const DEFAULT_TIERS = [
@@ -38,6 +39,54 @@ export async function getServerSideProps() {
 
     if (!tiersData.tiers || tiersData.tiers.length === 0) {
       tiersData.tiers = DEFAULT_TIERS;
+    }
+
+    // Sort by display order
+    tiersData.tiers.sort((a: any, b: any) => a.displayOrder - b.displayOrder);
+
+    // Early Bird validation
+    const earlyBird = tiersData.earlyBird || { isActive: false, price: 119, maxBookings: 30, createdAt: new Date() };
+    const earlyBirdBookings = await db.collection('bookings')
+      .aggregate([
+        { $match: { status: 'approved', 'cart.tierKey': 'early' } },
+        { $unwind: '$cart' },
+        { $match: { 'cart.tierKey': 'early' } },
+        { $group: { _id: null, total: { $sum: '$cart.units' } } }
+      ])
+      .toArray();
+    const earlyBirdSold = earlyBirdBookings[0]?.total || 0;
+    
+    const createdAtTime = earlyBird.createdAt ? new Date(earlyBird.createdAt).getTime() : 0;
+    const isExpired = !earlyBird.isActive || 
+                      (Date.now() - createdAtTime > 48 * 60 * 60 * 1000) || 
+                      (earlyBirdSold >= (earlyBird.maxBookings ?? 30));
+
+    if (!isExpired) {
+      const soloIndex = tiersData.tiers.findIndex((t: any) => t.key.toLowerCase() === 'solo' || t.key.toLowerCase() === 'single');
+      if (soloIndex !== -1) {
+        const originalSolo = tiersData.tiers[soloIndex];
+        tiersData.tiers[soloIndex] = {
+          ...originalSolo,
+          key: 'early',
+          name: 'Early Bird Single',
+          label: 'EARLY BIRD',
+          price: earlyBird.price || 119,
+          originalPrice: originalSolo.price,
+          badge: 'LIMITED OFFER',
+          description: 'Special discounted price for early buyers! Admits 1 person.'
+        };
+      } else {
+        tiersData.tiers.unshift({
+          key: 'early',
+          name: 'Early Bird Single',
+          label: 'EARLY BIRD',
+          price: earlyBird.price || 119,
+          seats: 1,
+          badge: 'LIMITED OFFER',
+          displayOrder: 0,
+          description: 'Special discounted price for early buyers! Admits 1 person.'
+        });
+      }
     }
 
     const inventoryDoc = await db.collection('inventory').findOne({ type: 'venue_capacity' });
@@ -458,6 +507,19 @@ export default function BookTickets({ tiersData, venueStatus }: { tiersData: any
                 </div>
               </div>
 
+              {seatsRemaining !== null && seatsRemaining <= 15 && (
+                <div className="mb-6 bg-red-500/10 border border-red-500/30 text-red-500 text-xs md:text-sm font-bold py-2.5 px-4 rounded-lg flex items-center gap-2 animate-pulse">
+                  <span className="material-symbols-outlined text-[16px] md:text-[20px]">alarm</span>
+                  <span>Hurry! Only {seatsRemaining} seat(s) left — booking fast!</span>
+                </div>
+              )}
+              {seatsRemaining !== null && seatsRemaining > 15 && seatsRemaining <= 30 && (
+                <div className="mb-6 bg-[#FF6B1A]/10 border border-[#FF6B1A]/30 text-[#FF6B1A] text-xs md:text-sm font-bold py-2.5 px-4 rounded-lg flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] md:text-[20px]">info</span>
+                  <span>Limited seats remaining.</span>
+                </div>
+              )}
+
               <div className="w-full grid grid-cols-3 gap-2 md:gap-4 mb-8 md:mt-0 px-1 md:px-0">
                 {tiers.map((tier: TicketTier) => {
                   const quantity = cart[tier.key] || 0;
@@ -503,6 +565,11 @@ export default function BookTickets({ tiersData, venueStatus }: { tiersData: any
                           </span>
                         </div>
                         <div className="flex flex-col items-center justify-center flex-1 w-full text-center mt-0.5">
+                          {tier.originalPrice && tier.originalPrice > tier.price && (
+                            <span className="text-white/40 text-[10px] md:text-xs line-through mb-0.5">
+                              ₹{tier.originalPrice}
+                            </span>
+                          )}
                           <h3 className="font-['Hind',sans-serif] text-[17px] md:text-3xl font-black text-white leading-none tracking-tight">
                             ₹{tier.price}
                           </h3>
@@ -608,6 +675,19 @@ export default function BookTickets({ tiersData, venueStatus }: { tiersData: any
           </div>
 
           <aside className="hidden md:block md:col-span-5 lg:col-span-4 md:sticky md:top-24 bg-[#141414] border border-white/10 rounded-xl p-8 shadow-2xl">
+            {seatsRemaining !== null && seatsRemaining <= 15 && (
+              <div className="mb-6 bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-bold py-2.5 px-4 rounded-lg flex items-center gap-2 animate-pulse">
+                <span className="material-symbols-outlined text-[18px]">alarm</span>
+                <span>Hurry! Only {seatsRemaining} seat(s) left — booking fast!</span>
+              </div>
+            )}
+            {seatsRemaining !== null && seatsRemaining > 15 && seatsRemaining <= 30 && (
+              <div className="mb-6 bg-[#FF6B1A]/10 border border-[#FF6B1A]/30 text-[#FF6B1A] text-xs font-bold py-2.5 px-4 rounded-lg flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">info</span>
+                <span>Limited seats remaining.</span>
+              </div>
+            )}
+
             <div className="flex flex-col gap-6 mb-8 pb-8 border-b border-white/10">
               <div className="flex items-start gap-4">
                 <span className="material-symbols-outlined text-[#FF6B1A] text-2xl">location_on</span>

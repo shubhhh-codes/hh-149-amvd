@@ -93,6 +93,53 @@ function sanitizeTier(tier: Record<string, unknown>): TierInput {
   };
 }
 
+/**
+ * Validates the early bird settings object.
+ */
+function validateEarlyBird(eb: unknown): string | null {
+  if (typeof eb !== 'object' || eb === null || Array.isArray(eb)) {
+    return 'earlyBird must be a valid object';
+  }
+
+  const e = eb as Record<string, unknown>;
+
+  if (typeof e.isActive !== 'boolean') {
+    return 'earlyBird.isActive must be a boolean';
+  }
+
+  const price = Number(e.price);
+  if (!Number.isFinite(price) || price <= 0) {
+    return `earlyBird.price must be a positive number (got: ${e.price})`;
+  }
+
+  const maxBookings = Number(e.maxBookings);
+  if (!Number.isInteger(maxBookings) || maxBookings <= 0) {
+    return `earlyBird.maxBookings must be a positive integer (got: ${e.maxBookings})`;
+  }
+
+  if (typeof e.createdAt !== 'string' && !(e.createdAt instanceof Date)) {
+    return 'earlyBird.createdAt must be a valid date or string';
+  }
+  const dateVal = new Date(e.createdAt as any);
+  if (isNaN(dateVal.getTime())) {
+    return 'earlyBird.createdAt must be a valid date';
+  }
+
+  return null;
+}
+
+/**
+ * Sanitizes early bird settings by picking only known fields.
+ */
+function sanitizeEarlyBird(eb: Record<string, unknown>) {
+  return {
+    isActive:    Boolean(eb.isActive),
+    price:       Number(eb.price),
+    maxBookings: Number(eb.maxBookings),
+    createdAt:   new Date(eb.createdAt as any),
+  };
+}
+
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 import { withErrorHandler } from '../../../../lib/withErrorHandler';
@@ -138,12 +185,13 @@ async function handler(
         venue: settings?.venue || 'The Humours Hub, Ahmedabad',
         date:  settings?.date  || 'Saturday',
         time:  settings?.time  || '8:30 PM',
+        earlyBird: settings?.earlyBird ?? { isActive: false, price: 119, maxBookings: 30, createdAt: new Date() },
       });
     }
 
     // ── POST ────────────────────────────────────────────────────────────────
     if (req.method === 'POST') {
-      const { tiers, venue, date, time } = req.body;
+      const { tiers, venue, date, time, earlyBird } = req.body;
 
       // ── Validate top-level fields ────────────────────────────────────────
       if (!Array.isArray(tiers) || tiers.length === 0 || tiers.length > 20) {
@@ -172,12 +220,22 @@ async function handler(
         return res.status(400).json({ message: 'time must be a non-empty string (max 100 chars)' });
       }
 
+      if (!earlyBird) {
+        return res.status(400).json({ message: 'Missing earlyBird settings' });
+      }
+
       // ── Validate each tier ───────────────────────────────────────────────
       for (let i = 0; i < tiers.length; i++) {
         const error = validateTier(tiers[i], i);
         if (error) {
           return res.status(400).json({ message: error });
         }
+      }
+
+      // ── Validate earlyBird ───────────────────────────────────────────────
+      const earlyBirdError = validateEarlyBird(earlyBird);
+      if (earlyBirdError) {
+        return res.status(400).json({ message: earlyBirdError });
       }
 
       // ── Sanitize: pick only known fields to prevent object injection ─────
@@ -193,6 +251,7 @@ async function handler(
             venue:     venue.trim(),
             date:      date.trim(),
             time:      time.trim(),
+            earlyBird: sanitizeEarlyBird(earlyBird),
             updatedAt: new Date(),
             updatedBy: session.user?.email ?? 'unknown',
           },

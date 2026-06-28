@@ -34,8 +34,55 @@ async function handler(
       price: t.price,
       seats: t.seats,
       badge: t.badge,
-      displayOrder: t.displayOrder
+      displayOrder: t.displayOrder,
+      description: t.description || ''
     }));
+
+    // Early Bird Promotion Calculation
+    const earlyBird = settings?.earlyBird || { isActive: false, price: 119, maxBookings: 30, createdAt: new Date() };
+
+    const earlyBirdBookings = await db.collection('bookings')
+      .aggregate([
+        { $match: { status: 'approved', 'cart.tierKey': 'early' } },
+        { $unwind: '$cart' },
+        { $match: { 'cart.tierKey': 'early' } },
+        { $group: { _id: null, total: { $sum: '$cart.units' } } }
+      ])
+      .toArray();
+    const earlyBirdSold = earlyBirdBookings[0]?.total || 0;
+
+    const createdAtTime = earlyBird.createdAt ? new Date(earlyBird.createdAt).getTime() : 0;
+    const isExpired = !earlyBird.isActive ||
+                      (Date.now() - createdAtTime > 48 * 60 * 60 * 1000) ||
+                      (earlyBirdSold >= (earlyBird.maxBookings ?? 30));
+
+    if (!isExpired) {
+      const soloIndex = publicTiers.findIndex((t: any) => t.key.toLowerCase() === 'solo' || t.key.toLowerCase() === 'single');
+      if (soloIndex !== -1) {
+        const originalSolo = publicTiers[soloIndex];
+        publicTiers[soloIndex] = {
+          ...originalSolo,
+          key: 'early',
+          name: 'Early Bird Single',
+          label: 'EARLY BIRD',
+          price: earlyBird.price || 119,
+          originalPrice: originalSolo.price,
+          badge: 'LIMITED OFFER',
+          description: 'Special discounted price for early buyers! Admits 1 person.'
+        };
+      } else {
+        publicTiers.unshift({
+          key: 'early',
+          name: 'Early Bird Single',
+          label: 'EARLY BIRD',
+          price: earlyBird.price || 119,
+          seats: 1,
+          badge: 'LIMITED OFFER',
+          displayOrder: 0,
+          description: 'Special discounted price for early buyers! Admits 1 person.'
+        });
+      }
+    }
 
     const inventoryDoc = await db.collection('inventory').findOne({ type: 'venue_capacity' });
     const VENUE_CAPACITY = inventoryDoc?.maxCapacity || 150;
