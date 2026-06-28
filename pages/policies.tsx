@@ -72,7 +72,7 @@ export default function Policies({ policies }: PoliciesProps) {
 export const getServerSideProps: GetServerSideProps = async () => {
   try {
     const client = await clientPromise;
-    const db = client.db('humourshub');
+    const db = client.db();
 
     const policies = await db
       .collection('homepage_content')

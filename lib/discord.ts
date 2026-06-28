@@ -12,6 +12,67 @@ export interface DiscordBookingData {
   timeToConvertSeconds?: number;
 }
 
+async function executeDiscordWebhook(url: string | undefined, payload: any, method = 'POST'): Promise<any> {
+  if (!url) return null;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (res.status === 429) {
+      const retryAfter = res.headers.get('Retry-After');
+      const waitMs = retryAfter ? parseInt(retryAfter) * 1000 : 1000;
+      await new Promise(r => setTimeout(r, waitMs));
+      
+      const retryController = new AbortController();
+      const retryTimeoutId = setTimeout(() => retryController.abort(), 5000);
+      const retryRes = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: retryController.signal
+      });
+      clearTimeout(retryTimeoutId);
+      
+      if (!retryRes.ok) {
+        console.error(`[Discord] Webhook retry failed: HTTP ${retryRes.status}`);
+      }
+      
+      if (retryRes.headers.get('content-type')?.includes('application/json')) {
+        return retryRes.json().catch(() => null);
+      }
+      return null;
+    }
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => 'No body');
+      console.error(`[Discord] Webhook failed: HTTP ${res.status} ${errText}`);
+    }
+
+    if (res.headers.get('content-type')?.includes('application/json')) {
+      return res.json().catch(() => null);
+    }
+    return null;
+
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      console.error('[Discord] Webhook timed out');
+    } else {
+      console.error('[Discord] Webhook network error:', err.message);
+    }
+    return null;
+  }
+}
+
 async function getBookingStats() {
   try {
     const client = await clientPromise;
@@ -94,40 +155,27 @@ export async function sendDiscordNotification(data: DiscordBookingData) {
     ]
   };
 
-  try {
-    const res = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+  await executeDiscordWebhook(webhookUrl, payload);
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => 'No response body');
-      console.error(`[Discord] Failed to send notification. HTTP ${res.status}: ${errText}`);
-    }
-
-    const stats = await getBookingStats();
-    if (stats) {
-      const statsPayload = {
-        embeds: [
-          {
-            author: { name: "Humours Hub Analytics", icon_url: "https://humourshub.in/favicon.ico" },
-            title: "📊 Today's Conversion Stats",
-            color: 3066993, // #2ECC71
-            fields: [
-              { name: '✅ Confirmed', value: `${stats.confirmed} (₹${stats.confirmedRevenue.toLocaleString()})`, inline: true },
-              { name: '⏳ Pending', value: `${stats.pending}`, inline: true },
-              { name: '❌ Cancelled', value: `${stats.cancelled}`, inline: true }
-            ],
-            footer: { text: `Conversion Rate: ${stats.conversionRate}%` },
-            timestamp: new Date().toISOString()
-          }
-        ]
-      };
-      await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(statsPayload) });
-    }
-  } catch (err) {
-    console.error('[Discord] Error sending notification:', err);
+  const stats = await getBookingStats();
+  if (stats) {
+    const statsPayload = {
+      embeds: [
+        {
+          author: { name: "Humours Hub Analytics", icon_url: "https://humourshub.in/favicon.ico" },
+          title: "📊 Today's Conversion Stats",
+          color: 3066993, // #2ECC71
+          fields: [
+            { name: '✅ Confirmed', value: `${stats.confirmed} (₹${stats.confirmedRevenue.toLocaleString()})`, inline: true },
+            { name: '⏳ Pending', value: `${stats.pending}`, inline: true },
+            { name: '❌ Cancelled', value: `${stats.cancelled}`, inline: true }
+          ],
+          footer: { text: `Conversion Rate: ${stats.conversionRate}%` },
+          timestamp: new Date().toISOString()
+        }
+      ]
+    };
+    await executeDiscordWebhook(webhookUrl, statsPayload);
   }
 }
 
@@ -162,12 +210,7 @@ export async function sendCheckInNotification(data: CheckInData) {
     }]
   };
 
-  try {
-    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!res.ok) console.error(`[Discord] Check-in error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
-  } catch (err) {
-    console.error('[Discord] Error sending check-in notification:', err);
-  }
+  await executeDiscordWebhook(webhookUrl, payload);
 }
 
 export interface VisitorData {
@@ -199,12 +242,7 @@ export async function sendVisitorNotification(visitorData: VisitorData) {
     }]
   };
 
-  try {
-    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!res.ok) console.error(`[Discord] Visitor error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
-  } catch (err) {
-    console.error('[Discord] Error sending visitor notification:', err);
-  }
+  await executeDiscordWebhook(webhookUrl, payload);
 }
 
 export interface TrackingData {
@@ -219,6 +257,11 @@ export interface TrackingData {
 }
 
 export async function sendTrackingNotification(data: TrackingData) {
+  // If it's a journey event and they have very little activity, ignore it to prevent noise
+  if (data.event === 'journey' && data.timeline && data.timeline.length <= 2) {
+    return;
+  }
+
   const abandonmentWebhook = process.env.DISCORD_ABANDONMENT_WEBHOOK_URL || process.env.DISCORD_TRAFFIC_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL;
   const journeyWebhook = process.env.DISCORD_JOURNEY_WEBHOOK_URL || process.env.DISCORD_TRAFFIC_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL;
   const webhookUrl = data.event === 'abandonment' ? abandonmentWebhook : journeyWebhook;
@@ -269,60 +312,31 @@ export async function sendTrackingNotification(data: TrackingData) {
     }]
   };
 
-  try {
-    if (data.event === 'journey' && data.sessionId) {
-      const client = await clientPromise;
-      const db = client.db();
-      const sessionDoc = await db.collection('discord_live_sessions').findOne({ _id: data.sessionId as any });
+  if (data.event === 'journey' && data.sessionId) {
+    const client = await clientPromise;
+    const db = client.db();
+    const sessionDoc = await db.collection('discord_live_sessions').findOne({ _id: data.sessionId as any });
 
-      if (sessionDoc) {
-        // PATCH existing message
-        await fetch(`${webhookUrl}/messages/${sessionDoc.messageId}`, { 
-          method: 'PATCH', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify(payload) 
-        });
-        
-        // We intentionally DO NOT delete the session from DB here.
-        // If the user minimizes the app (hidden), it marks it as final,
-        // but if they reopen the app 10 minutes later, we want to PATCH
-        // the exact same Discord message back to "Live" instead of spamming new messages!
-      } else {
-        // POST new message and wait for ID
-        const res = await fetch(`${webhookUrl}?wait=true`, { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify(payload) 
-        });
-        
-        if (res.ok) {
-          const msg = await res.json();
-          if (msg && msg.id) {
-            try {
-              await db.collection('discord_live_sessions').insertOne({ 
-                _id: data.sessionId as any, 
-                messageId: msg.id, 
-                createdAt: new Date() 
-              });
-            } catch (insertErr: any) {
-              if (insertErr.code !== 11000) {
-                throw insertErr; // Rethrow if it's not a duplicate key error
-              }
-            }
+    if (sessionDoc) {
+      await executeDiscordWebhook(`${webhookUrl}/messages/${sessionDoc.messageId}`, payload, 'PATCH');
+    } else {
+      const msg = await executeDiscordWebhook(`${webhookUrl}?wait=true`, payload, 'POST');
+      if (msg && msg.id) {
+        try {
+          await db.collection('discord_live_sessions').insertOne({ 
+            _id: data.sessionId as any, 
+            messageId: msg.id, 
+            createdAt: new Date() 
+          });
+        } catch (insertErr: any) {
+          if (insertErr.code !== 11000) {
+            throw insertErr; 
           }
         }
       }
-    } else {
-      // Standard POST without wait
-      const res = await fetch(webhookUrl, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(payload) 
-      });
-      if (!res.ok) console.error(`[Discord] Track error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
     }
-  } catch (err) {
-    console.error('[Discord] Error sending tracking notification:', err);
+  } else {
+    await executeDiscordWebhook(webhookUrl, payload, 'POST');
   }
 }
 
@@ -353,12 +367,7 @@ export async function sendContactNotification(data: ContactData) {
     }]
   };
 
-  try {
-    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!res.ok) console.error(`[Discord] Contact error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
-  } catch (err) {
-    console.error('[Discord] Error sending contact notification:', err);
-  }
+  await executeDiscordWebhook(webhookUrl, payload);
 }
 
 export interface FeedbackData {
@@ -403,12 +412,7 @@ export async function sendFeedbackNotification(data: FeedbackData) {
     }]
   };
 
-  try {
-    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!res.ok) console.error(`[Discord] Feedback error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
-  } catch (err) {
-    console.error('[Discord] Error sending feedback notification:', err);
-  }
+  await executeDiscordWebhook(webhookUrl, payload);
 }
 
 export interface DiscordPaymentCancelledData {
@@ -456,12 +460,7 @@ export async function sendPaymentCancelledNotification(data: DiscordPaymentCance
     }]
   };
 
-  try {
-    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!res.ok) console.error(`[Discord] Cancelled error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
-  } catch (err) {
-    console.error('[Discord] Error sending payment cancelled notification:', err);
-  }
+  await executeDiscordWebhook(webhookUrl, payload);
 }
 
 export async function sendCapacityAlert(percent: number, totalSeats: number, capacity: number) {
@@ -482,12 +481,7 @@ export async function sendCapacityAlert(percent: number, totalSeats: number, cap
     }]
   };
 
-  try {
-    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!res.ok) console.error(`[Discord] Capacity alert error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
-  } catch (err) {
-    console.error('[Discord] Error sending capacity alert:', err);
-  }
+  await executeDiscordWebhook(webhookUrl, payload);
 }
 
 export interface SecurityData {
@@ -524,12 +518,7 @@ export async function sendSecurityNotification(data: SecurityData) {
     }]
   };
 
-  try {
-    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!res.ok) console.error(`[Discord] Security error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
-  } catch (err) {
-    console.error('[Discord] Error sending security notification:', err);
-  }
+  await executeDiscordWebhook(webhookUrl, payload);
 }
 
 export interface ErrorData {
@@ -570,11 +559,5 @@ export async function sendErrorNotification(data: ErrorData) {
     });
   }
 
-  try {
-    const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!res.ok) console.error(`[Discord] Error notification error: HTTP ${res.status} ${await res.text().catch(() => '')}`);
-  } catch (err) {
-    console.error('[Discord] Error sending error notification:', err);
-  }
+  await executeDiscordWebhook(webhookUrl, payload);
 }
-

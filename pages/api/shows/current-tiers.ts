@@ -37,11 +37,22 @@ async function handler(
       displayOrder: t.displayOrder
     }));
 
+    const inventoryDoc = await db.collection('inventory').findOne({ type: 'venue_capacity' });
+    const VENUE_CAPACITY = inventoryDoc?.maxCapacity || 150;
+    const totalBookings = await db.collection('bookings')
+      .aggregate([
+        { $match: { status: 'approved' } },
+        { $group: { _id: null, total: { $sum: '$numberOfTickets' } } }
+      ])
+      .toArray();
+    const totalApproved = totalBookings[0]?.total || 0;
+    const seatsRemaining = Math.max(0, VENUE_CAPACITY - totalApproved);
+
     res.status(200).json({
       tiers: publicTiers,
       showId: 'default-show',
       showName: 'The Humours Hub - Live Standup',
-      seatsRemaining: 150, 
+      seatsRemaining: seatsRemaining, 
       venueName: 'The Black Box',
       showDate: 'Sat, 24 Oct • 8:30 PM'
     });

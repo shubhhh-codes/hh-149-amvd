@@ -40,9 +40,26 @@ export async function getServerSideProps() {
       tiersData.tiers = DEFAULT_TIERS;
     }
 
+    const inventoryDoc = await db.collection('inventory').findOne({ type: 'venue_capacity' });
+    const VENUE_CAPACITY = inventoryDoc?.maxCapacity || 150;
+
+    const totalBookings = await db.collection('bookings')
+      .aggregate([
+        { $match: { status: 'approved' } },
+        { $group: { _id: null, total: { $sum: '$numberOfTickets' } } }
+      ])
+      .toArray();
+
+    const totalApproved = totalBookings[0]?.total || 0;
+    const venueStatus = {
+      isFull: totalApproved >= VENUE_CAPACITY,
+      remainingSeats: Math.max(0, VENUE_CAPACITY - totalApproved)
+    };
+
     return {
       props: {
         tiersData,
+        venueStatus,
       },
     };
   } catch (error) {
@@ -50,12 +67,13 @@ export async function getServerSideProps() {
     return {
       props: {
         tiersData: { tiers: DEFAULT_TIERS },
+        venueStatus: { isFull: false, remainingSeats: 150 },
       },
     };
   }
 }
 
-export default function BookTickets({ tiersData }: { tiersData: any }) {
+export default function BookTickets({ tiersData, venueStatus }: { tiersData: any, venueStatus: any }) {
   const router = useRouter();
 
   const [cart, setCart] = useState<Record<string, number>>({});
@@ -63,6 +81,18 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
   const [customerEmail, setEmail] = useState('');
   const [customerPhone, setPhone] = useState('');
   const [isLoading, setLoading] = useState(false);
+  const [seatsRemaining, setSeatsRemaining] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch('/api/shows/current-tiers')
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data.seatsRemaining === 'number') {
+          setSeatsRemaining(data.seatsRemaining);
+        }
+      })
+      .catch(err => console.error('Failed to fetch seats remaining:', err));
+  }, []);
   const [mode, setMode] = useState<'loading' | 'active' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [showSummaryDetails, setShowSummaryDetails] = useState(false);
@@ -375,9 +405,46 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
           }
         }}
       >
-        <div className="md:max-w-5xl lg:max-w-6xl md:mx-auto md:px-6 md:py-10 md:grid md:grid-cols-12 md:gap-8 lg:gap-12 md:items-start">
-          <div className="max-w-md mx-auto px-4 pt-4 md:max-w-none md:p-0 md:col-span-7 lg:col-span-8">
-            <header className="text-center md:text-left mb-6">
+        {venueStatus?.isFull ? (
+          <div className="md:max-w-3xl md:mx-auto md:px-6 md:py-16 pt-10 px-4 flex flex-col items-center">
+            {/* SOLD OUT BANNER */}
+            <div className="mb-12 text-center">
+              <h2 className="font-['Hind',sans-serif] text-5xl md:text-7xl font-bold text-[#FF6B1A] tracking-wider uppercase inline-block border-4 md:border-8 border-[#FF6B1A] px-8 py-3 rounded-xl transform -rotate-3 mb-6 shadow-[0_0_30px_rgba(255,107,26,0.3)]">SOLD OUT</h2>
+              <p className="font-['DM_Sans',sans-serif] text-white/45 text-lg md:text-xl">This show is fully booked.</p>
+            </div>
+            
+            {/* ACTION CARDS */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full max-w-2xl mb-8">
+              {/* Card 1 */}
+              <div className="bg-[#141414] border-l-4 border-[#FF6B1A] rounded-r-lg p-6 flex flex-col items-start text-left h-full">
+                <span className="font-['Hind',sans-serif] text-[10px] md:text-xs font-bold text-[#FF6B1A] uppercase tracking-widest mb-3">NEXT SHOW</span>
+                <p className="font-['DM_Sans',sans-serif] text-sm text-white mb-8 leading-relaxed">Check our upcoming shows and grab your spot early.</p>
+                <button type="button" onClick={() => router.push('/shows')} className="mt-auto text-sm font-bold text-white hover:text-[#FF6B1A] transition-colors flex items-center gap-2 group">
+                  View Upcoming Shows 
+                  <span className="transform group-hover:translate-x-1 transition-transform">&rarr;</span>
+                </button>
+              </div>
+
+              {/* Card 2 */}
+              <div className="bg-[#141414] border border-white/10 rounded-lg p-6 flex flex-col items-start text-left h-full">
+                <span className="font-['Hind',sans-serif] text-[10px] md:text-xs font-bold text-white/45 uppercase tracking-widest mb-3">GET EARLY ACCESS</span>
+                <p className="font-['DM_Sans',sans-serif] text-sm text-white mb-8 leading-relaxed">We announce shows on Instagram first. Follow us to never miss a drop.</p>
+                <a href="https://www.instagram.com/the.humourshub" target="_blank" rel="noopener noreferrer" className="mt-auto text-sm font-bold text-white hover:text-[#FF6B1A] transition-colors flex items-center gap-2 group">
+                  Follow @thehumourshub 
+                  <span className="transform group-hover:translate-x-1 transition-transform">&rarr;</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Below cards text */}
+            <p className="font-['DM_Sans',sans-serif] text-[13px] text-white/30 text-center max-w-md">
+              Ticket drops are announced on Instagram 24–48 hours before they go live.
+            </p>
+          </div>
+        ) : (
+        <div className="w-full md:max-w-5xl lg:max-w-6xl md:mx-auto md:px-6 md:py-10 md:grid md:grid-cols-12 md:gap-8 lg:gap-12 md:items-start">
+          <div className="w-full max-w-md mx-auto px-4 pt-4 md:max-w-none md:p-0 md:col-span-7 lg:col-span-8">
+            <header className="w-full text-center md:text-left mb-6">
               <h1 className="font-['Hind',sans-serif] text-2xl md:text-4xl font-bold text-white mb-4 md:mb-8 leading-tight">Secure Your Spot</h1>
 
               <div className="flex flex-col gap-2 mb-6 text-sm font-['DM_Sans',sans-serif] md:hidden">
@@ -391,15 +458,22 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 md:gap-4 mb-8 md:mt-0 px-1 md:px-0">
+              <div className="w-full grid grid-cols-3 gap-2 md:gap-4 mb-8 md:mt-0 px-1 md:px-0">
                 {tiers.map((tier: TicketTier) => {
                   const quantity = cart[tier.key] || 0;
                   const isActive = quantity > 0;
+                  
+                  const otherSelectionsSeats = tiers.reduce(
+                    (acc: number, t: TicketTier) => t.key !== tier.key ? acc + t.seats * (cart[t.key] || 0) : acc,
+                    0
+                  );
+                  const tierRemainingSeats = Math.max(0, (seatsRemaining !== null ? seatsRemaining : 0) - otherSelectionsSeats);
+                  const cannotBook = seatsRemaining !== null && tierRemainingSeats < tier.seats;
 
                   return (
                     <div
                       key={tier.key}
-                      className={`bg-[#141414] rounded-xl p-1.5 md:p-3 transition-all flex flex-col items-center justify-between relative h-[130px] md:h-[180px] w-full ${
+                      className={`bg-[#141414] rounded-xl p-1.5 md:p-3 transition-all flex flex-col items-center justify-between relative h-[130px] md:h-[180px] w-full min-w-0 ${
                         isActive
                           ? 'border-[#FF6B1A] border shadow-[0_0_15px_rgba(255,107,26,0.2)] bg-[rgba(255,107,26,0.08)] z-10'
                           : 'border-white/10 border'
@@ -435,27 +509,41 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between bg-[#080808] border border-white/10 rounded w-full overflow-hidden shrink-0 h-6 md:h-10 mt-auto">
-                        <button
-                          type="button"
-                          onClick={() => setCart((previousState) => ({ ...previousState, [tier.key]: Math.max(0, (previousState[tier.key] || 0) - 1) }))}
-                          disabled={quantity === 0}
-                          aria-label={`Decrease ${tier.name} quantity`}
-                          className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <span className="material-symbols-outlined text-[14px] md:text-[18px]">remove</span>
-                        </button>
-                        <span className="font-['Hind',sans-serif] text-xs md:text-base font-bold text-white w-1/3 text-center leading-none">{quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => setCart((previousState) => ({ ...previousState, [tier.key]: Math.min(10, (previousState[tier.key] || 0) + 1) }))}
-                          disabled={quantity >= 10}
-                          aria-label={`Increase ${tier.name} quantity`}
-                          className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <span className="material-symbols-outlined text-[14px] md:text-[18px]">add</span>
-                        </button>
-                      </div>
+                      {cannotBook ? (
+                        <div className="w-full flex items-center justify-center text-center mt-auto h-auto min-h-6 md:h-10 shrink-0 px-1">
+                          {tierRemainingSeats === 0 ? (
+                            <span className="text-[#ef4444] text-[12px] font-['DM_Sans',sans-serif] font-medium leading-tight w-full block text-center">
+                              No seats remaining.
+                            </span>
+                          ) : (
+                            <span className="text-white/40 text-[12px] font-['DM_Sans',sans-serif] font-medium leading-[1.2] w-full block text-center break-words px-0.5">
+                              Only {tierRemainingSeats} seat(s) left — not enough for this pass.
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between bg-[#080808] border border-white/10 rounded w-full overflow-hidden shrink-0 h-6 md:h-10 mt-auto">
+                          <button
+                            type="button"
+                            onClick={() => setCart((previousState) => ({ ...previousState, [tier.key]: Math.max(0, (previousState[tier.key] || 0) - 1) }))}
+                            disabled={quantity === 0}
+                            aria-label={`Decrease ${tier.name} quantity`}
+                            className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <span className="material-symbols-outlined text-[14px] md:text-[18px]">remove</span>
+                          </button>
+                          <span className="font-['Hind',sans-serif] text-xs md:text-base font-bold text-white w-1/3 text-center leading-none">{quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => setCart((previousState) => ({ ...previousState, [tier.key]: Math.min(10, (previousState[tier.key] || 0) + 1) }))}
+                            disabled={quantity >= 10 || (seatsRemaining !== null && (quantity * tier.seats >= seatsRemaining || totalSeats + tier.seats > seatsRemaining))}
+                            aria-label={`Increase ${tier.name} quantity`}
+                            className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <span className="material-symbols-outlined text-[14px] md:text-[18px]">add</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -553,6 +641,12 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
               )}
             </div>
 
+            {seatsRemaining !== null && totalSeats > seatsRemaining && (
+              <div className="text-[#ef4444] text-sm font-bold mb-4 bg-[#ef4444]/10 p-3 rounded border border-[#ef4444]/20">
+                Only {seatsRemaining} seat(s) remaining. Please select fewer tickets.
+              </div>
+            )}
+
             <div className="flex justify-between items-end mb-8 pt-8 border-t border-white/10">
               <span className="font-['Hind',sans-serif] text-xs font-bold tracking-wider text-[#a3a3a3] uppercase">Total Amount</span>
               <div className="text-right">
@@ -564,7 +658,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
             <button
               type="button"
               onClick={handleAction}
-              disabled={isLoading || totalTickets === 0}
+              disabled={isLoading || totalTickets === 0 || (seatsRemaining !== null && totalSeats > seatsRemaining)}
               className="w-full bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white font-['Hind',sans-serif] font-bold py-4 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-all text-lg disabled:opacity-50 uppercase tracking-wide"
             >
               {isLoading ? (
@@ -578,8 +672,10 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
             </button>
           </aside>
         </div>
+        )}
       </main>
 
+      {!venueStatus?.isFull && (
       <div className="fixed bottom-0 w-full bg-[#111] border-t border-white/10 px-4 py-3 pb-safe z-50 md:hidden">
         <div className="max-w-md mx-auto">
           {showSummaryDetails && (
@@ -592,6 +688,11 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
               ))}
               {totalTickets === 0 && (
                 <div className="text-center italic opacity-50 py-2">Cart is empty</div>
+              )}
+              {seatsRemaining !== null && totalSeats > seatsRemaining && (
+                <div className="text-[#ef4444] text-xs font-bold mt-2 bg-[#ef4444]/10 p-2 rounded border border-[#ef4444]/20 text-center">
+                  Only {seatsRemaining} seat(s) remaining.
+                </div>
               )}
               <div className="flex justify-between items-center mt-1 pt-2.5 border-t border-white/10">
                 <span>Total Amount</span>
@@ -628,7 +729,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
           <button
             type="button"
             onClick={handleAction}
-            disabled={isLoading || totalTickets === 0}
+            disabled={isLoading || totalTickets === 0 || (seatsRemaining !== null && totalSeats > seatsRemaining)}
             className="w-full bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white font-['Hind',sans-serif] font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wide"
           >
             {isLoading ? (
@@ -641,6 +742,7 @@ export default function BookTickets({ tiersData }: { tiersData: any }) {
           </button>
         </div>
       </div>
+      )}
 
       <Footer />
 
