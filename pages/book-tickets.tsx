@@ -442,9 +442,9 @@ export default function BookTickets({ tiersData, venueStatus }: { tiersData: any
             </p>
           </div>
         ) : (
-        <div className="md:max-w-5xl lg:max-w-6xl md:mx-auto md:px-6 md:py-10 md:grid md:grid-cols-12 md:gap-8 lg:gap-12 md:items-start">
-          <div className="max-w-md mx-auto px-4 pt-4 md:max-w-none md:p-0 md:col-span-7 lg:col-span-8">
-            <header className="text-center md:text-left mb-6">
+        <div className="w-full md:max-w-5xl lg:max-w-6xl md:mx-auto md:px-6 md:py-10 md:grid md:grid-cols-12 md:gap-8 lg:gap-12 md:items-start">
+          <div className="w-full max-w-md mx-auto px-4 pt-4 md:max-w-none md:p-0 md:col-span-7 lg:col-span-8">
+            <header className="w-full text-center md:text-left mb-6">
               <h1 className="font-['Hind',sans-serif] text-2xl md:text-4xl font-bold text-white mb-4 md:mb-8 leading-tight">Secure Your Spot</h1>
 
               <div className="flex flex-col gap-2 mb-6 text-sm font-['DM_Sans',sans-serif] md:hidden">
@@ -458,26 +458,27 @@ export default function BookTickets({ tiersData, venueStatus }: { tiersData: any
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 md:gap-4 mb-8 md:mt-0 px-1 md:px-0">
+              <div className="w-full grid grid-cols-3 gap-2 md:gap-4 mb-8 md:mt-0 px-1 md:px-0">
                 {tiers.map((tier: TicketTier) => {
                   const quantity = cart[tier.key] || 0;
                   const isActive = quantity > 0;
-                  const notEnoughSeats = seatsRemaining !== null && seatsRemaining < tier.seats;
+                  
+                  const otherSelectionsSeats = tiers.reduce(
+                    (acc: number, t: TicketTier) => t.key !== tier.key ? acc + t.seats * (cart[t.key] || 0) : acc,
+                    0
+                  );
+                  const tierRemainingSeats = Math.max(0, (seatsRemaining !== null ? seatsRemaining : 0) - otherSelectionsSeats);
+                  const cannotBook = seatsRemaining !== null && tierRemainingSeats < tier.seats;
 
                   return (
                     <div
                       key={tier.key}
-                      className={`bg-[#141414] rounded-xl p-1.5 md:p-3 transition-all flex flex-col items-center justify-between relative h-[130px] md:h-[180px] w-full ${
+                      className={`bg-[#141414] rounded-xl p-1.5 md:p-3 transition-all flex flex-col items-center justify-between relative h-[130px] md:h-[180px] w-full min-w-0 ${
                         isActive
                           ? 'border-[#FF6B1A] border shadow-[0_0_15px_rgba(255,107,26,0.2)] bg-[rgba(255,107,26,0.08)] z-10'
                           : 'border-white/10 border'
-                      } ${notEnoughSeats ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+                      }`}
                     >
-                      {notEnoughSeats && (
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white/30 text-[11px] font-bold uppercase whitespace-nowrap z-30 pointer-events-none text-center bg-[#141414]/90 px-2 py-1 rounded">
-                          Not enough seats
-                        </div>
-                      )}
                       {tier.badge && (
                         <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#FF6B1A] px-1.5 py-0.5 rounded text-[7px] md:text-[10px] font-bold text-white shadow-lg uppercase whitespace-nowrap z-20">
                           {tier.badge}
@@ -508,27 +509,41 @@ export default function BookTickets({ tiersData, venueStatus }: { tiersData: any
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between bg-[#080808] border border-white/10 rounded w-full overflow-hidden shrink-0 h-6 md:h-10 mt-auto">
-                        <button
-                          type="button"
-                          onClick={() => setCart((previousState) => ({ ...previousState, [tier.key]: Math.max(0, (previousState[tier.key] || 0) - 1) }))}
-                          disabled={quantity === 0}
-                          aria-label={`Decrease ${tier.name} quantity`}
-                          className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <span className="material-symbols-outlined text-[14px] md:text-[18px]">remove</span>
-                        </button>
-                        <span className="font-['Hind',sans-serif] text-xs md:text-base font-bold text-white w-1/3 text-center leading-none">{quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => setCart((previousState) => ({ ...previousState, [tier.key]: Math.min(10, (previousState[tier.key] || 0) + 1) }))}
-                          disabled={quantity >= 10 || (seatsRemaining !== null && (quantity * tier.seats >= seatsRemaining || totalSeats + tier.seats > seatsRemaining))}
-                          aria-label={`Increase ${tier.name} quantity`}
-                          className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <span className="material-symbols-outlined text-[14px] md:text-[18px]">add</span>
-                        </button>
-                      </div>
+                      {cannotBook ? (
+                        <div className="w-full flex items-center justify-center text-center mt-auto h-auto min-h-6 md:h-10 shrink-0 px-1">
+                          {tierRemainingSeats === 0 ? (
+                            <span className="text-[#ef4444] text-[12px] font-['DM_Sans',sans-serif] font-medium leading-tight w-full block text-center">
+                              No seats remaining.
+                            </span>
+                          ) : (
+                            <span className="text-white/40 text-[12px] font-['DM_Sans',sans-serif] font-medium leading-[1.2] w-full block text-center break-words px-0.5">
+                              Only {tierRemainingSeats} seat(s) left — not enough for this pass.
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between bg-[#080808] border border-white/10 rounded w-full overflow-hidden shrink-0 h-6 md:h-10 mt-auto">
+                          <button
+                            type="button"
+                            onClick={() => setCart((previousState) => ({ ...previousState, [tier.key]: Math.max(0, (previousState[tier.key] || 0) - 1) }))}
+                            disabled={quantity === 0}
+                            aria-label={`Decrease ${tier.name} quantity`}
+                            className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <span className="material-symbols-outlined text-[14px] md:text-[18px]">remove</span>
+                          </button>
+                          <span className="font-['Hind',sans-serif] text-xs md:text-base font-bold text-white w-1/3 text-center leading-none">{quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => setCart((previousState) => ({ ...previousState, [tier.key]: Math.min(10, (previousState[tier.key] || 0) + 1) }))}
+                            disabled={quantity >= 10 || (seatsRemaining !== null && (quantity * tier.seats >= seatsRemaining || totalSeats + tier.seats > seatsRemaining))}
+                            aria-label={`Increase ${tier.name} quantity`}
+                            className="w-1/3 h-full flex items-center justify-center hover:bg-[#FF6B1A]/20 transition-all text-[#FF6B1A] disabled:text-[#a3a3a3] disabled:hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <span className="material-symbols-outlined text-[14px] md:text-[18px]">add</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
