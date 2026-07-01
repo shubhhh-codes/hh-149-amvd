@@ -1,4 +1,4 @@
-import { test, expect } from '../utils/auditFixture';
+﻿import { test, expect } from '../utils/auditFixture';
 import { mockAdminSession } from '../utils/authUtils';
 import { mockCameraPermission } from '../utils/mockUtils';
 
@@ -15,7 +15,7 @@ test.describe('QR Scanner - Runtime Failures', () => {
   test('TC-011: Should ignore crash in BarcodeDetector and fallback/recover gracefully', async ({ page }) => {
     // Inject a crashing BarcodeDetector
     await page.addInitScript(() => {
-      window['BarcodeDetector'] = class MockBD {
+      (window as any)['BarcodeDetector'] = class MockBD {
         constructor() {}
         async detect(): Promise<any[]> {
           throw new Error('Simulated decoder crash');

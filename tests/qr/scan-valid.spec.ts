@@ -1,4 +1,4 @@
-import { test, expect } from '../utils/auditFixture';
+﻿import { test, expect } from '../utils/auditFixture';
 import { mockAdminSession } from '../utils/authUtils';
 import { mockCameraPermission } from '../utils/mockUtils';
 
@@ -13,11 +13,11 @@ test.describe('QR Scanner - Valid Scanning Flows', () => {
     
     // Inject mock BarcodeDetector
     await page.addInitScript(() => {
-      window['BarcodeDetector'] = class MockBD {
+      (window as any)['BarcodeDetector'] = class MockBD {
         constructor() {}
         async detect() {
           return new Promise(resolve => {
-            window['triggerQRScan'] = (val: string) => {
+            (window as any)['triggerQRScan'] = (val: string) => {
               resolve([{ rawValue: val, boundingBox: { x: 0, y: 0, width: 100, height: 100 }, cornerPoints: [] }]);
             };
           });
@@ -56,9 +56,9 @@ test.describe('QR Scanner - Valid Scanning Flows', () => {
     // Wait for the scanner to be ready (video visible)
     await expect(page.locator('video').first()).toBeVisible();
 
-    await page.waitForFunction(() => typeof window['triggerQRScan'] === 'function');
+    await page.waitForFunction(() => typeof (window as any)['triggerQRScan'] === 'function');
     await page.evaluate(() => {
-      window['triggerQRScan']('VALID-1234');
+      (window as any)['triggerQRScan']('VALID-1234');
     });
 
     // Wait for the booking details to show up
