@@ -10,6 +10,12 @@ export default function TicketTiersManager() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Early Bird promotion states
+  const [earlyBirdActive, setEarlyBirdActive] = useState(false);
+  const [earlyBirdPrice, setEarlyBirdPrice] = useState(119);
+  const [earlyBirdMaxBookings, setEarlyBirdMaxBookings] = useState(30);
+  const [earlyBirdCreatedAt, setEarlyBirdCreatedAt] = useState<any>(new Date());
+
   useEffect(() => {
     fetchTiers();
   }, []);
@@ -23,6 +29,12 @@ export default function TicketTiersManager() {
         setVenue(data.venue || '');
         setDate(data.date || '');
         setTime(data.time || '');
+        if (data.earlyBird) {
+          setEarlyBirdActive(data.earlyBird.isActive ?? false);
+          setEarlyBirdPrice(data.earlyBird.price ?? 119);
+          setEarlyBirdMaxBookings(data.earlyBird.maxBookings ?? 30);
+          setEarlyBirdCreatedAt(data.earlyBird.createdAt ? new Date(data.earlyBird.createdAt) : new Date());
+        }
       }
     } catch (err) {
       console.error(err);
@@ -38,7 +50,18 @@ export default function TicketTiersManager() {
       const res = await fetch('/api/admin/cms/ticket-tiers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tiers: updatedTiers, venue, date, time }),
+        body: JSON.stringify({
+          tiers: updatedTiers,
+          venue,
+          date,
+          time,
+          earlyBird: {
+            isActive: earlyBirdActive,
+            price: earlyBirdPrice,
+            maxBookings: earlyBirdMaxBookings,
+            createdAt: earlyBirdCreatedAt
+          }
+        }),
       });
       if (res.ok) {
         setTiers(updatedTiers);
@@ -52,6 +75,12 @@ export default function TicketTiersManager() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleLaunchReset = () => {
+    const newDate = new Date();
+    setEarlyBirdCreatedAt(newDate);
+    alert('A new 48-hour countdown has started.');
   };
 
   const handleUpdate = (index: number, field: string, value: any) => {
@@ -95,6 +124,61 @@ export default function TicketTiersManager() {
             <label className="text-xs text-white/60">Time</label>
             <input type="text" value={time} onChange={(e) => setTime(e.target.value)} className="w-full bg-[#080808] p-2 rounded border border-white/10 mt-1" placeholder="e.g. 8:30 PM" />
           </div>
+        </div>
+      </div>
+
+      <div className="bg-[#141414] p-4 rounded-xl border border-white/10 space-y-4">
+        <h3 className="font-bold text-white/80 border-b border-white/10 pb-2 mb-4">Early Bird Special Settings</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex items-center space-x-3 h-full pt-6">
+            <input
+              type="checkbox"
+              id="earlyBirdActive"
+              checked={earlyBirdActive}
+              onChange={(e) => setEarlyBirdActive(e.target.checked)}
+              className="w-5 h-5 rounded border-white/10 bg-[#080808] text-primary-container focus:ring-0 focus:ring-offset-0"
+            />
+            <label htmlFor="earlyBirdActive" className="text-sm font-medium text-white/80 cursor-pointer">
+              Activate Early Bird Offer
+            </label>
+          </div>
+          <div className="flex flex-col justify-end">
+            <span className="text-xs text-white/40">Offer Created At</span>
+            <span className="text-sm font-semibold text-white/80 mt-1">
+              {earlyBirdCreatedAt ? new Date(earlyBirdCreatedAt).toLocaleString() : 'Not launched yet'}
+            </span>
+          </div>
+          <div>
+            <label className="text-xs text-white/60">Early Bird Price (₹)</label>
+            <input
+              type="number"
+              value={earlyBirdPrice}
+              onChange={(e) => setEarlyBirdPrice(Number(e.target.value))}
+              className="w-full bg-[#080808] p-2 rounded border border-white/10 mt-1 text-white"
+              placeholder="119"
+              min={1}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/60">Max Bookings (Limit)</label>
+            <input
+              type="number"
+              value={earlyBirdMaxBookings}
+              onChange={(e) => setEarlyBirdMaxBookings(Number(e.target.value))}
+              className="w-full bg-[#080808] p-2 rounded border border-white/10 mt-1 text-white"
+              placeholder="30"
+              min={1}
+            />
+          </div>
+        </div>
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={handleLaunchReset}
+            className="bg-[#FF6B1A] hover:bg-[#FF6B1A]/90 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors"
+          >
+            Launch / Reset Offer
+          </button>
         </div>
       </div>
 

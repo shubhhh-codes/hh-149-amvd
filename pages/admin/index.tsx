@@ -24,6 +24,12 @@ interface Booking {
   attended?: boolean;
   attendedAt?: string;
   createdAt: string;
+  cart?: Array<{
+    tierKey: string;
+    units: number;
+    seats: number;
+    price: number;
+  }>;
 }
 
 interface ComedianProfile {
@@ -799,7 +805,24 @@ export default function AdminPanel() {
                         </div>
                         <div>
                           <div className="font-label-caps text-on-surface/40 text-[10px] mb-1">TICKETS</div>
-                          <div className="text-sm">{booking.numberOfTickets} x General Admin</div>
+                          {booking.cart && Array.isArray(booking.cart) && booking.cart.length > 0 ? (
+                            booking.cart.map((item, idx) => {
+                              let displayName = item.tierKey;
+                              if (item.tierKey === 'early') displayName = 'Early Bird';
+                              else if (item.tierKey.toLowerCase() === 'solo' || item.tierKey.toLowerCase() === 'single') displayName = 'Single';
+                              else if (item.tierKey === 'couple' || item.tierKey === 'duo') displayName = 'Duo';
+                              else if (item.tierKey === 'squad') displayName = 'Squad';
+                              
+                              displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+                              return (
+                                <div key={idx} className="text-sm font-medium">
+                                  {item.units} x {displayName}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-sm">{booking.numberOfTickets} x General Admin</div>
+                          )}
                         </div>
                         <div>
                           <div className="font-label-caps text-on-surface/40 text-[10px] mb-1">ATTENDANCE</div>

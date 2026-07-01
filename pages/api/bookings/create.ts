@@ -42,6 +42,32 @@ async function handler(
     const client = await clientPromise;
     const db = client.db();
 
+    // Early Bird Expiration Check
+    const hasEarlyBird = cart && Array.isArray(cart) && cart.some((item: any) => item.tierKey === 'early');
+    if (hasEarlyBird) {
+      const settings = await db.collection('settings').findOne({ type: 'ticket-tiers' });
+      const earlyBird = settings?.earlyBird || { isActive: false, price: 119, maxBookings: 30, createdAt: new Date() };
+
+      const earlyBirdBookings = await db.collection('bookings')
+        .aggregate([
+          { $match: { status: 'approved', 'cart.tierKey': 'early' } },
+          { $unwind: '$cart' },
+          { $match: { 'cart.tierKey': 'early' } },
+          { $group: { _id: null, total: { $sum: '$cart.units' } } }
+        ])
+        .toArray();
+      const earlyBirdSold = earlyBirdBookings[0]?.total || 0;
+
+      const createdAtTime = earlyBird.createdAt ? new Date(earlyBird.createdAt).getTime() : 0;
+      const isExpired = !earlyBird.isActive ||
+                        (Date.now() - createdAtTime > 48 * 60 * 60 * 1000) ||
+                        (earlyBirdSold >= (earlyBird.maxBookings ?? 30));
+
+      if (isExpired) {
+        return res.status(400).json({ message: 'The Early Bird offer has expired. Please select a Solo Pass.' });
+      }
+    }
+
     // Atomically increment booked seats to prevent race conditions
     const inventoryResult = await db.collection('inventory').findOneAndUpdate(
       { type: 'venue_capacity' },

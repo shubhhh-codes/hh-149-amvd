@@ -140,12 +140,12 @@ export default function ShowsPage({ showsData }: { showsData: any }) {
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-4">
-                    {nextShow.metadata?.bookMyShowUrl && (
-                      <Link href={nextShow.metadata.bookMyShowUrl} target="_blank" className="bg-primary-container text-[#0A0A0A] px-8 py-4 rounded-full font-bold transition-all hover:bg-primary-container/90 flex items-center justify-center gap-2 btn-pulse">
-                        Book on BookMyShow
-                        <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 0" }}>arrow_forward</span>
-                      </Link>
-                    )}
+                     {nextShow.metadata?.bookMyShowUrl && nextShow.metadata.bookMyShowUrl.trim() !== "" && (
+                       <Link href={nextShow.metadata.bookMyShowUrl} target="_blank" className="bg-primary-container text-[#0A0A0A] px-8 py-4 rounded-full font-bold transition-all hover:bg-primary-container/90 flex items-center justify-center gap-2 btn-pulse">
+                         Book on BookMyShow
+                         <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 0" }}>arrow_forward</span>
+                       </Link>
+                     )}
                     <Link href="/book-tickets" className="border border-white/20 text-white px-8 py-4 rounded-full font-bold transition-all hover:bg-white/5 flex items-center justify-center gap-2">
                       Book on Our Website
                       <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 0" }}>arrow_forward</span>

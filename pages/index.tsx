@@ -258,7 +258,7 @@ export default function Home({ performers, gallery, nextShow }: Props) {
                   <Link href="/book-tickets" className="flex-1 bg-primary-container text-brand-black font-headline-sm text-headline-sm rounded-full px-6 py-4 text-center hover:bg-primary-container/90 transition-colors">
                     Book on Our Website →
                   </Link>
-                  {nextShow.metadata?.bookMyShowUrl && (
+                  {nextShow.metadata?.bookMyShowUrl && nextShow.metadata.bookMyShowUrl.trim() !== "" && (
                     <a href={nextShow.metadata.bookMyShowUrl} target="_blank" rel="noopener noreferrer" className="flex-1 bg-transparent border border-white/20 text-on-surface font-headline-sm text-headline-sm rounded-full px-6 py-4 text-center hover:bg-white/5 transition-colors">
                       Book on BookMyShow →
                     </a>

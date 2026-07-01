@@ -5,19 +5,19 @@ import { mockCameraPermission, mockNetworkFailure } from '../utils/mockUtils';
 test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
   test.beforeEach(async ({ page }) => {
     await mockAdminSession(page);
-    await page.route('**/api/admin/bookings', route => route.fulfill({ status: 200, json: { bookings: [] } }));
-    await page.route('**/api/admin/comedians', route => route.fulfill({ status: 200, json: { comedians: [] } }));
-    await page.route('**/api/admin/payments', route => route.fulfill({ status: 200, json: { payments: [], stats: {} } }));
-    await page.route('**/api/admin/contact-messages', route => route.fulfill({ status: 200, json: { messages: [] } }));
-    await page.route('**/api/admin/feedbacks', route => route.fulfill({ status: 200, json: { feedbacks: [] } }));
+    await page.route('**/api/admin/bookings', (route: any) => route.fulfill({ status: 200, json: { bookings: [] } }));
+    await page.route('**/api/admin/comedians', (route: any) => route.fulfill({ status: 200, json: { comedians: [] } }));
+    await page.route('**/api/admin/payments', (route: any) => route.fulfill({ status: 200, json: { payments: [], stats: {} } }));
+    await page.route('**/api/admin/contact-messages', (route: any) => route.fulfill({ status: 200, json: { messages: [] } }));
+    await page.route('**/api/admin/feedbacks', (route: any) => route.fulfill({ status: 200, json: { feedbacks: [] } }));
     
     // Inject mock BarcodeDetector
     await page.addInitScript(() => {
-      window['BarcodeDetector'] = class MockBD {
+      (window as any)['BarcodeDetector'] = class MockBD {
         constructor() {}
         async detect() {
           return new Promise(resolve => {
-            window['triggerQRScan'] = (val: string) => {
+            (window as any)['triggerQRScan'] = (val: string) => {
               resolve([{ rawValue: val, boundingBox: { x: 0, y: 0, width: 100, height: 100 }, cornerPoints: [] }]);
             };
           });
@@ -49,7 +49,7 @@ test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
     await page.click('button:has-text("QR Scanner")');
     await expect(page.locator('video:visible').first()).toBeVisible();
 
-    await page.route('**/api/admin/bookings/scan', async route => {
+    await page.route('**/api/admin/bookings/scan', async (route: any) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -68,10 +68,10 @@ test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
       });
     });
 
-    await page.waitForFunction(() => typeof window['triggerQRScan'] === 'function');
+    await page.waitForFunction(() => typeof (window as any)['triggerQRScan'] === 'function');
 
     for (let i = 0; i < 100; i++) {
-      await page.evaluate((val) => window['triggerQRScan'](val), `VALID-${i}`);
+      await page.evaluate((val) => (window as any)['triggerQRScan'](val), `VALID-${i}`);
       
       // Wait for UI to update to the scanned ticket
       await expect(page.locator('text=John Doe')).toBeVisible();
@@ -90,7 +90,7 @@ test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
     await page.click('button:has-text("QR Scanner")');
     await expect(page.locator('video:visible').first()).toBeVisible();
 
-    await page.route('**/api/admin/bookings/scan', async route => {
+    await page.route('**/api/admin/bookings/scan', async (route: any) => {
       await route.fulfill({
         status: 400,
         contentType: 'application/json',
@@ -98,10 +98,10 @@ test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
       });
     });
 
-    await page.waitForFunction(() => typeof window['triggerQRScan'] === 'function');
+    await page.waitForFunction(() => typeof (window as any)['triggerQRScan'] === 'function');
 
     const hugePayload = 'X'.repeat(50000); // 50KB payload
-    await page.evaluate((payload) => window['triggerQRScan'](payload), hugePayload);
+    await page.evaluate((payload) => (window as any)['triggerQRScan'](payload), hugePayload);
 
     // Should silently ignore, so no error toast and video remains visible
     await page.waitForTimeout(1000);
@@ -115,14 +115,14 @@ test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
     const page2 = await context.newPage();
     const page3 = await context.newPage();
 
-    const setupPage = async (p) => {
+    const setupPage = async (p: any) => {
       await mockAdminSession(p);
       await mockCameraPermission(p, 'granted');
-      await p.route('**/api/admin/bookings', route => route.fulfill({ status: 200, json: { bookings: [] } }));
-      await p.route('**/api/admin/comedians', route => route.fulfill({ status: 200, json: { comedians: [] } }));
-      await p.route('**/api/admin/payments', route => route.fulfill({ status: 200, json: { payments: [], stats: {} } }));
-      await p.route('**/api/admin/contact-messages', route => route.fulfill({ status: 200, json: { messages: [] } }));
-      await p.route('**/api/admin/feedbacks', route => route.fulfill({ status: 200, json: { feedbacks: [] } }));
+      await p.route('**/api/admin/bookings', (route: any) => route.fulfill({ status: 200, json: { bookings: [] } }));
+      await p.route('**/api/admin/comedians', (route: any) => route.fulfill({ status: 200, json: { comedians: [] } }));
+      await p.route('**/api/admin/payments', (route: any) => route.fulfill({ status: 200, json: { payments: [], stats: {} } }));
+      await p.route('**/api/admin/contact-messages', (route: any) => route.fulfill({ status: 200, json: { messages: [] } }));
+      await p.route('**/api/admin/feedbacks', (route: any) => route.fulfill({ status: 200, json: { feedbacks: [] } }));
       await p.goto('/admin');
       await p.click('button:has-text("QR Scanner")');
       await expect(p.locator('video:visible').first()).toBeVisible();
@@ -138,10 +138,10 @@ test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
     await page.click('button:has-text("QR Scanner")');
     await expect(page.locator('video:visible').first()).toBeVisible();
 
-    await page.waitForFunction(() => typeof window['triggerQRScan'] === 'function');
+    await page.waitForFunction(() => typeof (window as any)['triggerQRScan'] === 'function');
 
     // Online
-    await page.route('**/api/admin/bookings/scan', async route => {
+    await page.route('**/api/admin/bookings/scan', async (route: any) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -149,13 +149,13 @@ test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
       });
     });
     
-    await page.evaluate(() => window['triggerQRScan']('VALID-1234'));
+    await page.evaluate(() => (window as any)['triggerQRScan']('VALID-1234'));
     await expect(page.locator('text=John')).toBeVisible();
     await page.click('.material-symbols-outlined:has-text("close")');
 
     // Offline (Flap)
     await page.context().setOffline(true);
-    await page.evaluate(() => window['triggerQRScan']('VALID-1234'));
+    await page.evaluate(() => (window as any)['triggerQRScan']('VALID-1234'));
     // Should fail or show toast
     await expect(page.locator('text=Failed to process QR code').or(page.locator('text=Network error'))).toBeVisible({ timeout: 10000 }).catch(() => {});
 
@@ -164,7 +164,7 @@ test.describe('QR Scanner - Stress and Runtime Audit @stress', () => {
     
     // Use toPass to repeatedly try scanning until the camera is fully restarted and accepts scans
     await expect(async () => {
-      await page.evaluate(() => window['triggerQRScan']('VALID-1234-ONLINE'));
+      await page.evaluate(() => (window as any)['triggerQRScan']('VALID-1234-ONLINE'));
       await expect(page.locator('text=John')).toBeVisible({ timeout: 1000 });
     }).toPass({ timeout: 15000 });
   });

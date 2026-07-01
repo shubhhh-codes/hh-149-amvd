@@ -1,4 +1,4 @@
-import { test, expect } from '../utils/auditFixture';
+﻿import { test, expect } from '../utils/auditFixture';
 import { mockAdminSession } from '../utils/authUtils';
 import { mockCameraPermission, mockNetworkFailure } from '../utils/mockUtils';
 
@@ -13,11 +13,11 @@ test.describe('QR Scanner - Network Failures', () => {
     
     // Inject mock BarcodeDetector
     await page.addInitScript(() => {
-      window['BarcodeDetector'] = class MockBD {
+      (window as any)['BarcodeDetector'] = class MockBD {
         constructor() {}
         async detect() {
           return new Promise(resolve => {
-            window['triggerQRScan'] = (val: string) => {
+            (window as any)['triggerQRScan'] = (val: string) => {
               resolve([{ rawValue: val, boundingBox: { x: 0, y: 0, width: 100, height: 100 }, cornerPoints: [] }]);
             };
           });
@@ -36,9 +36,9 @@ test.describe('QR Scanner - Network Failures', () => {
 
     await expect(page.locator('video').first()).toBeVisible();
 
-    await page.waitForFunction(() => typeof window['triggerQRScan'] === 'function');
+    await page.waitForFunction(() => typeof (window as any)['triggerQRScan'] === 'function');
     await page.evaluate(() => {
-      window['triggerQRScan']('SERVER-ERROR-1234');
+      (window as any)['triggerQRScan']('SERVER-ERROR-1234');
     });
 
     // Code shows 'Failed to process QR code' on catch
@@ -54,9 +54,9 @@ test.describe('QR Scanner - Network Failures', () => {
 
     await expect(page.locator('video').first()).toBeVisible();
 
-    await page.waitForFunction(() => typeof window['triggerQRScan'] === 'function');
+    await page.waitForFunction(() => typeof (window as any)['triggerQRScan'] === 'function');
     await page.evaluate(() => {
-      window['triggerQRScan']('OFFLINE-1234');
+      (window as any)['triggerQRScan']('OFFLINE-1234');
     });
 
     await expect(page.locator('text=/network error|timed out|poor connection/i')).toBeVisible({ timeout: 10000 });
